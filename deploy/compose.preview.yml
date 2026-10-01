@@ -1,0 +1,35 @@
+# Reference deployment configuration. No host ports are published.
+# On Coolify, use Dockerfile application settings from COOLIFY.md instead.
+services:
+  signalfoundry:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    environment:
+      SIGNALFOUNDRY_PREVIEW_ORIGIN: ${SIGNALFOUNDRY_PREVIEW_ORIGIN:?Set one exact HTTPS origin}
+    expose:
+      - "8080"
+    volumes:
+      - signalfoundry-data:/app/data
+    secrets:
+      - source: preview_htpasswd
+        target: preview.htpasswd
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 128
+    restart: unless-stopped
+    stop_grace_period: 30s
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+volumes:
+  signalfoundry-data:
+secrets:
+  preview_htpasswd:
+    file: ./secrets/preview.htpasswd
