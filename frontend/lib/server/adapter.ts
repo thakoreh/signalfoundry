@@ -5,7 +5,6 @@ export type FunctionName =
   | "workspaces.analyze"
   | "workspaces.provision"
   | "workspaces.saveProfile"
-  | "workspaces.loadDemo"
   | "campaigns.list"
   | "campaigns.create"
   | "campaigns.get"
@@ -270,11 +269,6 @@ export async function handleApi(
         }),
       );
     }
-    if (route === "POST /demo/reset") {
-      admin();
-      keys(body, []);
-      return json(await invoke("workspaces.loadDemo"));
-    }
     if (route === "GET /health") {
       await invoke("workspaces.get");
       return json({
@@ -287,7 +281,7 @@ export async function handleApi(
     if (route === "GET /campaigns") return json(await invoke("campaigns.list"));
     if (route === "POST /campaigns") {
       keys(body, ["name", "mode", "domains"]);
-      if (body.mode !== "manual" && body.mode !== "demo")
+      if (body.mode !== "manual")
         fail(400, "Choose a valid research mode.");
       return json(
         await invoke("campaigns.create", {

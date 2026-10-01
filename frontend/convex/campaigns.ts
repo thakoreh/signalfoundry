@@ -31,6 +31,8 @@ export const create = tenantMutation({
   },
   returns: validators.campaign,
   handler: async (ctx, args) => {
+    if (args.mode === "demo")
+      throw appError("VALIDATION_ERROR", "Demo campaigns are not available");
     const workspace = await requireWorkspace(ctx, ctx.principal.orgId);
     if (!workspace.profile)
       throw appError(

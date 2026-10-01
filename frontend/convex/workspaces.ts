@@ -5,7 +5,6 @@ import { internal } from "./_generated/api";
 import { adminAction, adminMutation, tenantQuery } from "./lib/auth";
 import { getWorkspace, requireWorkspace, workspaceResult } from "./lib/records";
 import { normalizeWebsite, validateProfile } from "./lib/validation";
-import { DEMO_PROFILE } from "./lib/fixtures";
 import { callWorker, WorkerFailure, workerConfiguration } from "./lib/worker";
 import * as validators from "./validators";
 
@@ -62,20 +61,54 @@ export const saveProfile = adminMutation({
     return workspaceResult({ ...row, ...patch });
   },
 });
-export const loadDemo = adminMutation({
+export const cleanupDemo = adminMutation({
   args: {},
-  returns: validators.workspace,
+  returns: v.object({
+    accounts: v.number(),
+    campaigns: v.number(),
+    jobs: v.number(),
+    profileCleared: v.boolean(),
+  }),
   handler: async (ctx) => {
-    const row = await requireWorkspace(ctx, ctx.principal.orgId);
-    const patch = {
-      profile: DEMO_PROFILE,
-      name: DEMO_PROFILE.company_name,
-      website: null,
-      updatedAt: Date.now(),
-      profileVersion: row.profileVersion + 1,
-    };
-    await ctx.db.patch(row._id, patch);
-    return workspaceResult({ ...row, ...patch });
+    const orgId = ctx.principal.orgId;
+    const accountRows = await ctx.db
+      .query("accounts")
+      .withIndex("by_orgId", (q) => q.eq("orgId", orgId))
+      .collect();
+    let accounts = 0;
+    for (const row of accountRows) {
+      if (row.data.is_demo) {
+        await ctx.db.delete(row._id);
+        accounts += 1;
+      }
+    }
+    const jobRows = await ctx.db
+      .query("jobs")
+      .withIndex("by_orgId_and_mode", (q) =>
+        q.eq("orgId", orgId).eq("mode", "demo"),
+      )
+      .collect();
+    for (const row of jobRows) {
+      if (row.scheduledId) await ctx.scheduler.cancel(row.scheduledId);
+      await ctx.db.delete(row._id);
+    }
+    const campaignRows = await ctx.db
+      .query("campaigns")
+      .withIndex("by_orgId", (q) => q.eq("orgId", orgId))
+      .collect();
+    let campaigns = 0;
+    for (const row of campaignRows) {
+      if (row.mode === "demo") {
+        await ctx.db.delete(row._id);
+        campaigns += 1;
+      }
+    }
+    const workspace = await getWorkspace(ctx, orgId);
+    const profileCleared =
+      workspace?.profile?.company_name === "SignalFoundry Demo";
+    if (workspace && profileCleared)
+      await ctx.db.patch(workspace._id, { profile: null });
+    return { accounts, campaigns, jobs: jobRows.length, profileCleared };
   },
 });
 

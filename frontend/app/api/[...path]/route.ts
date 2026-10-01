@@ -12,7 +12,6 @@ const functionKinds: Record<FunctionName, "query" | "mutation" | "action"> = {
   "workspaces.analyze": "action",
   "workspaces.provision": "mutation",
   "workspaces.saveProfile": "mutation",
-  "workspaces.loadDemo": "mutation",
   "campaigns.list": "query",
   "campaigns.create": "mutation",
   "campaigns.get": "query",

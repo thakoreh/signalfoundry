@@ -51,7 +51,8 @@ export default defineSchema({
       "orgId",
       "campaignId",
       "data.domain",
-    ]),
+    ])
+    .index("by_orgId", ["orgId"]),
   jobs: defineTable({
     orgId: v.string(),
     campaignId: v.id("campaigns"),
@@ -71,7 +72,8 @@ export default defineSchema({
     countedActive: v.boolean(),
   })
     .index("by_orgId_and_idempotencyKey", ["orgId", "idempotencyKey"])
-    .index("by_orgId_and_campaignId", ["orgId", "campaignId"]),
+    .index("by_orgId_and_campaignId", ["orgId", "campaignId"])
+    .index("by_orgId_and_mode", ["orgId", "mode"]),
   usage: defineTable({
     orgId: v.string(),
     month: v.string(),

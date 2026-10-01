@@ -134,14 +134,13 @@ test("every REST mapping is explicit and forwards only its documented arguments"
       "workspaces.analyze",
       { website: "https://business.example" },
     ],
-    ["demo/reset", "POST", {}, "workspaces.loadDemo", {}],
     ["campaigns", "GET", undefined, "campaigns.list", {}],
     [
       "campaigns",
       "POST",
-      { name: "Demo", mode: "demo", domains: [] },
+      { name: "Research", mode: "manual", domains: ["business.example"] },
       "campaigns.create",
-      { name: "Demo", mode: "demo", domains: [] },
+      { name: "Research", mode: "manual", domains: ["business.example"] },
     ],
     ["campaigns/c1", "GET", undefined, "campaigns.get", { id: "c1" }],
     [
@@ -204,6 +203,18 @@ test("every REST mapping is explicit and forwards only its documented arguments"
     assert.match(result.response.headers.get("cache-control")!, /no-store/);
   }
 });
+test("SaaS no longer exposes demo reset or demo campaign creation", async () => {
+  const reset = await call("demo/reset", "POST", {});
+  assert.equal(reset.response.status, 404);
+  assert.equal(reset.calls.length, 0);
+  const campaign = await call("campaigns", "POST", {
+    name: "Fictional demo",
+    mode: "demo",
+    domains: [],
+  });
+  assert.equal(campaign.response.status, 400);
+  assert.equal(campaign.calls.length, 0);
+});
 test("tenant/function/price spoofing and unknown arguments never reach Convex", async () => {
   for (const [path, body] of [
     ["workspace", { orgId: "org_b" }],
@@ -231,7 +242,6 @@ test("members can research and review but cannot administer profile, workspace, 
   for (const path of [
     "workspace",
     "workspace/analyze",
-    "demo/reset",
     "billing/checkout",
     "billing/portal",
   ]) {

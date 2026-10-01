@@ -120,6 +120,8 @@ export const start = tenantMutation({
       ctx.principal.orgId,
       args.campaignId,
     );
+    if (campaign.mode === "demo")
+      throw appError("VALIDATION_ERROR", "Demo jobs are not available");
     const existing = await ctx.db
       .query("jobs")
       .withIndex("by_orgId_and_idempotencyKey", (q) =>
