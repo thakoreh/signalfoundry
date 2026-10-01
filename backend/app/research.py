@@ -52,8 +52,15 @@ class RulesDecisionProvider:
         is_demo = fixture is not None
         text = page.text
         matched_keywords = [x for x in profile.keywords if matches(x, text)]
-        matched_industries = [x for x in profile.industries if matches(x, text) or
-                             any(matches(t, text) for t in INDUSTRY_TERMS.get(x, []))]
+        # A page can describe its customers' industries. Do not treat those
+        # navigation/use-case mentions as the company's own business identity.
+        inferred_industry = fixture['industry'] if fixture else next(
+            (label for source in (page.title, page.description)
+             for label, terms in INDUSTRY_TERMS.items()
+             if any(matches(t, source) for t in terms)), 'Unknown')
+        matched_industries = [x for x in profile.industries if
+                             x.casefold() == inferred_industry.casefold() or
+                             (inferred_industry == 'Unknown' and matches(x, page.title))]
         matched_roles = [x for x in profile.buyer_roles if matches(x, text)]
         matched_signals = [x for x in SIGNAL_TERMS if matches(x, text)]
         exclusions = [x for x in profile.exclusions if matches(x, text)]
@@ -72,6 +79,11 @@ class RulesDecisionProvider:
             breakdown.append(ScoreComponent(label='Exclusion penalty', points=-50, max_points=0,
                                              reason='Excluded website language: ' + ', '.join(exclusions)))
         score = max(0, min(100, sum(x.points for x in breakdown)))
+        if profile.industries and not matched_industries and score >= 65:
+            breakdown.append(ScoreComponent(label='Unconfirmed industry fit',
+                points=64-score, max_points=0,
+                reason='Company identity does not establish the target industry; score capped below strong fit'))
+            score = 64
         evidence = [Evidence(id=new_id('ev'), title=('Fictional demo: ' if is_demo else '') + page.title,
                              url=page.url, excerpt=(('Fictional fixture. ' if is_demo else '') + (page.description or text[:400]))[:600],
                              kind='company', published_at=None, retrieved_at=timestamp, is_demo=is_demo)]
@@ -100,7 +112,8 @@ class RulesDecisionProvider:
         else:
             unknowns.extend(['Employee count is unknown', 'Company location is unknown',
                              'Industry is suggested by website language, not independently verified'])
-        inferred_industry = next((label for label, terms in INDUSTRY_TERMS.items() if any(matches(t, text) for t in terms)), 'Unknown')
+        if profile.industries and not matched_industries:
+            unknowns.append('Company identity does not establish the target industry; customer/use-case mentions are not company classification')
         contacts = [Contact(name=None, role=profile.buyer_roles[0] if profile.buyer_roles else 'Relevant decision-maker',
                             email=None, verification_status='not_available', source_url=None,
                             note='Suggested role to research, not an identified person. Contact provider is not configured.')]
