@@ -1,7 +1,6 @@
 import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { internal } from "./_generated/api";
-import { demoAccounts } from "./lib/fixtures";
 import { callWorker, WorkerFailure } from "./lib/worker";
 import type { Profile, WorkerAccount } from "./validators";
 import type { Id } from "./_generated/dataModel";
@@ -20,16 +19,7 @@ export const execute = internalAction({
     if (!work) return null;
     try {
       let result: { accounts: WorkerAccount[]; errors: string[] };
-      if (work.mode === "demo")
-        result = {
-          accounts: demoAccounts(
-            work.profile,
-            work.campaignId,
-            new Date().toISOString(),
-          ),
-          errors: [],
-        };
-      else {
+      {
         const response = await callWorker("/worker/research", {
           profile: work.profile,
           campaign_id: work.campaignId,

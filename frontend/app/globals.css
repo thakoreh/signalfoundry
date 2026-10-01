@@ -1267,6 +1267,7 @@ legend {
   padding-right: 0;
 }
 .table-scroll {
+  position: relative;
   overflow-x: auto;
 }
 .accounts-table {

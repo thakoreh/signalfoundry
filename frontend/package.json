@@ -11,6 +11,7 @@
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "format": "prettier --write app components lib tests proxy.ts next.config.ts eslint.config.mjs",
     "format:check": "prettier --check app components lib tests proxy.ts next.config.ts eslint.config.mjs",
+    "test:landing": "vitest run --config vitest.landing.config.ts",
     "test:convex": "vitest run --config vitest.config.ts"
   },
   "dependencies": {

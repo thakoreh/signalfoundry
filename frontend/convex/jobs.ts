@@ -318,6 +318,10 @@ export const claim = internalMutation({
       args.attempt > row.maxAttempts
     )
       return null;
+    if (row.mode !== "manual") {
+      await failJob(ctx, row, "Demo research is disabled", false);
+      return null;
+    }
     if (row.mode === "manual") {
       try {
         await entitled(ctx, row.orgId, row.domains.length);
@@ -449,8 +453,8 @@ export const finish = internalMutation({
       activeJobId: undefined,
       account_count: args.accounts.length + retained.length,
       qualified_count:
-        args.accounts.filter((account) => account.score >= 60).length +
-        retained.filter((account) => account.score >= 60).length,
+        args.accounts.filter((account) => account.score >= 65).length +
+        retained.filter((account) => account.score >= 65).length,
       errors: args.errors,
       updated_at: iso(Date.now()),
     });

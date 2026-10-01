@@ -78,6 +78,8 @@ describe("Stripe action contract mocks (no provider network)", () => {
     vi.setSystemTime(new Date("2026-10-01T12:00:05Z"));
     const result = await admin.action(api.stripe.checkout, { requestId });
     expect(result.url).toBe("https://checkout.stripe.com/session-fixture");
+    expect(fake.createSession.mock.calls[0][0].success_url).toBe("https://app.example.com/workspace?billing=return");
+    expect(fake.createSession.mock.calls[0][0].cancel_url).toBe("https://app.example.com/workspace?billing=cancelled");
     expect(fake.createSession.mock.calls[1]).toEqual(
       fake.createSession.mock.calls[0],
     );
@@ -177,7 +179,7 @@ describe("Stripe action contract mocks (no provider network)", () => {
     fake.createPortal.mockResolvedValue({ url: "https://billing.stripe.com/session-fixture" });
     await admin.action(api.stripe.portal, { requestId: crypto.randomUUID() });
     expect(fake.createPortal.mock.calls[0][0]).toEqual({
-      customer: "cus_alpha", return_url: "https://app.example.com",
+      customer: "cus_alpha", return_url: "https://app.example.com/workspace",
       configuration: "bpc_signalfoundry_staging",
     });
   });
@@ -189,7 +191,7 @@ describe("Stripe action contract mocks (no provider network)", () => {
     await admin.action(api.stripe.portal, { requestId: crypto.randomUUID() });
     expect(fake.createPortal.mock.calls[0][0]).toEqual({
       customer: "cus_alpha",
-      return_url: "https://app.example.com",
+      return_url: "https://app.example.com/workspace",
     });
   });
 });

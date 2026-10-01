@@ -1,7 +1,7 @@
 /// <reference types="vite/client" />
 import { convexTest } from "convex-test";
-import { describe, expect, it } from "vitest";
-import { api } from "../convex/_generated/api";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
 
 const modules = import.meta.glob("../convex/**/*.ts");
@@ -147,7 +147,15 @@ async function seeded() {
   return { t, admin, ids };
 }
 
+afterEach(()=>vi.useRealTimers());
 describe("SaaS no-demo boundary", () => {
+  it("fails closed when an old scheduled demo job reaches dispatch", async()=>{
+    vi.useFakeTimers();const {t,admin,ids}=await seeded();
+    await t.run(async(ctx)=>{await ctx.db.delete(ids.demoAccount);await ctx.db.patch(ids.demoJob,{status:"queued",attempt:0});await ctx.db.patch(ids.demoCampaign,{activeJobId:ids.demoJob});});
+    await t.action(internal.research.execute,{id:ids.demoJob,attempt:1});
+    expect((await admin.query(api.jobs.get,{id:ids.demoJob})).status).toBe("failed");
+    expect(await admin.query(api.campaigns.accounts,{id:ids.demoCampaign})).toEqual([]);
+  });
   it("admin cleanup removes only fictional rows and the exact demo profile", async () => {
     const { t, admin, ids } = await seeded();
     await expect(admin.mutation(api.workspaces.cleanupDemo, {})).resolves.toMatchObject({
@@ -170,6 +178,13 @@ describe("SaaS no-demo boundary", () => {
     expect(remaining.accounts.map((row) => row._id)).toEqual([ids.realAccount]);
   });
 
+  it("releases only the capacity reserved by deleted fictional jobs", async () => {
+    const {t,admin,ids}=await seeded();
+    const global=await t.run(async(ctx)=>{await ctx.db.patch(ids.demoJob,{countedActive:true});await ctx.db.patch(ids.workspace,{activeJobs:1});return ctx.db.insert('systemLimits',{key:'research',activeJobs:3});});
+    await admin.mutation(api.workspaces.cleanupDemo,{});
+    const result=await t.run(async(ctx)=>({workspace:await ctx.db.get(ids.workspace),global:await ctx.db.get(global)}));
+    expect(result.workspace?.activeJobs).toBe(0);expect(result.global?.activeJobs).toBe(2);
+  });
   it("does not clear a real profile when fictional rows are absent", async () => {
     const { admin } = await seeded();
     await admin.mutation(api.workspaces.saveProfile, { profile: profile("Real Company") });

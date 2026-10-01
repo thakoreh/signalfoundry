@@ -57,6 +57,75 @@ class JevTest(unittest.TestCase):
         self.assertEqual(account.employee_range, 'Unknown')
         self.assertTrue(all(c.email is None for c in account.contacts))
 
+    def test_not_fit_qualification_overrides_high_fit_score(self):
+        data = response_data()
+        data['answers']['qualification'].update(
+            choice='not_fit', probabilities={'fit': 0.05, 'not_fit': 0.9, 'unknown': 0.05})
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.score, 0)
+        self.assertEqual(account.score_breakdown[0].points, 0)
+        self.assertEqual(account.confidence, 'low')
+
+    def test_sparse_probability_maps_are_accepted_as_zero_filled(self):
+        data = response_data()
+        data['answers']['qualification'].update(choice='fit', probabilities={'fit': 1.0})
+        data['answers']['fit_score'].update(score=4.0, probabilities={'4': 1.0})
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.score, 100)
+
+    def test_usage_is_strictly_typed_and_bounded(self):
+        for usage in ({'input_tokens': 100, 'output_tokens': 20, 'unexpected': 1},
+                      {'input_tokens': -1, 'output_tokens': 20},
+                      {'input_tokens': 100}):
+            with self.subTest(usage=usage):
+                data = response_data()
+                data['usage'] = usage
+                raw = json.dumps(data).encode()
+                provider = JevDecisionProvider(
+                    self.api_key,
+                    transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+                )
+
+                account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+                self.assertEqual(account.decision_engine, 'rules')
+                self.assertIn('Rules fallback used', account.unknowns[0])
+
+    def test_low_model_confidence_is_exposed_and_downgrades_account(self):
+        data = response_data()
+        data['answers']['qualification']['confidence'] = 0.2
+        data['answers']['fit_score']['confidence'] = 0.3
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.confidence, 'low')
+        self.assertLess(account.score, 65)
+        self.assertIn('review', account.score_breakdown[0].reason.lower())
+        self.assertIn('qualification 0.20', account.unknowns[0])
+        self.assertIn('fit score 0.30', account.unknowns[0])
+
     def test_malformed_out_of_range_nonfinite_and_unknown_model_fallback(self):
         cases = []
         data = response_data(); data['answers']['fit_score']['score'] = 9.0; cases.append(data)

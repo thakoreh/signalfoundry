@@ -19,6 +19,17 @@ class PreviewTest(unittest.TestCase):
             with self.subTest(origin=origin), self.assertRaises(ValueError):
                 preview_origin(origin)
 
+    def test_public_preview_cannot_load_or_create_fictional_data(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
+                'SIGNALFOUNDRY_PREVIEW_ORIGIN': 'https://preview.company.com',
+                'SIGNALFOUNDRY_PUBLIC_ACCESS': 'true',
+                'SIGNALFOUNDRY_DB_PATH': str(Path(tmp) / 'preview.sqlite3')}):
+            with TestClient(create_app(testing=True)) as client:
+                headers={'Origin':'https://preview.company.com'}
+                self.assertEqual(client.post('/api/demo/reset',json={},headers=headers).status_code,410)
+                self.assertEqual(client.post('/api/campaigns',json={'name':'Demo','mode':'demo','domains':[]},headers=headers).status_code,410)
+                self.assertIsNone(client.get('/api/workspace').json()['profile'])
+
     def test_public_preview_health_does_not_claim_password_protection(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
                 'SIGNALFOUNDRY_PREVIEW_ORIGIN': 'https://preview.company.com',

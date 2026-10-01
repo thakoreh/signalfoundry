@@ -104,10 +104,16 @@ export const cleanupDemo = adminMutation({
       }
     }
     const workspace = await getWorkspace(ctx, orgId);
+    const released = jobRows.filter((row) => row.countedActive).length;
+    if (released && workspace) {
+      await ctx.db.patch(workspace._id, {activeJobs: Math.max(0, workspace.activeJobs-released)});
+      const global = await ctx.db.query('systemLimits').withIndex('by_key',q=>q.eq('key','research')).unique();
+      if (global) await ctx.db.patch(global._id,{activeJobs:Math.max(0,global.activeJobs-released)});
+    }
     const profileCleared =
       workspace?.profile?.company_name === "SignalFoundry Demo";
     if (workspace && profileCleared)
-      await ctx.db.patch(workspace._id, { profile: null });
+      await ctx.db.patch(workspace._id, { profile: null, name: 'Your workspace', website: null, profileVersion: workspace.profileVersion+1, updatedAt: Date.now() });
     return { accounts, campaigns, jobs: jobRows.length, profileCleared };
   },
 });

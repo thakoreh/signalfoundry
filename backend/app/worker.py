@@ -23,7 +23,7 @@ from fastapi.responses import JSONResponse
 from pydantic import Field, StringConstraints, model_validator
 
 from .models import Account, AnalyzeRequest, Profile, StrictModel, URLText
-from .research import RulesDecisionProvider, demo_accounts, infer_profile
+from .research import RulesDecisionProvider, infer_profile
 from .safety import FetchError, fetch_public_page, normalize_url
 from .worker_config import WorkerSettings
 
@@ -43,13 +43,13 @@ RESEARCH_DEADLINE_SECONDS = 105.0
 class ResearchRequest(StrictModel):
     profile: Profile
     campaign_id: Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{1,128}$')]
-    mode: Literal['demo', 'manual']
+    mode: Literal['manual']
     domains: list[URLText] = Field(max_length=10)
 
     @model_validator(mode='after')
     def valid_domains(self):
-        if (self.mode == 'manual' and not self.domains) or (self.mode == 'demo' and self.domains):
-            raise ValueError('Manual research requires domains; demo research requires an empty domain list')
+        if not self.domains:
+            raise ValueError('Manual research requires public business domains')
         return self
 
 
@@ -207,8 +207,6 @@ def create_worker() -> FastAPI:
 
     @app.post('/worker/research', response_model=ResearchResponse)
     def research(body: ResearchRequest):
-        if body.mode == 'demo':
-            return ResearchResponse(accounts=demo_accounts(body.profile, body.campaign_id), errors=[])
         # Each domain gets one fetch (8s incl. DNS/redirects) and at most one Jev
         # call (8s). Four lanes finish ten domains in <=48s network budget.
         # Admission caps total work at two requests / eight domain lanes.

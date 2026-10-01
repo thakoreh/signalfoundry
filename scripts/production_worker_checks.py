@@ -59,12 +59,12 @@ def run_case(configured):
             assert request('/api/workspace')[0] == 404
             if configured:
                 sys.path.insert(0, str(ROOT / 'backend'))
-                from app.fixtures import DEMO_PROFILE
-                body = {'profile': DEMO_PROFILE.model_dump(), 'campaign_id': 'integration', 'mode': 'demo', 'domains': []}
+                from app.models import Profile
+                profile = Profile(company_name='HTTP worker test', description='Disposable integration test', industries=[], company_sizes=[], geographies=[], buyer_roles=[], keywords=[], exclusions=[])
+                body = {'profile': profile.model_dump(), 'campaign_id': 'integration', 'mode': 'demo', 'domains': []}
                 status, headers, result = request('/worker/research', body, True)
-                assert status == 200 and len(result['accounts']) == 8 and result['errors'] == []
+                assert status == 422, 'Worker must reject retired fictional-data mode'
                 assert len(headers['X-Request-ID']) == 32
-                assert all(item['is_demo'] and item['decision_engine'] == 'rules' for item in result['accounts'])
             assert list(Path(tmp).iterdir()) == [], 'Worker unexpectedly wrote files'
         finally:
             process.terminate()
@@ -80,7 +80,7 @@ def run_case(configured):
 def run():
     run_case(False)
     run_case(True)
-    print('PASS: local HTTP worker missing-token fail-closed, auth, readiness, demo research, request ID, no demo API, no files, token redaction')
+    print('PASS: local HTTP worker missing-token fail-closed, auth, readiness, fictional-data rejection, request ID, no demo API, no files, token redaction')
     print('Not run: Docker image, TLS reverse proxy, managed Convex reachability, live public fetch, paid Jev')
 
 

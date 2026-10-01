@@ -4,9 +4,9 @@ import { runtimeConfig } from "@/lib/runtime-config";
 import { SetupState } from "@/components/setup-state";
 import "./globals.css";
 export const metadata: Metadata = {
-  title: "SignalFoundry — Find your next right customer",
+  title: "SignalFoundry | Prospect research that earns your next conversation",
   description:
-    "Evidence-led account research. Build your ideal customer profile, prioritize accounts, and turn public signals into thoughtful outreach.",
+    "Turn company websites into an evidence-backed prospect shortlist. Define your ideal customer, qualify accounts, and prepare outreach you can review.",
 };
 export const dynamic = "force-dynamic";
 export default function RootLayout({
@@ -23,8 +23,8 @@ export default function RootLayout({
             dynamic
             signInUrl="/sign-in"
             signUpUrl="/sign-up"
-            signInFallbackRedirectUrl="/"
-            signUpFallbackRedirectUrl="/"
+            signInFallbackRedirectUrl="/workspace"
+            signUpFallbackRedirectUrl="/workspace"
           >
             {children}
           </ClerkProvider>

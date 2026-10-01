@@ -3,18 +3,19 @@ import { convexTest } from "convex-test";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
-import { DEMO_PROFILE, demoAccounts } from "../convex/lib/fixtures";
+import { DEMO_PROFILE, manualAccounts, configureTestWorker, grantTestSubscription } from "./helpers";
 const modules = import.meta.glob("../convex/**/*.ts");
 const identity = (
   org = "org_one",
   subject = "user_admin",
   role = "org:admin",
 ) => ({ subject, issuer: "https://clerk.test", org_id: org, org_role: role });
-async function setup() {
+async function setup(paid = false) {
   const t = convexTest(schema, modules);
   const admin = t.withIdentity(identity());
   await admin.mutation(api.workspaces.provision, {});
-  await admin.mutation(api.workspaces.loadDemo, {});
+  await admin.mutation(api.workspaces.saveProfile, { profile: DEMO_PROFILE });
+  if (paid) { configureTestWorker(); await grantTestSubscription(t); }
   return { t, admin };
 }
 function configured() {
@@ -38,12 +39,21 @@ afterEach(() => {
 });
 
 describe("durable jobs (local Convex mock)", () => {
-  it("atomically schedules and completes a demo without worker access, duplicate saves or quota leaks", async () => {
-    const { t, admin } = await setup();
+  it("counts qualified prospects at the same 65-point threshold as the UI", async()=>{
+    const {t,admin}=await setup(true);
+    const campaign=await admin.mutation(api.campaigns.create,{name:'Threshold',mode:'manual',domains:['acme.com']});
+    const job=await admin.mutation(api.jobs.start,{campaignId:campaign.id,idempotencyKey:'threshold_research'});
+    await t.mutation(internal.jobs.claim,{id:job.id,attempt:1});
+    const accounts=manualAccounts(DEMO_PROFILE,campaign.id,new Date().toISOString());accounts[0].score=64;
+    await t.mutation(internal.jobs.finish,{id:job.id,attempt:1,accounts,errors:[]});
+    expect((await admin.query(api.campaigns.get,{id:campaign.id})).qualified_count).toBe(0);
+  });
+  it("atomically schedules paid manual research without duplicate saves or quota leaks", async () => {
+    const { t, admin } = await setup(true);
     const campaign = await admin.mutation(api.campaigns.create, {
       name: "Demo",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await admin.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -68,7 +78,7 @@ describe("durable jobs (local Convex mock)", () => {
     });
     expect(
       await admin.query(api.campaigns.get, { id: campaign.id }),
-    ).toMatchObject({ status: "complete", account_count: 8 });
+    ).toMatchObject({ status: "complete", account_count: 1 });
     const accounts = await admin.query(api.campaigns.accounts, {
       id: campaign.id,
     });
@@ -86,18 +96,18 @@ describe("durable jobs (local Convex mock)", () => {
         async (ctx) => (await ctx.db.query("systemLimits").first())?.activeJobs,
       ),
     ).toBe(0);
-    expect(await t.run((ctx) => ctx.db.query("usage").take(2))).toEqual([]);
+    expect(await t.run((ctx) => ctx.db.query("usage").take(2))).toHaveLength(1);
   });
   it("scopes cancellation to creator/admin and discards late results while holding running capacity", async () => {
-    const { t, admin } = await setup();
+    const { t, admin } = await setup(true);
     const owner = t.withIdentity(identity("org_one", "user_one", "org:member"));
     const colleague = t.withIdentity(
       identity("org_one", "user_two", "org:member"),
     );
     const campaign = await owner.mutation(api.campaigns.create, {
       name: "Cancel",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await owner.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -118,7 +128,7 @@ describe("durable jobs (local Convex mock)", () => {
     await t.mutation(internal.jobs.finish, {
       id: job.id,
       attempt: 1,
-      accounts: demoAccounts(
+      accounts: manualAccounts(
         DEMO_PROFILE,
         campaign.id,
         new Date().toISOString(),
@@ -144,12 +154,12 @@ describe("durable jobs (local Convex mock)", () => {
     ).toBe(0);
   });
   it("enforces per-org and global concurrency and releases queued cancellations", async () => {
-    const { t, admin } = await setup();
+    const { t, admin } = await setup(true);
     const make = async (user: typeof admin, key: string) => {
       const campaign = await user.mutation(api.campaigns.create, {
         name: key,
-        mode: "demo",
-        domains: [],
+        mode: "manual",
+        domains: ["acme.com"],
       });
       return user.mutation(api.jobs.start, {
         campaignId: campaign.id,
@@ -163,17 +173,18 @@ describe("durable jobs (local Convex mock)", () => {
     await make(admin, "fourth_pending");
     const extra = t.withIdentity(identity("org_overflow"));
     await extra.mutation(api.workspaces.provision, {});
-    await extra.mutation(api.workspaces.loadDemo, {});
+    await extra.mutation(api.workspaces.saveProfile, { profile: DEMO_PROFILE });
+    await grantTestSubscription(t, "org_overflow");
     await expect(make(extra, "overflow_pending")).rejects.toThrow(
       "Research capacity is busy",
     );
   });
   it("recovers a lost scheduled action at most five times and releases slots", async () => {
-    const { t, admin } = await setup();
+    const { t, admin } = await setup(true);
     const campaign = await admin.mutation(api.campaigns.create, {
       name: "Lost",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await admin.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -355,11 +366,11 @@ describe("durable jobs (local Convex mock)", () => {
     ).toBe(0);
   });
   it("preserves user shortlist decisions on a successful rerun", async () => {
-    const { t, admin } = await setup();
+    const { t, admin } = await setup(true);
     const campaign = await admin.mutation(api.campaigns.create, {
       name: "Repeat",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const first = await admin.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -383,14 +394,14 @@ describe("durable jobs (local Convex mock)", () => {
     ).toBe("shortlisted");
     expect(
       await admin.query(api.campaigns.accounts, { id: campaign.id }),
-    ).toHaveLength(8);
+    ).toHaveLength(1);
   });
   it("preserves untouched prior results, stable IDs, decisions and merged counts on a partial rerun", async () => {
-    const { t, admin } = await setup();
+    const { t, admin } = await setup(true);
     const campaign = await admin.mutation(api.campaigns.create, {
       name: "Partial",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com", "beta.com"],
     });
     const first = await admin.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -410,10 +421,11 @@ describe("durable jobs (local Convex mock)", () => {
       idempotencyKey: "partial_rerun",
     });
     await t.mutation(internal.jobs.claim, { id: second.id, attempt: 1 });
-    const fresh = demoAccounts(
+    const fresh = manualAccounts(
       DEMO_PROFILE,
       campaign.id,
       new Date().toISOString(),
+      ["acme.com", "beta.com"],
     ).filter((account) => account.domain !== untouched.domain);
     await t.mutation(internal.jobs.finish, {
       id: second.id,
@@ -424,7 +436,7 @@ describe("durable jobs (local Convex mock)", () => {
     const results = await admin.query(api.campaigns.accounts, {
       id: campaign.id,
     });
-    expect(results).toHaveLength(8);
+    expect(results).toHaveLength(2);
     expect(
       await admin.query(api.accounts.get, { id: untouched.id }),
     ).toMatchObject({
@@ -435,8 +447,8 @@ describe("durable jobs (local Convex mock)", () => {
       await admin.query(api.campaigns.get, { id: campaign.id }),
     ).toMatchObject({
       status: "partial",
-      account_count: 8,
-      qualified_count: results.filter((account) => account.score >= 60).length,
+      account_count: 2,
+      qualified_count: results.filter((account) => account.score >= 65).length,
     });
   });
 
@@ -506,7 +518,7 @@ describe("durable jobs (local Convex mock)", () => {
       domains: ["https://acme.com"],
     });
     const startedAt = Date.now();
-    const fixture = demoAccounts(
+    const fixture = manualAccounts(
       DEMO_PROFILE,
       campaign.id,
       new Date().toISOString(),

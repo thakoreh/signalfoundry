@@ -141,8 +141,8 @@ export const checkout = adminAction({
           metadata: { signalfoundry_org_id: orgId },
           subscription_data: { metadata: { signalfoundry_org_id: orgId } },
           expires_at: Math.floor(operation.expiresAt / 1000),
-          success_url: `${origin}/?billing=return`,
-          cancel_url: `${origin}/?billing=cancelled`,
+          success_url: `${origin}/workspace?billing=return`,
+          cancel_url: `${origin}/workspace?billing=cancelled`,
         },
         { idempotencyKey: `sf-checkout-${orgId}-${operation.requestId}` },
       );
@@ -185,7 +185,7 @@ export const portal = adminAction({
       const session = await client().billingPortal.sessions.create(
         {
           customer: row.stripeCustomerId,
-          return_url: billingOrigin(),
+          return_url: `${billingOrigin()}/workspace`,
           ...(process.env.STRIPE_PORTAL_CONFIGURATION_ID
             ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID }
             : {}),

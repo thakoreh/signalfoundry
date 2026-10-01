@@ -3,7 +3,7 @@ import { convexTest } from "convex-test";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api, internal } from "../convex/_generated/api";
 import schema from "../convex/schema";
-import { DEMO_PROFILE, demoAccounts } from "../convex/lib/fixtures";
+import { DEMO_PROFILE, manualAccounts, configureTestWorker, grantTestSubscription } from "./helpers";
 import { principalFromIdentity } from "../convex/lib/auth";
 import type { UserIdentity } from "convex/server";
 
@@ -17,10 +17,11 @@ async function setup() {
   const t = convexTest(schema, modules);
   const admin = t.withIdentity(identity());
   await admin.mutation(api.workspaces.provision, {});
-  await admin.mutation(api.workspaces.loadDemo, {});
+  await admin.mutation(api.workspaces.saveProfile, { profile: DEMO_PROFILE });
   const member = t.withIdentity(
     identity("org_one", "user_member", "org:member"),
   );
+  configureTestWorker(); await grantTestSubscription(t);
   const stranger = t.withIdentity(identity("org_two"));
   return { t, admin, member, stranger };
 }
@@ -78,7 +79,7 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
     await expect(member.mutation(api.workspaces.provision, {})).rejects.toThrow(
       "ADMIN_REQUIRED",
     );
-    await expect(member.mutation(api.workspaces.loadDemo, {})).rejects.toThrow(
+    await expect(member.mutation(api.workspaces.cleanupDemo, {})).rejects.toThrow(
       "ADMIN_REQUIRED",
     );
     await expect(
@@ -91,8 +92,8 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
     const { t, member, stranger } = await setup();
     const campaign = await member.mutation(api.campaigns.create, {
       name: "Demo",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await member.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -135,7 +136,7 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
       }),
     ).rejects.toThrow("NOT_FOUND");
   });
-  it("bounds arguments and exposes fiction labels and grounded drafts", async () => {
+  it("bounds arguments and exposes real-only research and grounded drafts", async () => {
     vi.useFakeTimers();
     const { t, admin, member } = await setup();
     await expect(
@@ -164,8 +165,8 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
     }
     const campaign = await member.mutation(api.campaigns.create, {
       name: "Fiction only",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await member.mutation(api.jobs.start, {
       campaignId: campaign.id,
@@ -175,20 +176,13 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
     const accounts = await member.query(api.campaigns.accounts, {
       id: campaign.id,
     });
-    expect(accounts).toHaveLength(8);
-    expect(
-      accounts.every(
-        (a) =>
-          a.is_demo &&
-          a.domain.endsWith(".example") &&
-          a.evidence.every((e) => e.is_demo) &&
-          a.contacts.every((c) => c.email === null),
-      ),
-    ).toBe(true);
+    expect(accounts).toHaveLength(1);
+    expect(accounts.every((a) => !a.is_demo && a.domain === "acme.com" && a.evidence.every((e) => !e.is_demo) && a.contacts.every((c) => c.email === null))).toBe(true);
+
     const draft = await member.query(api.accounts.draft, {
       id: accounts[0].id,
     });
-    expect(draft.warning).toContain("FICTIONAL DEMO");
+    expect(draft.warning).not.toContain("FICTIONAL DEMO");
     expect(draft.warning).toContain("nothing is sent");
     await member.mutation(api.accounts.setStatus, {
       id: accounts[0].id,
@@ -203,20 +197,20 @@ describe("verified Clerk tenant boundary (mock identity, not live JWT proof)", (
     const { t, member } = await setup();
     const campaign = await member.mutation(api.campaigns.create, {
       name: "Demo",
-      mode: "demo",
-      domains: [],
+      mode: "manual",
+      domains: ["acme.com"],
     });
     const job = await member.mutation(api.jobs.start, {
       campaignId: campaign.id,
       idempotencyKey: "bad_fixture",
     });
     await t.mutation(internal.jobs.claim, { id: job.id, attempt: 1 });
-    const accounts = demoAccounts(
+    const accounts = manualAccounts(
       DEMO_PROFILE,
       campaign.id,
       new Date().toISOString(),
     );
-    accounts[0].contacts[0].email = "invented@example.com";
+    accounts[0].is_demo = true;
     await expect(
       t.mutation(internal.jobs.finish, {
         id: job.id,

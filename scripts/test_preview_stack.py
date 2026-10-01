@@ -73,17 +73,17 @@ def main():
                             {'Origin': 'https://evil.com'}, {'Origin': 'null'},
                             {'X-Forwarded-Proto': 'http'}, {'Forwarded': 'host=preview.company.com'}):
                     assert request('/api/workspace', headers=bad)[0] in (400, 403), bad
-                assert request('/api/demo/reset', data={})[0] == 200
-                status, body = request('/api/campaigns', data={'name': 'Protected preview regression', 'mode': 'demo', 'domains': []})
+                assert request('/api/demo/reset', data={})[0] == 410
+                assert request('/api/campaigns', data={'name':'Retired demo', 'mode':'demo', 'domains':[]})[0] == 410
+                # Real website identifiers, but no external fetch or fictional accounts.
+                status, body = request('/api/campaigns', data={'name': 'Public preview regression', 'mode': 'manual', 'domains': ['lowcode.agency']})
                 assert status == 201
                 campaign_id = json.loads(body)['id']
-                status, body = request(f'/api/campaigns/{campaign_id}/research', data={})
-                assert status == 200 and json.loads(body)['status'] == 'complete'
                 status, body = request(f'/api/campaigns/{campaign_id}/accounts')
-                assert status == 200 and len(json.loads(body)) == 8
+                assert status == 200 and json.loads(body) == []
                 status, body = request(f'/api/campaigns/{campaign_id}/export.csv')
                 assert status == 200 and b'is_demo' in body
-                print('Preview standalone runtime: exact HTTPS origin + UI + demo/research/export passed; six hostile-header cases rejected')
+                print('Preview standalone runtime: exact HTTPS origin, landing, real-domain campaign, empty CSV, retired-demo rejection passed; six hostile-header cases rejected. No live research in this check.')
             except BaseException:
                 log.flush()
                 print(log_path.read_text()[-10000:])

@@ -43,8 +43,8 @@ export function SaasWorkspace() {
         </div>
         <OrganizationList
           hidePersonal
-          afterSelectOrganizationUrl="/"
-          afterCreateOrganizationUrl="/"
+          afterSelectOrganizationUrl="/workspace"
+          afterCreateOrganizationUrl="/workspace"
         />
       </main>
     );
@@ -75,8 +75,8 @@ export function SaasWorkspace() {
         organizationControl={
           <OrganizationSwitcher
             hidePersonal
-            afterSelectOrganizationUrl="/"
-            afterCreateOrganizationUrl="/"
+            afterSelectOrganizationUrl="/workspace"
+            afterCreateOrganizationUrl="/workspace"
           />
         }
         userControl={<UserButton />}

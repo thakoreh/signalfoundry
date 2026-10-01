@@ -14,7 +14,7 @@ async function setup() {
     org_role: "org:admin",
   });
   await admin.mutation(api.workspaces.provision, {});
-  await admin.mutation(api.workspaces.loadDemo, {});
+  await admin.mutation(api.workspaces.saveProfile, { profile: DEMO_PROFILE });
   return { t, admin };
 }
 beforeEach(() => {

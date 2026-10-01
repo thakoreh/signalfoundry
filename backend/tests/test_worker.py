@@ -17,7 +17,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 from app.fixtures import DEMO_PROFILE
-from app.safety import DNS_CAPACITY, FetchError, Page
+from app.safety import DNS_CAPACITY, FetchError, Page, fetch_public_page
 from app.worker import WorkerBoundary, create_worker
 from app.worker_config import WorkerSettings, worker_origin
 
@@ -35,16 +35,20 @@ class WorkerTest(unittest.TestCase):
         self.auth = {'Authorization': f'Bearer {self.token}'}
         with patch.dict(os.environ, self.env):
             self.app = create_worker()
+        self.app.state.fetch_page = lambda url: PAGE
         self.client = TestClient(self.app, base_url=self.env['SIGNALFOUNDRY_WORKER_URL'])
         self.addCleanup(self.client.close)
 
-    def body(self, mode='demo', domains=None):
+    def body(self, mode='manual', domains=None):
         return {'profile': DEMO_PROFILE.model_dump(), 'campaign_id': 'convex_campaign_123',
-                'mode': mode, 'domains': domains or []}
+                'mode': mode, 'domains': ['https://company.com/'] if domains is None else domains}
 
     def post(self, body=None, headers=None, path='/worker/research'):
         return self.client.post(path, json=self.body() if body is None else body,
                                 headers=self.auth if headers is None else headers)
+
+    def test_reject_demo_research_without_creating_fictional_accounts(self):
+        self.assertEqual(self.post(self.body('demo', [])).status_code, 422)
 
     def test_authentication_rejects_missing_wrong_duplicate_and_nonbearer(self):
         for headers in ({}, {'Authorization': 'Bearer ' + secrets.token_urlsafe(36)},
@@ -66,15 +70,15 @@ class WorkerTest(unittest.TestCase):
                     self.assertEqual(client.get('/readyz').status_code, 503)
                     self.assertEqual(client.post('/worker/research', json=self.body(), headers=self.auth).status_code, 503)
 
-    def test_demo_contract_and_no_persistence_or_local_routes(self):
+    def test_manual_contract_and_no_persistence_or_local_routes(self):
         self.assertFalse(hasattr(self.app.state, 'repository'))
         with patch('sqlite3.connect', side_effect=AssertionError('Worker must never use SQLite')):
             response = self.post()
         self.assertEqual(response.status_code, 200, response.text)
         data = response.json()
         self.assertEqual(set(data), {'accounts', 'errors'})
-        self.assertEqual(len(data['accounts']), 8)
-        self.assertTrue(all(a['is_demo'] and a['decision_engine'] == 'rules' and a['campaign_id'] == 'convex_campaign_123' for a in data['accounts']))
+        self.assertEqual(len(data['accounts']), 1)
+        self.assertTrue(all(not a['is_demo'] and a['decision_engine'] == 'rules' and a['campaign_id'] == 'convex_campaign_123' for a in data['accounts']))
         for path in ('/api/workspace', '/api/campaigns', '/api/demo/reset', '/docs', '/redoc', '/openapi.json'):
             self.assertEqual(self.client.get(path).status_code, 404)
         self.assertEqual(self.client.get('/readyz').status_code, 200)
@@ -101,8 +105,8 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(self.client.get('/worker/research', headers=self.auth).status_code, 405)
 
     def test_strict_contract_bounds_and_validation_do_not_echo_input(self):
-        bad = [dict(self.body(), tenant_id='other-tenant'), dict(self.body(), domains=['https://company.com/']),
-               self.body('manual'), self.body('manual', ['company.com'] * 11),
+        bad = [dict(self.body(), tenant_id='other-tenant'), dict(self.body(), mode='demo'),
+               self.body('manual', []), self.body('manual', ['company.com'] * 11),
                dict(self.body(), campaign_id='has spaces'), dict(self.body(), campaign_id='x' * 129),
                dict(self.body(), profile={**DEMO_PROFILE.model_dump(), 'private_secret': self.token}),
                dict(self.body(), mode='automatic')]
@@ -191,6 +195,7 @@ class WorkerTest(unittest.TestCase):
         self.assertTrue(all(not a['is_demo'] for a in result.json()['accounts']))
 
     def test_fetch_security_is_used_by_worker_routes(self):
+        self.app.state.fetch_page = fetch_public_page
         with patch('app.safety.socket.getaddrinfo', return_value=[(2, 1, 6, '', ('169.254.169.254', 443))]), \
              patch('app.safety.socket.create_connection') as connect:
             response = self.post({'website': 'metadata.company.com'}, path='/worker/analyze')
@@ -259,6 +264,7 @@ class WorkerTest(unittest.TestCase):
 
     def test_two_jobs_slow_dns_fit_eight_bounded_lanes(self):
         from test_security import FakeConnection, FakeResponse
+        self.app.state.fetch_page = fetch_public_page
         simultaneous = threading.Barrier(8)
         lock = threading.Lock()
         active = 0

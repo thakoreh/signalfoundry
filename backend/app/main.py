@@ -149,6 +149,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.post('/api/demo/reset', response_model=Workspace)
     def load_demo(body: EmptyRequest):
+        if configured_origin:
+            raise HTTPException(410, "Fictional data is disabled on deployed previews")
         return repository().save_profile(DEMO_PROFILE, 'https://signalfoundry.example/', set_website=True)
 
     @app.get('/api/campaigns', response_model=list[Campaign])
@@ -157,6 +159,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.post('/api/campaigns', response_model=Campaign, status_code=201)
     def create_campaign(body: CampaignCreate):
+        if configured_origin and body.mode == "demo":
+            raise HTTPException(410, "Fictional campaigns are disabled on deployed previews")
         domains = list(dict.fromkeys(normalize_url(domain) for domain in body.domains))
         try:
             return repository().create_campaign(body.name, body.mode, domains)
@@ -170,6 +174,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     @app.post('/api/campaigns/{campaign_id}/research', response_model=Campaign)
     def research(campaign_id: str, body: EmptyRequest):
         campaign = get_campaign(campaign_id)
+        if configured_origin and campaign.mode == "demo":
+            raise HTTPException(410, "Fictional research is disabled on deployed previews")
         profile = repository().workspace().profile
         if profile is None:
             raise HTTPException(422, 'Analyze a website, save an ICP profile, or load the fictional demo first')
