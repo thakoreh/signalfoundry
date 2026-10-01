@@ -32,7 +32,7 @@ def main():
         shutil.copytree(ROOT / 'frontend/.next/static', standalone / '.next/static')
         env = {**os.environ, 'SIGNALFOUNDRY_PREVIEW_ORIGIN': ORIGIN,
                'SIGNALFOUNDRY_DB_PATH': str(tmp / 'workspace.sqlite3'),
-               'DECISION_ENGINE': 'rules', 'NEXT_TELEMETRY_DISABLED': '1',
+               'DECISION_ENGINE': 'rules', 'NEXT_TELEMETRY_DISABLED': '1', 'SIGNALFOUNDRY_MODE': 'local-demo', 'NEXT_PUBLIC_SIGNALFOUNDRY_MODE': 'local-demo',
                'HOSTNAME': '127.0.0.1', 'PORT': '3001'}
         log_path = tmp / 'stack.log'
         def request(path, *, headers=None, data=None):

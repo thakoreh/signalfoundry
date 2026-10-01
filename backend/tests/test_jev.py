@@ -3,6 +3,7 @@ import io
 from unittest.mock import MagicMock, patch
 import json
 import unittest
+import secrets
 import httpx
 
 from app.fixtures import DEMO_PROFILE
@@ -23,6 +24,9 @@ def response_data():
 
 
 class JevTest(unittest.TestCase):
+    def setUp(self):
+        self.api_key = secrets.token_urlsafe(36)
+
     def test_no_key_never_calls_network(self):
         def fail(_):
             raise AssertionError('Network must not be called')
@@ -37,14 +41,14 @@ class JevTest(unittest.TestCase):
         def handler(request):
             calls.append(request)
             self.assertEqual(str(request.url), 'https://api.typesafe.ai/v1/systemone')
-            self.assertEqual(request.headers['Authorization'], 'Bearer test-only-not-a-secret')
+            self.assertEqual(request.headers['Authorization'], f'Bearer {self.api_key}')
             body = json.loads(request.content)
             self.assertEqual(body['model'], MODEL)
             self.assertEqual(body['questions']['fit_score']['type'], 'score')
             self.assertEqual(len(body['questions']['fit_score']['criteria']), 5)
             self.assertEqual(body['state']['website']['url'], PAGE.url)
             return httpx.Response(200, json=response_data())
-        provider = JevDecisionProvider('test-only-not-a-secret', transport=httpx.MockTransport(handler))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
         account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(len(calls), 1)
         self.assertEqual(account.decision_engine, 'jev')
@@ -66,7 +70,7 @@ class JevTest(unittest.TestCase):
         for data in cases:
             with self.subTest(data=data):
                 raw = json.dumps(data).encode()
-                provider = JevDecisionProvider('mock', transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)))
+                provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)))
                 account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
                 self.assertEqual(account.decision_engine, 'rules')
                 self.assertIn('Rules fallback used', account.unknowns[0])
@@ -77,7 +81,7 @@ class JevTest(unittest.TestCase):
             def handler(request):
                 calls.append(request)
                 return httpx.Response(status)
-            provider = JevDecisionProvider('mock', transport=httpx.MockTransport(handler))
+            provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
             account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
             self.assertEqual(account.decision_engine, 'rules')
             self.assertIn(str(status), account.unknowns[0])
@@ -86,13 +90,13 @@ class JevTest(unittest.TestCase):
     def test_timeout_fallback(self):
         def handler(request):
             raise httpx.ReadTimeout('timeout')
-        provider = JevDecisionProvider('mock', transport=httpx.MockTransport(handler))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
         account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('timeout', account.unknowns[0])
 
     def test_oversized_response_fallback(self):
-        provider = JevDecisionProvider('mock', transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b'x' * 100001)))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b'x' * 100001)))
         self.assertEqual(provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test').decision_engine, 'rules')
 
     def test_live_transport_is_pinned_and_deadline_bounded_without_network(self):
@@ -105,7 +109,7 @@ class JevTest(unittest.TestCase):
         connection = MagicMock()
         connection.getresponse.return_value = response
         with patch('app.jev.resolve_public', return_value=['8.8.8.8']) as resolver, patch('app.jev.PinnedHTTPSConnection', return_value=connection) as factory:
-            account = JevDecisionProvider('mock').evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+            account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'jev')
         resolver.assert_called_once_with('api.typesafe.ai', 443, 2.0)
         self.assertEqual(factory.call_args.args[:3], ('api.typesafe.ai', '8.8.8.8', 443))
@@ -120,7 +124,7 @@ class JevTest(unittest.TestCase):
         response.getheader.return_value = 'identity'
         connection.getresponse.return_value = response
         with patch('app.jev.resolve_public', return_value=['8.8.8.8']), patch('app.jev.PinnedHTTPSConnection', return_value=connection), patch('app.jev.time.monotonic', side_effect=[0, 1, 9]):
-            account = JevDecisionProvider('mock').evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+            account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('timeout', account.unknowns[0])
         response.read1.assert_not_called()

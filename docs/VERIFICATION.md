@@ -1,36 +1,53 @@
 # Verification record
 
-Verified September 30, 2026. This record distinguishes executable checks from unverified integrations.
+Date: 2026-10-01 UTC. Scope: `harden/clerk-convex-stripe`, based on remote main `5dac4f2adc0ee6ba81e643074d3f2095018e45f7`. This record replaces the earlier local-MVP verification narrative; it must not be read as live SaaS certification.
 
-## Passed
+## Passed locally on Linux
 
-- Clean virtual-environment installation from the pinned dependency lock and all 45 backend tests
-- 45 deterministic backend tests: complete API workflow, input validation, atomic persistence, tenant-scoped access, account rerun/status preservation, SSRF and redirect defenses, overall deadlines, response-size limits, Jev response validation and explicit fallbacks
-- 8 live-HTTP smoke checks: health/mode, demo profile, persisted ranked accounts, shortlist round trip, evidence-grounded draft, CSV row count, rejected unsafe/invalid input, profile preservation
-- 3 real Next.js proxy integration checks: trusted local hosts pass, hostile/lookalike hosts cannot read the local API, and a 31.26-second upstream response completes successfully
-- Packaging privacy regression: runtime database directories, database sidecars, local environment files, dependencies and build outputs excluded from source archive
-- Shell script syntax checks
+- 72 backend Python tests: original demo/API behavior plus stateless worker auth/readiness, no database imports, token redaction, concurrency, DNS/body deadlines, pinned DNS, redirects, cloud-platform IP rejection, CSV safety and mocked Jev contracts
+- 28 frontend Node tests: existing UI utilities, strict runtime/build modes, host/origin controls, closed REST mappings, admin/tenant guards, token/session and organization-intent binding, billing expiry display, and preservation of request headers
+- 47 Convex tests using `convex-test`: anonymous/cross-org access, roles, input bounds, durable job transitions, cancellation/lease recovery, idempotency, quota/configuration gates, occupied worker retry, partial rerun preservation; Stripe raw-signature validation, duplicate/reordered events, subscription binding, Checkout retry parameters, duplicate-subscription prevention, resubscription and attempt throttling
+- Full frontend TypeScript check and ESLint, with zero errors or warnings
+- Production Next build in local-demo mode; existing full-stack API workflow through Next with a disposable SQLite database
+- Real rewrite integration, including a response exceeding 31 seconds and hostile host/proxy-header rejection
+- Standalone preview regression: exact HTTPS-origin emulation, profile/demo/research/export and six hostile-header cases. This does **not** run NGINX or TLS
+- Production Next build in SaaS mode with no provider credentials; real local HTTP checks prove setup-state rendering, readiness 503, API 503, and no fallback to the demo backend
+- Worker process HTTP smoke in an isolated subprocess, both missing-token and runtime-generated-token modes, using fictional data only
+- Five offline source/security gates and existing packaging/deployment/launcher tests
+- npm production dependency audit: zero reported vulnerabilities at the time checked
+- pip-audit 2.9.0 against all 16 pinned Python runtime dependencies: zero known vulnerabilities reported at the time checked
+- Gitleaks 8.28.0: zero findings in all five inherited commits and current source at the time checked. Binary checksum verified against the official release
 
-- Frontend: TypeScript typecheck, ESLint, all 11 unit/regression tests, and optimized Next.js production build
-- Full production-stack HTTP check: rendered frontend page plus all 8 smoke checks through Next.js into FastAPI against an isolated temporary database
-- Development launcher: two tests for allowed ports and safe process-group cleanup
-- Independent code/security review: reported Host-boundary, deadline, signal-count, async-state and archive-privacy findings corrected and rechecked; no remaining blocking findings in reviewed code
+No live secrets are used in tests. Contract mocks and fixture identities are not proof of an actual provider integration.
 
-## Integration limits
+## Independent review corrections
 
-- Execution was tested on Linux. README recommends WSL 2 Ubuntu for Windows shell compatibility, but WSL 2, native Windows and macOS were not separately tested; no Docker setup is included
+Fixed and regression-tested: partial research losing prior evidence/review statuses, same-second stale Stripe snapshots restoring access, unstable idempotent Checkout parameters, duplicate subscriptions through stale local billing state, completed-session resubscription, repeated cached billing calls bypassing throttles, organization-switch request intent, cloud-platform address SSRF, DNS/worker capacity mismatch, and prematurely exhausted busy-worker retry windows.
 
-- Jev was checked against its official contract and tested using mocked responses. No live credential, paid request, provider account or real Jev success is claimed
-- Public website transport was exercised with deterministic network/socket tests. Unrestricted live-web research was not verified from this restricted execution environment
-- External candidate-discovery and contact-verification providers are intentionally not configured
-- No email was sent; no signup, billing, public deployment or repository push was performed
+An independent recheck found no remaining blocking issue in those corrected areas. That statement is scoped to the code and tests reviewed, not an external penetration test or broad security guarantee.
 
-## Browser verification limit
+## Never run or still blocked
 
-The managed cloud browser rejected local preview navigation to `http://localhost:3000` with `net::ERR_BLOCKED_BY_CLIENT`. No browser restriction was bypassed. Browser interaction, visual appearance, responsive behavior and screenshots must not be reported as verified from this attempt.
+- Official Convex codegen/push and tests against a real Convex deployment. Checked-in generated files are transparently labeled local type bootstraps
+- Real Clerk sign-in/recovery/invitation/removal/MFA/session-expiry flows and two-organization browser acceptance
+- Stripe test-mode or live Checkout/Portal/payment lifecycle, registered webhook delivery, customer cancellation/renewal and tax behavior
+- Actual Convex-to-worker HTTPS, distributed scheduler/restart behavior and provider failure injection in the target environment
+- Docker image build/runtime: Docker is absent here. CI defines image builds and worker smoke, but CI has not run for this unpublished branch
+- Interactive browser QA: the cloud browser rejected the local URL with `ERR_BLOCKED_BY_CLIENT`; HTTP rendering checks are not a substitute
+- Target NGINX/TLS/firewall/proxy configuration, load testing, security assessment, monitoring/alerts, encrypted backup/restore rehearsal
+- Original GitGuardian incident resolution. Gitleaks passing and dynamic test fixtures cannot determine what GitGuardian detected or rotate a real exposed credential
+- Licensed lead/contact data, verification, outbound email, commercial policy/legal/privacy approval
 
-## How to reproduce
+## Reproduce
 
-Run `./scripts/setup.sh`, then `./scripts/check.sh`. Stop existing development servers first; production integration checks use local ports 8000 and 3001. For local manual acceptance, start `./scripts/dev.sh` and follow `docs/DEMO_WALKTHROUGH.md`.
+Run `bash scripts/setup.sh`, then `bash scripts/check.sh`. Separately run:
 
-In a supported browser, additionally check: editing and reopening the ICP; repeated selection of the active campaign; creating/rerunning a demo campaign; search/filter/sort; zero-signal accounts; account drawer close/reopen during status updates; draft generation/copy; CSV export; loading/error states; keyboard escape/tab focus; and narrow viewports. Company size and geography are planning fields only and do not affect MVP scoring.
+- `python scripts/production_preflight.py`
+- `.venv/bin/python scripts/production_worker_checks.py`
+- `python scripts/test_saas_failclosed.py` (replaces the local `.next` output with a SaaS build)
+- `cd frontend && npm audit --omit=dev --audit-level=moderate`
+- `GITLEAKS_BIN=/path/to/gitleaks bash scripts/scan_secrets.sh`
+
+With Docker available, build the image tags expected by `.github/workflows/verify.yml` and run `python scripts/production_container_smoke.py`. Its absence is a failure/not-run result, never a skipped pass.
+
+Before release, run all required CI and live acceptance gates against the exact reviewed release commit. See [launch checklist](PRODUCTION_READINESS.md).

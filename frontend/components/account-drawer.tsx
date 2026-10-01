@@ -1,10 +1,11 @@
 "use client";
 import { useState } from "react";
 import type { Account, AccountStatus, Draft, Evidence } from "@/lib/types";
-import { api, errorMessage } from "@/lib/api";
+import { errorMessage } from "@/lib/api";
 import { formatDate, initials, safeUrl, scoreLabel } from "@/lib/utils";
 import { Dialog } from "./dialog";
 import { Icon } from "./icons";
+import { useWorkspaceSession } from "./workspace-session";
 function EvidenceCard({
   evidence,
   index,
@@ -71,6 +72,7 @@ export function AccountDrawer({
   busy: boolean;
   statusError: string;
 }) {
+  const { api } = useWorkspaceSession();
   const [tab, setTab] = useState<"overview" | "evidence" | "outreach">(
     "overview",
   );

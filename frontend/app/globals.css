@@ -3956,3 +3956,112 @@ legend {
 .score-confidence > .tag {
   color: #4a7040;
 }
+
+/* Authenticated organization shell retains the research workspace design. */
+.auth-shell {
+  min-height: 100dvh;
+  padding: 64px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  background: #f3f7f5;
+}
+.auth-heading {
+  text-align: center;
+  max-width: 640px;
+}
+.auth-heading h1 {
+  font-size: clamp(25px, 4vw, 40px);
+  letter-spacing: -1.2px;
+  margin: 24px 0 12px;
+}
+.auth-brand {
+  color: #153d32;
+  font-size: 28px;
+  font-weight: 800;
+  text-decoration: none;
+}
+.auth-shell p {
+  color: #60716b;
+  line-height: 1.65;
+}
+.setup-card {
+  padding: 32px;
+  border: 1px solid #dce6e0;
+  border-radius: 18px;
+  background: white;
+  max-width: 680px;
+  width: 100%;
+}
+.setup-card h1,
+.setup-card h2 {
+  margin-bottom: 16px;
+}
+.setup-card ul {
+  padding-left: 20px;
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+.setup-card p + p,
+.setup-card p + a {
+  margin-top: 16px;
+}
+.organization-heading {
+  max-width: 680px;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+.organization-control {
+  padding: 6px 20px 16px;
+  color-scheme: light;
+  background: #eff8f2;
+  border-radius: 10px;
+  margin: 0 14px 12px;
+}
+.organization-control button {
+  max-width: 205px;
+}
+.billing-card {
+  margin-top: 24px;
+}
+.billing-card .tag {
+  display: inline-block;
+  margin-bottom: 20px;
+  text-transform: capitalize;
+}
+.billing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 22px 0;
+}
+.job-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px 24px;
+  background: #f0f8f4;
+  border-top: 1px solid #dbe9e1;
+}
+.job-status strong {
+  text-transform: capitalize;
+}
+.job-status p {
+  flex-basis: 100%;
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  .auth-shell {
+    padding: 32px 14px;
+  }
+  .setup-card {
+    padding: 24px 20px;
+  }
+  .job-status {
+    padding: 16px;
+  }
+}

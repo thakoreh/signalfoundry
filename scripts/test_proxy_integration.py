@@ -95,7 +95,7 @@ def main() -> None:
             base = f'http://127.0.0.1:{port}'
             environment = {**os.environ,
                 'API_BASE_URL': f'http://127.0.0.1:{upstream.server_port}',
-                'NEXT_TELEMETRY_DISABLED': '1',
+                'NEXT_TELEMETRY_DISABLED': '1', 'SIGNALFOUNDRY_MODE': 'local-demo', 'NEXT_PUBLIC_SIGNALFOUNDRY_MODE': 'local-demo',
             }
             log_path = Path(temporary) / 'next.log'
 

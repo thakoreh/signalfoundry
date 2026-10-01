@@ -7,19 +7,10 @@ from __future__ import annotations
 import json
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
-from uuid import uuid4
 
 from .models import Account, Campaign, Profile, Workspace
-
-
-def now() -> str:
-    return datetime.now(timezone.utc).isoformat().replace('+00:00', 'Z')
-
-
-def new_id(prefix: str) -> str:
-    return f'{prefix}_{uuid4().hex}'
+from .primitives import new_id, now
 
 
 class Repository:

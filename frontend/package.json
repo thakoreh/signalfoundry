@@ -10,21 +10,29 @@
     "lint": "eslint .",
     "test": "node --experimental-strip-types --test tests/*.test.ts",
     "format": "prettier --write app components lib tests proxy.ts next.config.ts eslint.config.mjs",
-    "format:check": "prettier --check app components lib tests proxy.ts next.config.ts eslint.config.mjs"
+    "format:check": "prettier --check app components lib tests proxy.ts next.config.ts eslint.config.mjs",
+    "test:convex": "vitest run --config vitest.config.ts"
   },
   "dependencies": {
+    "@clerk/nextjs": "7.9.9",
+    "convex": "1.46.0",
+    "convex-helpers": "0.1.124",
     "next": "16.3.8",
     "react": "19.3.0",
-    "react-dom": "19.3.0"
+    "react-dom": "19.3.0",
+    "stripe": "23.0.0"
   },
   "devDependencies": {
+    "@edge-runtime/vm": "5.0.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "convex-test": "0.0.60",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.8",
     "prettier": "^3.9.9",
-    "typescript": "^5.9.0"
+    "typescript": "^5.9.0",
+    "vitest": "5.0.3"
   },
   "engines": {
     "node": ">=22.6.0"

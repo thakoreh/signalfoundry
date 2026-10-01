@@ -1,6 +1,10 @@
 # SignalFoundry
 
-A working, local-first B2B prospect research MVP. SignalFoundry is a temporary product name.
+A B2B prospect research application with a Clerk + Convex + Stripe SaaS release candidate and a separate local demo. SignalFoundry is a temporary product name.
+
+**SaaS launch is gated.** The new multi-user code requires provider configuration, review, and live-environment acceptance before customer use. Start with [SaaS setup](docs/SAAS_SETUP.md), [launch gates](docs/PRODUCTION_READINESS.md), and [operations](docs/OPERATIONS.md). Nothing in this branch automatically provisions accounts, credentials, prices, migrations, or a deployment.
+
+## Local demo instructions
 
 **This is a local demo, not a production multi-user SaaS.** There is no login, billing, outbound sending, or commercial lead-data subscription. Do not expose either application server publicly. An optional password-protected single-operator preview is described in [Coolify deployment](deploy/COOLIFY.md). The app has one local workspace, and anyone with access to that instance can see and edit its contents.
 
@@ -33,7 +37,7 @@ Open http://localhost:3000. FastAPI is available at http://127.0.0.1:8000/api/he
 
 A draft is never sent. Demo accounts and their supporting examples are fictional and labeled throughout. A homepage observation is not a verified buying signal. Unknown company details, contacts, email verification and event dates remain unknown.
 
-## Architecture
+## Local demo architecture
 
 - Next.js / React / TypeScript frontend, with same-origin `/api` requests proxied to FastAPI
 - FastAPI / Pydantic API with strict payload validation
@@ -60,7 +64,7 @@ The default installation needs no API key and performs no paid API calls. Manual
 
 Never put credentials in browser variables or source code. Optional decision-provider setup is server-side, off by default, and documented separately. The OpenAI Decisions API remains an extension point until a public, verified contract is available.
 
-## Security boundary
+## Local demo security boundary
 
 SSRF defenses reject non-public addresses and unsafe schemes and recheck redirect destinations. Fetches have bounded time and size. CSV fields are neutralized against spreadsheet formula injection. Local access controls and tenant-scoped queries are useful defense in depth, but are **not authentication**. This app is intended for one trusted operator on a private machine.
 

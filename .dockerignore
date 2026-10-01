@@ -18,3 +18,7 @@ deploy/secrets
 **/.htpasswd
 **/*.pem
 **/*.key
+**/.convex
+**/test-results
+**/playwright-report
+**/coverage

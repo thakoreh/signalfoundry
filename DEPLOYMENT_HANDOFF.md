@@ -1,3 +1,5 @@
+> This legacy handoff concerns the separate local-demo preview. The Clerk/Convex/Stripe SaaS branch needs the [SaaS setup](docs/SAAS_SETUP.md) and [launch gates](docs/PRODUCTION_READINESS.md); do not replace a running preview or migrate customer data implicitly.
+
 # Deployment handoff
 
 Deploy a new, isolated SignalFoundry preview using the root Dockerfile. Read [deploy/COOLIFY.md](deploy/COOLIFY.md) fully before acting.

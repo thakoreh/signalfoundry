@@ -1,4 +1,12 @@
-# SignalFoundry API
+# SignalFoundry Python services
+
+Production SaaS uses only the stateless `app.worker:app` service; Clerk handles
+identity, Convex owns all tenant data, and Stripe handles billing. Worker contract,
+authentication, deployment boundaries, and verification are documented in
+[`deploy/worker.README.md`](../deploy/worker.README.md). The worker neither imports
+nor exposes the SQLite demo below.
+
+## Isolated local-demo API
 
 Python 3.11+ / FastAPI / SQLite local-demo backend. Run from this directory:
 
@@ -87,4 +95,4 @@ The adapter pins `jev-1.13.0`, calls `POST https://api.typesafe.ai/v1/systemone`
 
 ## Verification
 
-45 offline automated tests pass, covering API workflows, SQLite restart persistence, tenant isolation, rollback, failure preservation, manual evidence/unknowns, reruns, status edits, CSV escaping, strict validation, local-origin checks, DNS/IP/redirect filtering, content and time budgets, a real socketpair HTTP parser round trip, and mocked Jev success/failure contracts. Public website fetching is validated with deterministic transports, not an unrestricted live-web crawl. Live paid Jev integration has not been run.
+The offline automated suite covers API workflows, SQLite restart persistence, tenant isolation, rollback, failure preservation, manual evidence/unknowns, reruns, status edits, CSV escaping, strict validation, local-origin checks, DNS/IP/redirect filtering, content and time budgets, a real socketpair HTTP parser round trip, and mocked Jev success/failure contracts. Public website fetching is validated with deterministic transports, not an unrestricted live-web crawl. Live paid Jev integration has not been run.

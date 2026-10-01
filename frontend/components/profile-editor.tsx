@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
 import type { Profile, WorkspaceData } from "@/lib/types";
-import { api, jsonBody, errorMessage } from "@/lib/api";
+import { jsonBody, errorMessage } from "@/lib/api";
 import { tokens } from "@/lib/utils";
 import { Icon } from "./icons";
+import { useWorkspaceSession } from "./workspace-session";
 const fields = [
   [
     "industries",
@@ -39,6 +40,7 @@ export function ProfileEditor({
   profile: Profile | null;
   onSaved: (workspace: WorkspaceData) => void;
 }) {
+  const { api, mode: appMode, isAdmin } = useWorkspaceSession();
   const [name, setName] = useState(profile?.company_name || "");
   const [description, setDescription] = useState(profile?.description || "");
   const [values, setValues] = useState<Record<string, string>>(() =>
@@ -83,14 +85,16 @@ export function ProfileEditor({
           <p>Tell us who you help and what makes a customer a great fit.</p>
         </div>
         <span className="tag green">
-          <Icon name="edit" size={13} /> Always editable
+          <Icon name="edit" size={13} />{" "}
+          {isAdmin ? "Admin managed" : "Read only"}
         </span>
       </div>
       <div className="notice soft">
         <Icon name="info" size={17} />
         <span>
-          Website analysis creates a rules-based draft. Review these inputs
-          before researching accounts. You can also fill this out from scratch.
+          {appMode === "saas"
+            ? "Your organization’s targeting preferences guide research. Only administrators can save changes."
+            : "Website analysis creates a rules-based draft. Review these inputs before researching accounts. You can also fill this out from scratch."}
         </span>
       </div>
       {error && (
@@ -104,7 +108,7 @@ export function ProfileEditor({
           Your company name
           <input
             required
-            disabled={busy}
+            disabled={busy || !isAdmin}
             maxLength={200}
             value={name}
             onChange={(e) => {
@@ -118,7 +122,7 @@ export function ProfileEditor({
           What do you help customers do?
           <textarea
             required
-            disabled={busy}
+            disabled={busy || !isAdmin}
             value={description}
             onChange={(e) => {
               setDescription(e.target.value);
@@ -133,7 +137,7 @@ export function ProfileEditor({
           <label key={key}>
             {label}
             <textarea
-              disabled={busy}
+              disabled={busy || !isAdmin}
               value={values[key]}
               onChange={(e) => {
                 setValues({ ...values, [key]: e.target.value });
@@ -166,7 +170,11 @@ export function ProfileEditor({
           <Icon name="shield" size={16} /> Your profile guides scoring across
           new campaigns
         </p>
-        <button className="btn primary" disabled={busy} type="submit">
+        <button
+          className="btn primary"
+          disabled={busy || !isAdmin}
+          type="submit"
+        >
           {busy ? (
             <>
               <span className="spinner" />

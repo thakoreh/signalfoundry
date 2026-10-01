@@ -21,3 +21,8 @@ Account: {id,campaign_id,name,domain,description,industry,employee_range,locatio
 Evidence: {id,title,url,excerpt,kind:'fit'|'signal'|'company',published_at:string|null,retrieved_at:string,is_demo:boolean}
 Contact: {name:string|null,role,email:string|null,verification_status:'unverified'|'not_available'|'verified',source_url:string|null,note:string}
 Fixtures use .example domains and conspicuous demo=true. Fictional person emails must be null. Real research provides no invented people/employee numbers/geography/dates; unknowns stay unknown.
+
+
+## SaaS contract additions
+
+In explicit `saas` mode the same-origin Next API routes use verified Clerk sessions and a server-side Convex client. The FastAPI routes below remain local-demo only. Organization identity is never accepted in a request body. SaaS research returns HTTP202 with a durable Job, not a completed Campaign; poll `/api/jobs/{id}` or `/api/campaigns/{id}/job`, and POST `/api/jobs/{id}/cancel`. Start with an `idempotencyKey`. Billing uses GET `/api/billing`, POST `/api/billing/checkout` and `/api/billing/portal` with `requestId`; commercial access comes only from signed Stripe reconciliation. See adapter tests and `frontend/convex` validators for the authoritative implemented contract.

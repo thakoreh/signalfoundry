@@ -4,14 +4,18 @@ export async function api<T>(
 ): Promise<T> {
   let response: Response;
   try {
+    const headers = new Headers(options.headers);
+    if (!headers.has("Content-Type"))
+      headers.set("Content-Type", "application/json");
     response = await fetch(`/api${path}`, {
       ...options,
-      headers: { "Content-Type": "application/json", ...options.headers },
+      headers,
       cache: "no-store",
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
     throw new Error(
-      "Unable to reach the research server. Check that the backend is running, then try again.",
+      "Unable to reach the research service. Check your connection, then try again.",
     );
   }
   if (!response.ok) {

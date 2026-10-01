@@ -5,7 +5,7 @@ DEST="${1:-$ROOT/artifacts/signalfoundry-mvp-source.zip}"
 python3 - "$ROOT" "$DEST" <<'PY'
 import pathlib, sys, zipfile
 root, output = map(pathlib.Path, sys.argv[1:])
-excluded = {'.git', '.next', 'node_modules', '.venv', '__pycache__', '.pytest_cache', '.ruff_cache', 'artifacts', '.runtime', 'secrets'}
+excluded = {'.git', '.next', 'node_modules', '.venv', '__pycache__', '.pytest_cache', '.ruff_cache', 'artifacts', '.runtime', '.convex', 'secrets', 'test-results', 'playwright-report', 'coverage'}
 output.parent.mkdir(parents=True, exist_ok=True)
 with zipfile.ZipFile(output, 'w', zipfile.ZIP_DEFLATED) as archive:
     for p in sorted(root.rglob('*')):

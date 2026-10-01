@@ -5,7 +5,7 @@ from urllib.parse import urlsplit
 from .fixtures import FIXTURES
 from .models import Account, Contact, Draft, Evidence, Profile, ScoreComponent
 from .safety import Page
-from .store import new_id, now
+from .primitives import new_id, now
 
 INDUSTRY_TERMS = {
     'B2B SaaS': ['saas', 'b2b', 'software as a service'],

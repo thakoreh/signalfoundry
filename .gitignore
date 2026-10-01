@@ -20,3 +20,8 @@ deploy/secrets/
 .htpasswd
 *.pem
 *.key
+
+.convex/
+coverage/
+test-results/
+playwright-report/

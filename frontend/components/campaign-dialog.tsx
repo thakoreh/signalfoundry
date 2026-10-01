@@ -1,9 +1,10 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Campaign } from "@/lib/types";
-import { api, jsonBody, errorMessage } from "@/lib/api";
+import { jsonBody, errorMessage } from "@/lib/api";
 import { Dialog } from "./dialog";
 import { Icon } from "./icons";
+import { useWorkspaceSession } from "./workspace-session";
 export function CampaignDialog({
   onClose,
   onCreated,
@@ -11,6 +12,9 @@ export function CampaignDialog({
   onClose: () => void;
   onCreated: (campaign: Campaign) => Promise<void>;
 }) {
+  const { api, mode: appMode } = useWorkspaceSession();
+  const isSaas = appMode === "saas";
+  const requestKey = useRef<string | null>(null);
   const [name, setName] = useState("");
   const [mode, setMode] = useState<"manual" | "demo">("manual");
   const [domains, setDomains] = useState("");
@@ -47,11 +51,12 @@ export function CampaignDialog({
           ? "Scoring fictional demo accounts…"
           : "Reading public websites and scoring accounts…",
       );
+      if (!requestKey.current) requestKey.current = crypto.randomUUID();
       const result = await api<Campaign>(`/campaigns/${campaign.id}/research`, {
         method: "POST",
-        body: "{}",
+        body: jsonBody(isSaas ? { idempotencyKey: requestKey.current } : {}),
       });
-      await onCreated(result);
+      await onCreated(isSaas ? { ...campaign, status: "researching" } : result);
       onClose();
     } catch (e) {
       setError(errorMessage(e));
@@ -136,8 +141,8 @@ export function CampaignDialog({
               placeholder={"company.com\nanother-company.com"}
             />
             <span className="input-hint">
-              One public business domain per line, up to 10. No people search or
-              verified emails.
+              One public business domain per line, up to 10 (subject to your
+              plan). No people search or verified emails.
             </span>
           </label>
         ) : (
@@ -154,7 +159,11 @@ export function CampaignDialog({
             <span className="spinner" />
             <div>
               <strong>{phase}</strong>
-              <p>Public websites can take a moment. Keep this window open.</p>
+              <p>
+                {isSaas
+                  ? "Starting a durable background job. You can leave once it has been queued."
+                  : "Public websites can take a moment. Keep this window open."}
+              </p>
             </div>
           </div>
         )}

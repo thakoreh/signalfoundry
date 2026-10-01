@@ -1,7 +1,8 @@
 # No credentials or runtime databases are copied into the image.
 FROM node:24-bookworm-slim AS frontend-build
 WORKDIR /build/frontend
-ENV NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=768
+ENV NEXT_TELEMETRY_DISABLED=1 NODE_OPTIONS=--max-old-space-size=768 \
+    SIGNALFOUNDRY_MODE=local-demo NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
@@ -12,7 +13,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     NEXT_TELEMETRY_DISABLED=1 NODE_ENV=production \
     NODE_OPTIONS=--max-old-space-size=256 \
     SIGNALFOUNDRY_DB_PATH=/app/data/signalfoundry.sqlite3 \
-    DECISION_ENGINE=rules
+    DECISION_ENGINE=rules \
+    SIGNALFOUNDRY_MODE=local-demo NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo
 RUN apt-get update && apt-get install -y --no-install-recommends nginx ca-certificates bash libstdc++6 \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app

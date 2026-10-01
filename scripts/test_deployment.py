@@ -3,6 +3,8 @@
 import importlib.util
 from pathlib import Path
 import tempfile
+import secrets
+import string
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,8 +20,10 @@ class DeploymentTest(unittest.TestCase):
             template = ROOT / 'deploy/nginx.conf.template'
             with self.assertRaises(FileNotFoundError):
                 config.render('https://preview.company.com', password_file, template)
-            for invalid in ('', 'preview:plaintext', 'preview:{SHA}weak', 'preview:$apr1$weak',
-                            'preview:$2y$04$' + 'a'*53, 'preview:$2y$12$' + 'a'*53 + '\nother:password'):
+            random_hash = ''.join(secrets.choice(string.ascii_letters + string.digits + './') for _ in range(53))
+            for invalid in ('', 'preview:' + secrets.token_urlsafe(16), 'preview:{SHA}' + secrets.token_urlsafe(16),
+                            'preview:$apr1$' + secrets.token_urlsafe(16),
+                            'preview:$2y$04$' + random_hash, 'preview:$2y$12$' + random_hash + '\nother:' + secrets.token_urlsafe(16)):
                 password_file.write_text(invalid)
                 with self.subTest(value=invalid[:20]), self.assertRaises(ValueError):
                     config.render('https://preview.company.com', password_file, template)
@@ -27,11 +31,12 @@ class DeploymentTest(unittest.TestCase):
     def test_gateway_protects_all_paths_and_preserves_boundaries(self):
         with tempfile.TemporaryDirectory() as tmp:
             password_file = Path(tmp) / 'preview.htpasswd'
-            # Syntactically valid placeholder, never a real account or credential.
-            password_file.write_text('preview:$2y$12$' + 'a'*53)
+            # Runtime-only syntactic fixture, never a saved account credential.
+            random_hash = ''.join(secrets.choice(string.ascii_letters + string.digits + './') for _ in range(53))
+            password_file.write_text('preview:$2y$12$' + random_hash)
             rendered = config.render('https://preview.company.com', password_file, ROOT / 'deploy/nginx.conf.template')
             self.assertNotIn('@@', rendered)
-            self.assertNotIn('a'*53, rendered)
+            self.assertNotIn(random_hash, rendered)
             self.assertIn('auth_basic_user_file ' + str(password_file), rendered)
             self.assertEqual(rendered.count('location '), 1)
             self.assertIn('location / {', rendered)

@@ -25,7 +25,7 @@ def main():
     if not node or not (ROOT / 'frontend/.next/BUILD_ID').is_file():
         raise SystemExit('Run npm ci and npm run build in frontend first')
     children = []
-    env = {**os.environ, 'DECISION_ENGINE': 'rules', 'NEXT_TELEMETRY_DISABLED': '1'}
+    env = {**os.environ, 'DECISION_ENGINE': 'rules', 'NEXT_TELEMETRY_DISABLED': '1', 'SIGNALFOUNDRY_MODE': 'local-demo', 'NEXT_PUBLIC_SIGNALFOUNDRY_MODE': 'local-demo'}
     with tempfile.TemporaryDirectory(prefix='signalfoundry-full-stack-') as tmp:
         db = str(Path(tmp) / 'smoke.sqlite3')
         log_path = Path(tmp) / 'servers.log'

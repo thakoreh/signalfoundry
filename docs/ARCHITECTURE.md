@@ -1,33 +1,47 @@
 # Architecture and boundaries
 
-## Request flow
+## Explicit modes
 
-The browser calls same-origin `/api` endpoints through Next.js. Next.js proxies to the local FastAPI process. The API validates input, reads the current fixed local workspace, calls the research/decision layer and stores results through the SQLite repository. The browser never receives provider keys.
+`saas` and `local-demo` are separate build/runtime modes. Both mode variables must agree with the compiled app. Missing or mismatched configuration fails closed. A running preview is not a multi-user SaaS environment.
 
-## Research and judgments are separate
+### SaaS request flow
 
-A research source supplies a URL, extracted text and retrieval time. A judgment evaluates that evidence against the saved ideal customer profile. A draft uses those stored observations rather than inventing a relationship, purchase intent or contact detail.
+Browser → same-origin Next REST adapter → authenticated Convex queries/mutations/actions. Clerk owns identity and organization membership. Next verifies its session and checks an intent-only organization header against that session; the template JWT must match the same subject and organization. Convex independently verifies signature/issuer/audience and derives tenant identity only from signed claims.
 
-An account is reviewable even when the evidence is incomplete. “Unknown” is a valid and useful result. A failed fetch does not become a positive fit signal. A score is an aid to prioritization, not a certification that the company will buy.
+Convex stores workspaces, campaigns, accounts, research jobs, usage counters, and a minimal billing projection. Public functions use shared tenant/admin wrappers. Entity IDs are checked against the verified tenant; private scheduler, research-save, and billing functions remain internal. Indexed bounded reads prevent accidental full-table scans.
 
-## Deterministic development and tests
+Convex durable actions call the separate stateless Python worker over authenticated HTTPS. The worker never opens the demo database. It receives a bounded profile/campaign payload, researches supplied public company domains, and returns structured evidence. The worker pins validated DNS destinations and checks every redirect; explicit cloud-platform address exclusions supplement non-global IP rejection. Deployment egress policy is still required.
 
-Fictional demo fixtures use reserved `.example` domains and explicit demo flags. They are not fallbacks for a failed live request. Tests do not need paid services, real credentials or outbound messages. Provider tests replace network responses with validated fixtures.
+### Local-demo request flow
 
-## Persistence semantics
+Next uses an explicit local-only API rewrite to FastAPI, which injects a fixed workspace and stores data in SQLite. This mode has no multi-user authentication. The existing protected/public preview configuration continues to describe this mode only.
 
-Campaigns, accounts, review state and evidence live in SQLite. Research reruns retain account identity and review status. API validation failures should leave previously saved workspace data unchanged. Scores are snapshots of the profile and evidence at research time; after changing the profile, rerun research before relying on old scores.
+## Durable research and persistence
 
-## Tenant boundary
+Convex job creation, quota reservation and scheduler enqueue happen transactionally. Per-organization idempotency keys prevent repeated submissions from consuming quota twice. A maximum of two research jobs run globally, matching the default two-request worker capacity. Five total attempts use 15/30/60/120-second retry delays and 150-second leases; watchdogs recover dispatch/completion loss. Four domain lanes per worker request share an eight-slot bounded DNS pool.
 
-The repository uses tenant-scoped queries to make later isolation straightforward to test. The current tenant is a fixed development value. This does not provide authentication or user isolation. A production identity layer must derive tenant identity from a validated server session and enforce it on every route, storage reference and job.
+Cancellation prevents future attempts and discards late results; a request already in flight cannot be retracted. Running cancelled jobs keep their slot until completion or lease expiry. Partial reruns preserve previous failed-domain records, timestamps, stable identities and review decisions. Profile changes do not retroactively change earlier evidence or scores.
 
-## Provider seams
+Manual research needs a verified active matching unexpired subscription and configured commercial limits at both admission and dispatch. UTC calendar-month quota counts accepted distinct starts; failure/cancellation does not refund it. Retry attempts do not increment quota again. Operational safety caps are separate from commercial entitlements.
 
-- Candidate discovery: fictional fixtures or explicitly supplied company domains today; replaceable external discovery boundary
-- Website research: public-page fetch and extraction, bounded and SSRF-protected
-- Decisions: explainable rules by default, optional Jev adapter under server-only opt-in configuration
-- Contact verification: no configured provider, explicitly unavailable
-- Writing: grounded templates, human review, no sending
+## Billing trust boundary
 
-Use the backend source and README as authoritative implementation details. Do not assume future provider support exists because the architecture has a place for it.
+Admin-only actions select the server-configured Stripe price and return origin. They reuse deterministic Checkout operations and Stripe idempotency keys, query the customer's current subscriptions before creation, inspect prior Checkout state, and throttle every action attempt including cached retries.
+
+The webhook accepts bounded raw bytes and verifies Stripe's signature/time tolerance before processing. The action retrieves authoritative subscription state and verifies its stored customer/organization binding. Internal mutations deduplicate event IDs, reject older event timestamps and prevent same-second stale snapshots from restoring access. No browser redirect or client-set claim establishes paid entitlement. Payment details are collected by Stripe-hosted pages.
+
+## Evidence and product honesty
+
+Research supplies URLs, extracted text and retrieval times. Rules evaluate evidence against an editable profile. Drafts use stored observations without inventing a relationship, purchase intent, email address, or verification result. They are never sent automatically.
+
+Fictional demos use reserved `.example` domains and explicit flags; they are never fallback results for a failed real request. Unknown facts remain unknown. Website observations are not certified buying signals.
+
+## Provider seams and limitations
+
+- Discovery: fictional fixtures or user-supplied public company domains
+- Decisions: explainable rules; optional server-side Jev adapter requires independent live verification
+- Contact verification/licensed commercial lead data: unconfigured
+- Writing: grounded templates for human review, with no sending capability
+- Recovery, operational monitoring, legal/privacy policy and live provider acceptance: release gates in [production readiness](PRODUCTION_READINESS.md)
+
+See [SaaS setup](SAAS_SETUP.md), [operations](OPERATIONS.md), and the authoritative validators/functions for implementation detail. No configured or verified integration should be inferred from a provider adapter alone.
