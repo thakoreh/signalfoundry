@@ -183,7 +183,13 @@ export const portal = adminAction({
     if (operation.url) return { url: operation.url };
     try {
       const session = await client().billingPortal.sessions.create(
-        { customer: row.stripeCustomerId, return_url: billingOrigin() },
+        {
+          customer: row.stripeCustomerId,
+          return_url: billingOrigin(),
+          ...(process.env.STRIPE_PORTAL_CONFIGURATION_ID
+            ? { configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID }
+            : {}),
+        },
         { idempotencyKey: `sf-portal-${orgId}-${requestId}` },
       );
       const url = trustedLink(session.url, "billing.stripe.com");

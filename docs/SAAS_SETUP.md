@@ -52,6 +52,7 @@ Run the Convex CLI only after selecting an authorized development deployment. Th
 | `STRIPE_SECRET_KEY` | Stripe server key for the same intended environment |
 | `STRIPE_WEBHOOK_SECRET` | Signing secret for this environment's webhook endpoint |
 | `STRIPE_PRICE_ID` | Approved recurring price; not created or chosen by code |
+| `STRIPE_PORTAL_CONFIGURATION_ID` | Dedicated optional Portal configuration; set it on shared Stripe accounts to avoid another app's default |
 | `SIGNALFOUNDRY_MONTHLY_RESEARCH_LIMIT` | Approved positive integer job quota |
 | `SIGNALFOUNDRY_DOMAINS_PER_CAMPAIGN_LIMIT` | Approved integer 1–10 |
 | `APP_URL` | Exact HTTPS application origin for Stripe return URLs |

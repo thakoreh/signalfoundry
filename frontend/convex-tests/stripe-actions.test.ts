@@ -171,6 +171,16 @@ describe("Stripe action contract mocks (no provider network)", () => {
       (await t.query(internal.billing.forOrg, { orgId: "org_alpha" }))?.status,
     ).toBe("none");
   });
+  it("uses the dedicated portal configuration when configured", async () => {
+    vi.stubEnv("STRIPE_PORTAL_CONFIGURATION_ID", "bpc_signalfoundry_staging");
+    const { admin } = await setup();
+    fake.createPortal.mockResolvedValue({ url: "https://billing.stripe.com/session-fixture" });
+    await admin.action(api.stripe.portal, { requestId: crypto.randomUUID() });
+    expect(fake.createPortal.mock.calls[0][0]).toEqual({
+      customer: "cus_alpha", return_url: "https://app.example.com",
+      configuration: "bpc_signalfoundry_staging",
+    });
+  });
   it("binds Portal to authenticated organization customer and fixed return origin", async () => {
     const { admin } = await setup();
     fake.createPortal.mockResolvedValue({
