@@ -3,6 +3,8 @@ pid /tmp/signalfoundry-nginx.pid;
 error_log stderr warn;
 events { worker_connections 128; }
 http {
+    # Long generated preview hosts/origins exceed NGINX's default map bucket.
+    map_hash_bucket_size 128;
     access_log off;
     server_tokens off;
     client_body_temp_path /tmp/signalfoundry-client;
