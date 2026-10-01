@@ -11,6 +11,9 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM node:24-bookworm-slim AS runtime
+# Coolify may replace Docker HEALTHCHECK with its curl/wget HTTP probe.
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 \
     SIGNALFOUNDRY_MODE=saas NEXT_PUBLIC_SIGNALFOUNDRY_MODE=saas
 WORKDIR /app
