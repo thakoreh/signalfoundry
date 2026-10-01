@@ -9,9 +9,9 @@ for url in ('http://127.0.0.1:8000/api/health', 'http://127.0.0.1:3000/api/healt
     with opener.open(url, timeout=3) as response:
         assert response.status == 200 and json.load(response)['status'] == 'ok'
 host = os.environ['SIGNALFOUNDRY_PREVIEW_ORIGIN'].removeprefix('https://')
+public_access = os.environ.get('SIGNALFOUNDRY_PUBLIC_ACCESS') == 'true'
 try:
-    opener.open(Request('http://127.0.0.1:8080/', headers={'Host': host, 'X-Forwarded-Proto': 'https'}), timeout=3)
+    with opener.open(Request('http://127.0.0.1:8080/', headers={'Host': host, 'X-Forwarded-Proto': 'https'}), timeout=3) as response:
+        assert public_access and response.status == 200
 except HTTPError as error:
-    assert error.code == 401 and 'Basic' in error.headers.get('WWW-Authenticate', '')
-else:
-    raise SystemExit('Preview gateway is not requiring authentication')
+    assert not public_access and error.code == 401 and 'Basic' in error.headers.get('WWW-Authenticate', '')

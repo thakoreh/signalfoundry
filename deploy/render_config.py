@@ -8,10 +8,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
 from app.config import preview_origin
 
 
-def render(origin: str, password_file: Path, template: Path) -> str:
+def render(origin: str, password_file: Path, template: Path, *, public_access: bool = False) -> str:
     origin = preview_origin(origin)
     if not origin:
-        raise ValueError('Set SIGNALFOUNDRY_PREVIEW_ORIGIN before starting the protected preview')
+        raise ValueError('Set SIGNALFOUNDRY_PREVIEW_ORIGIN before starting the preview')
+    rendered = (template.read_text().replace('@@ORIGIN@@', origin)
+                .replace('@@HOST@@', origin.removeprefix('https://')))
+    if public_access:
+        return rendered.replace('auth_basic "SignalFoundry private preview";', 'auth_basic off;').replace(
+            '        auth_basic_user_file @@PASSWORD_FILE@@;\n', '')
     if not password_file.is_absolute() or not re.fullmatch(r'/[a-zA-Z0-9_./-]+', str(password_file)):
         raise ValueError('The preview password file must be an absolute safe path')
     if password_file.stat().st_size > 1024:
@@ -28,7 +33,11 @@ def render(origin: str, password_file: Path, template: Path) -> str:
 def main():
     template = Path(__file__).with_name('nginx.conf.template')
     password_file = Path('/run/secrets/preview.htpasswd')
-    config = render(os.environ.get('SIGNALFOUNDRY_PREVIEW_ORIGIN', ''), password_file, template)
+    public_access = os.environ.get('SIGNALFOUNDRY_PUBLIC_ACCESS', 'false')
+    if public_access not in ('true', 'false'):
+        raise ValueError('SIGNALFOUNDRY_PUBLIC_ACCESS must be true or false')
+    config = render(os.environ.get('SIGNALFOUNDRY_PREVIEW_ORIGIN', ''), password_file, template,
+                    public_access=public_access == 'true')
     target = Path('/tmp/signalfoundry-nginx.conf')
     target.write_text(config)
     target.chmod(0o600)

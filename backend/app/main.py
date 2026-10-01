@@ -126,7 +126,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.get('/api/health')
     def health():
-        return {'status': 'ok', 'mode': 'protected-preview' if configured_origin else 'local-demo', 'decision_engine': app.state.decision_provider.name,
+        return {'status': 'ok', 'mode': ('public-preview' if os.environ.get('SIGNALFOUNDRY_PUBLIC_ACCESS') == 'true' else 'protected-preview') if configured_origin else 'local-demo', 'decision_engine': app.state.decision_provider.name,
                 'providers': {'discovery': 'demo', 'contacts': 'not_configured'}}
 
     @app.get('/api/workspace', response_model=Workspace)

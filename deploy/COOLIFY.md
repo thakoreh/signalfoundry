@@ -2,6 +2,10 @@
 
 This is one shared, single-operator workspace behind HTTPS and Basic authentication. It is not a production multi-user SaaS. Both Next and FastAPI remain private loopback processes. Only the authenticated gateway on container port 8080 is reachable by Coolify's proxy. Never publish ports 3000 or 8000, or remove the gateway/host/origin checks.
 
+## Owner-authorized public access
+
+Set runtime `SIGNALFOUNDRY_PUBLIC_ACCESS=true` only when the owner explicitly wants a publicly editable shared preview. This disables gateway Basic authentication and removes the password-file requirement. The default is `false` (protected), and invalid values fail startup. Keep the exact HTTPS origin, host/origin guards, rate limits, private backend ports, and dedicated persistent data mount. Health reports `public-preview` in this mode. Anyone with the URL can view and change the shared profile, campaigns, accounts, and drafts; do not store confidential data. This is not user authentication or a multi-user SaaS. The protected-preview instructions below apply when public access is disabled.
+
 ## Access and authorization gates
 
 Use an existing authorized HTTPS Coolify session, or an authorized SSH tunnel for an HTTP-only dashboard. Do not send dashboard credentials over public HTTP. Do not create server keys, API credentials, accounts, firewall rules, or broad permissions to work around missing access. The preview password must be set by the owner through a secure flow, or its creation/configuration explicitly approved at action time. No passwords belong in chat, code, image layers, or build arguments.

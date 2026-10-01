@@ -45,6 +45,19 @@ class DeploymentTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     config.render(bad_origin, password_file, ROOT / 'deploy/nginx.conf.template')
 
+    def test_explicit_public_access_needs_no_password_and_keeps_request_guards(self):
+        rendered = config.render('https://preview.company.com', Path('/missing/preview.htpasswd'),
+                                 ROOT / 'deploy/nginx.conf.template', public_access=True)
+        self.assertIn('auth_basic off;', rendered)
+        self.assertNotIn('auth_basic_user_file', rendered)
+        self.assertIn('if ($allowed_origin = 0) { return 403; }', rendered)
+        self.assertIn('if ($http_x_forwarded_proto != "https") { return 426; }', rendered)
+        self.assertIn('limit_req zone=preview_requests', rendered)
+        self.assertNotIn('@@', rendered)
+        with self.assertRaises(ValueError):
+            config.render('http://preview.company.com', Path('/missing/preview.htpasswd'),
+                          ROOT / 'deploy/nginx.conf.template', public_access=True)
+
     def test_container_does_not_publish_or_copy_private_application_data(self):
         dockerfile = (ROOT / 'Dockerfile').read_text()
         self.assertIn('USER 10001:10001', dockerfile)
