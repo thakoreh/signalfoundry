@@ -44,6 +44,12 @@ class CustomerValueTests(unittest.TestCase):
         account=RulesDecisionProvider().evaluate(self.profile(),Page('https://agency.example/','Example Agency','We build workflow automation for teams.','Agency workflow automation AI.'),campaign_id='test')
         self.assertIn('Sender offer relevance and geographic applicability are not verified',make_draft(account,self.profile()).warning)
 
+    def test_draft_keeps_profile_instructions_out_of_sender_offer(self):
+        from app.research import make_draft
+        profile=self.profile().model_copy(update={'description':'We help agencies automate workflows. Draft ICP from website keyword rules; review target industries.'})
+        account=RulesDecisionProvider().evaluate(profile,Page('https://agency.example/','Agency','We build workflow automation.','Agency workflow automation.'),campaign_id='test')
+        self.assertNotIn('Draft ICP',make_draft(account,profile).body)
+
     def test_explicit_company_category_exclusion_is_preserved(self):
         profile=self.profile().model_copy(update={'exclusions':['SaaS']})
         page=Page('https://vendor.example/','Example SaaS vendor','We sell a SaaS platform.','Workflow automation SaaS platform.')

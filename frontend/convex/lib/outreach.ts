@@ -60,7 +60,7 @@ export function makeGroundedDraft(account: Account, profile: Profile): Draft {
   const sourceLine = observed
     ? `Your website includes this description: “${observed}”`
     : "I could not find a complete, citable description on the available page.";
-  const offer = completeSourceSentence(profile.description, 400);
+  const offer = completeSourceSentence(profile.description.split(/(?<=[.!?])\s+/)[0], 400);
   const senderLine = `I’m reaching out from ${profile.company_name}. ${offer ?? "[Add your specific offer and its relevance before using this draft.]"}`;
   const body =
     `Hi ${name} team,\n\n` +

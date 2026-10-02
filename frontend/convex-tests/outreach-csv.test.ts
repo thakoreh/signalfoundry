@@ -125,6 +125,12 @@ it("never treats a high fit score as verification of sender offer or geographic 
  expect(draft.body).not.toContain("you are based in Paris");
 });
 
+it("keeps profile-analysis instructions out of the sender offer",()=>{
+ const draft=makeGroundedDraft(account,{...profile,description:"We help agencies automate repetitive workflows. Draft ICP from website keyword rules; review target industries and roles."});
+ expect(draft.body).not.toContain("Draft ICP");
+ expect(draft.body).toContain("We help agencies automate repetitive workflows.");
+});
+
 it("grounds the sender offer in the editable supplier description rather than inventing results",()=>{
  const offer="We help agencies automate repetitive workflows.";
  const draft=makeGroundedDraft(account,{...profile,description:offer});

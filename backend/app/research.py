@@ -195,7 +195,7 @@ def make_draft(account: Account, profile: Profile) -> Draft:
     source_line = (f'Your website includes this description: “{observed}”'
                    if observed else
                    'I could not find a complete, citable description on the available page.')
-    offer = _complete_source_sentence(profile.description, limit=400)
+    offer = _complete_source_sentence(re.split(r'(?<=[.!?])\s+', profile.description, maxsplit=1)[0], limit=400)
     sender_line = (f'I’m reaching out from {profile.company_name}. ' +
                    (offer or '[Add your specific offer and its relevance before using this draft.]'))
     body = (f'Hi {name} team,\n\n'
