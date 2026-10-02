@@ -439,3 +439,55 @@ test("demo interactions make no requests, downloads, or persistent mutations", a
     "No accounts are imported, researched, saved, or exported here.",
   );
 });
+
+test("small research labels retain readable foreground contrast", async ({
+  page,
+}) => {
+  await openLanding(page);
+  await page.getByRole("tab", { name: "Import accounts", exact: true }).click();
+  const results = await page.evaluate(() => {
+    const luminance = (color: string) => {
+      const rgb = color
+        .match(/[\d.]+/g)!
+        .slice(0, 3)
+        .map(Number)
+        .map((part) => {
+          const value = part / 255;
+          return value <= 0.04045
+            ? value / 12.92
+            : ((value + 0.055) / 1.055) ** 2.4;
+        });
+      return 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+    };
+    return [
+      ".sf-domain-list > div > span",
+      ".sf-demo-bottom > p",
+      ".sf-demo-disclaimer",
+      ".sf-hero-lede",
+    ].map((selector) => {
+      const element = document.querySelector(selector)!;
+      let ancestor: Element | null = element;
+      let background = "rgb(255, 255, 255)";
+      while (ancestor) {
+        const color = getComputedStyle(ancestor).backgroundColor;
+        if (color !== "rgba(0, 0, 0, 0)" && color !== "transparent") {
+          background = color;
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+      const foreground = getComputedStyle(element).color;
+      const levels = [luminance(foreground), luminance(background)].sort(
+        (a, b) => a - b,
+      );
+      return {
+        selector,
+        foreground,
+        background,
+        contrast: (levels[1] + 0.05) / (levels[0] + 0.05),
+      };
+    });
+  });
+  for (const result of results)
+    expect(result.contrast, JSON.stringify(result)).toBeGreaterThanOrEqual(4.5);
+});

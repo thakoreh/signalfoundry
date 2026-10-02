@@ -597,7 +597,7 @@
   border-bottom: 0;
 }
 .sf-domain-list span {
-  color: #7a8a7e;
+  color: #647567;
   font:
     12px ui-monospace,
     monospace;
@@ -812,7 +812,7 @@
   align-items: center;
   gap: 5px;
   font-size: 13px;
-  color: #6f7b70;
+  color: #647567;
   font-variant-numeric: tabular-nums;
 }
 .sf-demo-bottom strong {
