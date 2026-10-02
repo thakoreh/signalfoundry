@@ -59,6 +59,7 @@ export default function LandingPage() {
         <Link className="sf-brand" href="/" aria-label="SignalFoundry home">
           <Brand />
         </Link>
+        <LandingMotion />
         <nav
           className="sf-nav-links"
           id="sf-mobile-menu"
@@ -82,7 +83,6 @@ export default function LandingPage() {
           >
             Create workspace <Arrow />
           </Link>
-          <LandingMotion />
         </div>
       </header>
 
@@ -412,8 +412,7 @@ export default function LandingPage() {
         <div>
           <p className="sf-kicker">A FEW GOOD QUESTIONS</p>
           <h2 id="faq-title">
-            Clarity comes
-            <br />
+            Clarity comes <br />
             standard.
           </h2>
         </div>
@@ -473,8 +472,7 @@ export default function LandingPage() {
         </div>
         <p className="sf-kicker">FROM A LIST TO A POINT OF VIEW</p>
         <h2 id="final-title">
-          Make your next account
-          <br />
+          Make your next account <br />
           list worth believing.
         </h2>
         <p>Bring the companies. Keep the reasons.</p>

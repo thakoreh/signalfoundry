@@ -123,6 +123,12 @@ test("responsive landing has no horizontal overflow and stable walkthrough dimen
 }, testInfo) => {
   await openLanding(page);
   await noOverflow(page);
+  await expect(page.locator("#faq-title")).toHaveText(
+    "Clarity comes standard.",
+  );
+  await expect(page.locator("#final-title")).toHaveText(
+    "Make your next account list worth believing.",
+  );
   await capture(page, testInfo, "landing");
   const sizes: { stage: string; width: number; height: number }[] = [];
   for (let index = 0; index < STAGES.length; index++) {
@@ -175,13 +181,23 @@ test("mobile menu opens, closes after a link, and restores focus on Escape", asy
   await expect(toggle).toBeVisible();
   await expect(toggle).toHaveAttribute("aria-expanded", "false");
   await expect(navigation).toBeHidden();
+  await toggle.focus();
   for (let attempt = 0; attempt < 2; attempt++) {
-    await toggle.click();
+    await page.keyboard.press("Enter");
     await expect(navigation).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-expanded", "true");
-    const faq = navigation.getByRole("link", { name: "FAQ", exact: true });
-    await expect(faq).toBeVisible();
-    await faq.focus();
+    for (const name of [
+      "How it works",
+      "The evidence",
+      "Scope & plans",
+      "FAQ",
+      "Sign in",
+    ]) {
+      await page.keyboard.press("Tab");
+      await expect(
+        navigation.getByRole("link", { name, exact: true }),
+      ).toBeFocused();
+    }
     await page.keyboard.press("Escape");
     await expect(navigation).toBeHidden();
     await expect(toggle).toHaveAttribute("aria-expanded", "false");

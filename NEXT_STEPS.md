@@ -18,12 +18,12 @@ The owner requested one reviewable branch/PR per repository. The owner's other a
 
 ## Verification completed locally
 
-- Complete `bash scripts/check.sh` passed: 91 backend tests; packaging, deployment, launcher, preflight and worker checks; 41 frontend node tests; 64 Convex tests; 14 landing/DOM tests; TypeScript; ESLint; production build; proxy integration; full-stack API workflow; public-preview standalone and hostile-header checks
+- Complete `bash scripts/check.sh` passed: 91 backend tests; packaging, deployment, launcher, preflight and worker checks; 41 frontend node tests; 64 Convex tests; 14 landing/DOM tests (15 after the focused accessibility-review additions); TypeScript; ESLint; production build; proxy integration; full-stack API workflow; public-preview standalone and hostile-header checks
 - Separate `scripts/test_saas_failclosed.py` passed: SaaS build with missing providers fails closed; no legacy/demo API fallback
 - DOM regressions exercise roving keyboard focus, repeated stage transitions, endpoint controls, reversible shortlist state, native anchor contracts, no network/storage/download effects, and honest product boundaries
 - Dependency audit at the initial test checkpoint reported zero vulnerabilities including dev dependencies; exact final-head CI repeats the repository audits
 
-Local browser navigation to the loopback preview was refused (`ERR_BLOCKED_BY_CLIENT`). This is **not** a visual QA pass. The PR adds 35 Chromium CI cases across desktop 1188/1440 and mobile/tablet 360/390/768, keyboard/menu/hash behavior, reduced motion, stable panel heights, and source screenshots. Inspect the `landing-browser-evidence` artifact for the final commit. The final CI outcome and remaining visual observations must be recorded before this handoff is called ready.
+Local browser navigation to the loopback preview was refused (`ERR_BLOCKED_BY_CLIENT`). This is **not** a visual QA pass. The PR adds 35 Chromium CI cases across desktop 1188/1440 and mobile/tablet 360/390/768, keyboard/menu/hash behavior, reduced motion, stable panel heights, and source screenshots. Inspect the `landing-browser-evidence` artifact for the final commit. The initial full CI run passed on `51b794b` (run `37009106124`), including all 35 browser cases, three Docker builds, worker-container smoke, dependency audits, fail-closed checks, and Gitleaks. Downloaded desktop/tablet/mobile screenshots were visually inspected. Review then corrected mobile navigation keyboard order, compact tab naming, and word spacing when mobile headings hide a line break, with targeted regression assertions. Recheck the final PR head CI after these refinements; do not use the earlier run as proof of the newer head.
 
 ## Environment and migrations
 

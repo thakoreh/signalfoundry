@@ -107,6 +107,24 @@ describe("interactive sample research walkthrough", () => {
     );
   });
 
+  it("includes each compact visible label in the accessible tab name", () => {
+    for (const tab of tabs()) {
+      const compactLabel = tab
+        .querySelector(".sf-tab-short")
+        ?.textContent?.trim();
+      expect(compactLabel).toBeTruthy();
+      const accessibleCopy = tab.cloneNode(true) as HTMLElement;
+      accessibleCopy
+        .querySelectorAll('[aria-hidden="true"]')
+        .forEach((element) => element.remove());
+      const accessibleName =
+        tab.getAttribute("aria-label") ?? accessibleCopy.textContent ?? "";
+      expect(accessibleName.toLowerCase()).toContain(
+        compactLabel!.toLowerCase(),
+      );
+    }
+  });
+
   it("supports direct stage selection in any order, including repeated clicks", async () => {
     for (const index of [2, 0, 3, 1, 1, 2, 3, 0]) {
       await click(tabs()[index]);

@@ -5,7 +5,7 @@ import { useRef, useState, type KeyboardEvent } from "react";
 export const RESEARCH_STAGES = [
   {
     label: "Define the ICP",
-    short: "Your ICP",
+    short: "ICP",
     title: "Start with a clear point of view.",
     description:
       "Tell the workspace what a good-fit company looks like. Your brief guides the review.",
