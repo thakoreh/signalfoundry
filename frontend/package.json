@@ -12,7 +12,8 @@
     "format": "prettier --write app components lib tests proxy.ts next.config.ts eslint.config.mjs",
     "format:check": "prettier --check app components lib tests proxy.ts next.config.ts eslint.config.mjs",
     "test:landing": "vitest run --config vitest.landing.config.ts",
-    "test:convex": "vitest run --config vitest.config.ts"
+    "test:convex": "vitest run --config vitest.config.ts",
+    "test:browser": "playwright test --config playwright.config.ts"
   },
   "dependencies": {
     "@clerk/nextjs": "7.9.9",
@@ -25,12 +26,14 @@
   },
   "devDependencies": {
     "@edge-runtime/vm": "5.0.0",
+    "@playwright/test": "1.63.0",
     "@types/node": "^24.0.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "convex-test": "0.0.60",
     "eslint": "^9.0.0",
     "eslint-config-next": "16.3.8",
+    "jsdom": "26.1.0",
     "prettier": "^3.9.9",
     "typescript": "^5.9.0",
     "vitest": "5.0.3"
