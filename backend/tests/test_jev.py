@@ -3,11 +3,14 @@ import io
 from unittest.mock import MagicMock, patch
 import json
 import unittest
+import secrets
 import httpx
 
 from app.fixtures import DEMO_PROFILE
 from app.jev import JevDecisionProvider, MODEL
+from app.models import Profile
 from app.providers import ProviderNotConfigured, UnconfiguredContacts, UnconfiguredDiscovery
+from app.research import RulesDecisionProvider, make_draft
 from app.safety import Page
 
 PAGE = Page('https://company.com/', 'Public Company', 'Workflow automation',
@@ -23,6 +26,9 @@ def response_data():
 
 
 class JevTest(unittest.TestCase):
+    def setUp(self):
+        self.api_key = secrets.token_urlsafe(36)
+
     def test_no_key_never_calls_network(self):
         def fail(_):
             raise AssertionError('Network must not be called')
@@ -32,19 +38,74 @@ class JevTest(unittest.TestCase):
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('no server key', account.unknowns[0])
 
+    def test_provider_sends_targeting_fields_not_supplier_profile(self):
+        profile = Profile(
+            company_name='Grand River AI',
+            description='Supplier biography that must not influence target qualification.',
+            industries=['Agency'],
+            company_sizes=['11–50'],
+            geographies=['Canada'],
+            buyer_roles=['Founder', 'Operations'],
+            keywords=['automation'],
+            exclusions=['Recruiting'],
+        )
+        def handler(request):
+            payload = json.loads(request.content)
+            state = payload['state']
+            self.assertNotIn('icp', state)
+            self.assertEqual(state['targeting'], {
+                'industries': ['Agency'],
+                'company_sizes': ['11–50'],
+                'geographies': ['Canada'],
+                'buyer_roles': ['Founder', 'Operations'],
+                'keywords': ['automation'],
+                'exclusions': ['Recruiting'],
+            })
+            serialized = json.dumps(state)
+            self.assertNotIn('Grand River AI', serialized)
+            self.assertNotIn('Supplier biography', serialized)
+            instructions = payload['questions']['qualification']['instructions'].lower()
+            self.assertIn('missing evidence', instructions)
+            self.assertIn('explicit exclusion', instructions)
+            self.assertIn('not require every', instructions)
+            return httpx.Response(200, json=response_data())
+
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
+        account = provider.evaluate(profile, PAGE, campaign_id='cmp_test')
+        self.assertEqual(account.decision_engine, 'jev')
+
+    def test_grounded_draft_uses_complete_company_evidence_and_warns_on_unconfirmed_fit(self):
+        profile = Profile(
+            company_name='Grand River AI',
+            description='A supplier profile that is editable but not target evidence.',
+            industries=['Agency'], company_sizes=[], geographies=[],
+            buyer_roles=['Founder'], keywords=['automation'], exclusions=[],
+        )
+        page = Page(
+            'https://target.example/', 'Target Company',
+            'We build custom AI software that replaces off-the-shelf SaaS.',
+            'Home Back Integrations … to streamline operations, from internal tools and CRMs to AI-powered automation.',
+        )
+        account = RulesDecisionProvider().evaluate(profile, page, campaign_id='cmp_test')
+        draft = make_draft(account, profile)
+        self.assertIn('We build custom AI software that replaces off-the-shelf SaaS.', draft.body)
+        self.assertNotIn('… to streamline', draft.body)
+        self.assertNotIn('Back Integrations', draft.body)
+        self.assertIn('Fit is unconfirmed', draft.warning)
+
     def test_mocked_official_contract_and_expected_score_scale(self):
         calls = []
         def handler(request):
             calls.append(request)
             self.assertEqual(str(request.url), 'https://api.typesafe.ai/v1/systemone')
-            self.assertEqual(request.headers['Authorization'], 'Bearer test-only-not-a-secret')
+            self.assertEqual(request.headers['Authorization'], f'Bearer {self.api_key}')
             body = json.loads(request.content)
             self.assertEqual(body['model'], MODEL)
             self.assertEqual(body['questions']['fit_score']['type'], 'score')
             self.assertEqual(len(body['questions']['fit_score']['criteria']), 5)
             self.assertEqual(body['state']['website']['url'], PAGE.url)
             return httpx.Response(200, json=response_data())
-        provider = JevDecisionProvider('test-only-not-a-secret', transport=httpx.MockTransport(handler))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
         account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(len(calls), 1)
         self.assertEqual(account.decision_engine, 'jev')
@@ -52,6 +113,75 @@ class JevTest(unittest.TestCase):
         self.assertIn('0.60', account.unknowns[0])
         self.assertEqual(account.employee_range, 'Unknown')
         self.assertTrue(all(c.email is None for c in account.contacts))
+
+    def test_not_fit_qualification_overrides_high_fit_score(self):
+        data = response_data()
+        data['answers']['qualification'].update(
+            choice='not_fit', probabilities={'fit': 0.05, 'not_fit': 0.9, 'unknown': 0.05})
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.score, 0)
+        self.assertEqual(account.score_breakdown[0].points, 0)
+        self.assertEqual(account.confidence, 'low')
+
+    def test_sparse_probability_maps_are_accepted_as_zero_filled(self):
+        data = response_data()
+        data['answers']['qualification'].update(choice='fit', probabilities={'fit': 1.0})
+        data['answers']['fit_score'].update(score=4.0, probabilities={'4': 1.0})
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.score, 100)
+
+    def test_usage_is_strictly_typed_and_bounded(self):
+        for usage in ({'input_tokens': 100, 'output_tokens': 20, 'unexpected': 1},
+                      {'input_tokens': -1, 'output_tokens': 20},
+                      {'input_tokens': 100}):
+            with self.subTest(usage=usage):
+                data = response_data()
+                data['usage'] = usage
+                raw = json.dumps(data).encode()
+                provider = JevDecisionProvider(
+                    self.api_key,
+                    transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+                )
+
+                account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+                self.assertEqual(account.decision_engine, 'rules')
+                self.assertIn('Rules fallback used', account.unknowns[0])
+
+    def test_low_model_confidence_is_exposed_and_downgrades_account(self):
+        data = response_data()
+        data['answers']['qualification']['confidence'] = 0.2
+        data['answers']['fit_score']['confidence'] = 0.3
+        raw = json.dumps(data).encode()
+        provider = JevDecisionProvider(
+            self.api_key,
+            transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)),
+        )
+
+        account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+
+        self.assertEqual(account.decision_engine, 'jev')
+        self.assertEqual(account.confidence, 'low')
+        self.assertLess(account.score, 65)
+        self.assertIn('review', account.score_breakdown[0].reason.lower())
+        self.assertIn('qualification 0.20', account.unknowns[0])
+        self.assertIn('fit score 0.30', account.unknowns[0])
 
     def test_malformed_out_of_range_nonfinite_and_unknown_model_fallback(self):
         cases = []
@@ -66,7 +196,7 @@ class JevTest(unittest.TestCase):
         for data in cases:
             with self.subTest(data=data):
                 raw = json.dumps(data).encode()
-                provider = JevDecisionProvider('mock', transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)))
+                provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(lambda _: httpx.Response(200, content=raw)))
                 account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
                 self.assertEqual(account.decision_engine, 'rules')
                 self.assertIn('Rules fallback used', account.unknowns[0])
@@ -77,7 +207,7 @@ class JevTest(unittest.TestCase):
             def handler(request):
                 calls.append(request)
                 return httpx.Response(status)
-            provider = JevDecisionProvider('mock', transport=httpx.MockTransport(handler))
+            provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
             account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
             self.assertEqual(account.decision_engine, 'rules')
             self.assertIn(str(status), account.unknowns[0])
@@ -86,13 +216,13 @@ class JevTest(unittest.TestCase):
     def test_timeout_fallback(self):
         def handler(request):
             raise httpx.ReadTimeout('timeout')
-        provider = JevDecisionProvider('mock', transport=httpx.MockTransport(handler))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
         account = provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('timeout', account.unknowns[0])
 
     def test_oversized_response_fallback(self):
-        provider = JevDecisionProvider('mock', transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b'x' * 100001)))
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(lambda _: httpx.Response(200, content=b'x' * 100001)))
         self.assertEqual(provider.evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test').decision_engine, 'rules')
 
     def test_live_transport_is_pinned_and_deadline_bounded_without_network(self):
@@ -105,7 +235,7 @@ class JevTest(unittest.TestCase):
         connection = MagicMock()
         connection.getresponse.return_value = response
         with patch('app.jev.resolve_public', return_value=['8.8.8.8']) as resolver, patch('app.jev.PinnedHTTPSConnection', return_value=connection) as factory:
-            account = JevDecisionProvider('mock').evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+            account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'jev')
         resolver.assert_called_once_with('api.typesafe.ai', 443, 2.0)
         self.assertEqual(factory.call_args.args[:3], ('api.typesafe.ai', '8.8.8.8', 443))
@@ -120,7 +250,7 @@ class JevTest(unittest.TestCase):
         response.getheader.return_value = 'identity'
         connection.getresponse.return_value = response
         with patch('app.jev.resolve_public', return_value=['8.8.8.8']), patch('app.jev.PinnedHTTPSConnection', return_value=connection), patch('app.jev.time.monotonic', side_effect=[0, 1, 9]):
-            account = JevDecisionProvider('mock').evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
+            account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('timeout', account.unknowns[0])
         response.read1.assert_not_called()
@@ -135,3 +265,20 @@ class JevTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class JevMetadataTests(unittest.TestCase):
+    def test_target_page_identity_metadata_reaches_the_provider(self):
+        from uuid import uuid4
+        seen=[]
+        def capture(request):
+            seen.append(json.loads(request.content))
+            return httpx.Response(503)
+        page=Page('https://company.example/','Example software vendor','We build collaboration software.','Navigation and workflow text.')
+        profile=Profile(company_name='Supplier',description='Not target evidence',industries=['B2B SaaS'],keywords=['workflow'],company_sizes=[],geographies=[],buyer_roles=[],exclusions=[])
+        JevDecisionProvider(uuid4().hex,transport=httpx.MockTransport(capture)).evaluate(profile,page,campaign_id='metadata-test')
+        self.assertEqual(seen[0]['state']['website'].get('title'),page.title)
+        self.assertEqual(seen[0]['state']['website'].get('description'),page.description)
+        self.assertIn('industry',seen[0]['questions']['fit_score']['criteria'][3].lower())
+        self.assertIn('keyword',seen[0]['questions']['fit_score']['criteria'][3].lower())
+        self.assertIn('unconfigured',seen[0]['questions']['fit_score']['instructions'].lower())

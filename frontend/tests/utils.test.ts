@@ -9,6 +9,8 @@ import {
   signalCount,
   sourceCount,
   replaceSelectedAccount,
+  decisionEngineLabel,
+  websiteAnalysisMessage,
 } from "../lib/utils.ts";
 import type { Account, Evidence } from "../lib/types.ts";
 const accounts = [
@@ -75,6 +77,41 @@ test("multiple excerpts from one URL are one source", () =>
     ] as Evidence[]),
     2,
   ));
+test("decision engine labels are neutral, truthful, and flag fallback mixing", () => {
+  assert.equal(decisionEngineLabel([]), "Decision engine");
+  assert.equal(
+    decisionEngineLabel([{ decision_engine: "jev" }]),
+    "Jev intelligence",
+  );
+  assert.equal(
+    decisionEngineLabel([{ decision_engine: "rules" }]),
+    "Rules-based intelligence",
+  );
+  assert.equal(
+    decisionEngineLabel([
+      { decision_engine: "jev" },
+      { decision_engine: "rules" },
+    ]),
+    "Mixed decision engines",
+  );
+});
+
+test("website analysis guidance describes service readiness without unsupported setup claims", () => {
+  assert.equal(
+    websiteAnalysisMessage(true, true),
+    "Analyze your public website or define your customer profile below. The research service is responding; review and edit the draft before saving.",
+  );
+  assert.equal(
+    websiteAnalysisMessage(true, false),
+    "Analyze your public website or define your customer profile below. Service status is unavailable right now, so you can define the profile manually or retry analysis later.",
+  );
+  assert.equal(
+    websiteAnalysisMessage(false, true),
+    "You can review this profile. An organization administrator can change targeting preferences.",
+  );
+  assert.ok(!websiteAnalysisMessage(true, true).includes("must configure"));
+});
+
 test("late status response cannot reopen dismissed detail or overwrite newer selection", () => {
   const updated = { id: "a", status: "shortlisted" } as Account;
   assert.equal(replaceSelectedAccount(null, updated), null);

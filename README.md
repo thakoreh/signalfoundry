@@ -1,6 +1,12 @@
 # SignalFoundry
 
-A working, local-first B2B prospect research MVP. SignalFoundry is a temporary product name.
+An AI B2B prospecting and outreach-preparation application: define an ICP, import company domains or CSV, inspect public-site evidence, prioritize a shortlist, draft and export. SignalFoundry targets the established outbound market, not an agency-only niche.
+
+The public homepage lives at `/`; the application lives at `/workspace`. It includes a responsive landing page, legal/contact routes, real-domain CSV importing, and an optional server-side Jev qualification adapter. Automatic prospect discovery, verified contact enrichment, email delivery, reply tracking and meeting booking are **not implemented**. They remain launch requirements for a full outbound platform.
+
+**SaaS launch is gated.** The new multi-user code requires provider configuration, review, and live-environment acceptance before customer use. Start with [SaaS setup](docs/SAAS_SETUP.md), [launch gates](docs/PRODUCTION_READINESS.md), and [operations](docs/OPERATIONS.md). Nothing in this branch automatically provisions accounts, credentials, prices, migrations, or a deployment.
+
+## Local demo instructions
 
 **This is a local demo, not a production multi-user SaaS.** There is no login, billing, outbound sending, or commercial lead-data subscription. Do not expose either application server publicly. An optional password-protected single-operator preview is described in [Coolify deployment](deploy/COOLIFY.md). The app has one local workspace, and anyone with access to that instance can see and edit its contents.
 
@@ -25,15 +31,15 @@ From the extracted project folder, run the same two Bash commands above. Verific
 
 Open http://localhost:3000. FastAPI is available at http://127.0.0.1:8000/api/health and its interactive development API documentation at http://127.0.0.1:8000/docs.
 
-1. Load the fictional demo to explore the full workflow, or enter your public business website and review the draft ideal customer profile
+1. Open `/workspace`, enter your public business website and review the draft ideal customer profile
 2. Edit your target industries, roles, company sizes, regions and keywords
-3. Create a demo campaign or paste public business domains for a real research campaign
+3. Create a research campaign by importing a CSV website column or pasting public business domains
 4. Run research, inspect each account's sources and scoring, and shortlist promising accounts
 5. Create an evidence-grounded outreach draft for human review and export a CSV
 
-A draft is never sent. Demo accounts and their supporting examples are fictional and labeled throughout. A homepage observation is not a verified buying signal. Unknown company details, contacts, email verification and event dates remain unknown.
+A draft is never sent. Public preview and SaaS reject demo campaigns and demo-reset requests; test fixtures are limited to isolated private tests. A homepage observation is not a verified buying signal. Unknown company details, contacts, email verification and event dates remain unknown.
 
-## Architecture
+## Local demo architecture
 
 - Next.js / React / TypeScript frontend, with same-origin `/api` requests proxied to FastAPI
 - FastAPI / Pydantic API with strict payload validation
@@ -56,11 +62,11 @@ For a running disposable development instance, `python3 scripts/smoke.py` exerci
 
 ## Data and external services
 
-The default installation needs no API key and performs no paid API calls. Manual website research makes ordinary HTTPS requests only to the public company URLs supplied for the campaign. The website analyzer is an editable draft, not a factual certification. Candidate discovery uses explicitly fictional fixtures in demo mode; real research starts with user-supplied domains. Commercial discovery and contact-verification integrations are intentionally not configured.
+The default installation needs no API key and performs no paid API calls. Manual website research makes ordinary HTTPS requests only to the public company URLs supplied for the campaign. The website analyzer is an editable draft, not a factual certification. Research starts with user-supplied domains; there is no automatic prospect discovery. Commercial discovery and contact-verification integrations are intentionally not configured.
 
 Never put credentials in browser variables or source code. Optional decision-provider setup is server-side, off by default, and documented separately. The OpenAI Decisions API remains an extension point until a public, verified contract is available.
 
-## Security boundary
+## Local demo security boundary
 
 SSRF defenses reject non-public addresses and unsafe schemes and recheck redirect destinations. Fetches have bounded time and size. CSV fields are neutralized against spreadsheet formula injection. Local access controls and tenant-scoped queries are useful defense in depth, but are **not authentication**. This app is intended for one trusted operator on a private machine.
 

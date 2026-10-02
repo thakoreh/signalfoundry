@@ -49,7 +49,8 @@ def main() -> int:
     if not node or not next_bin.is_file():
         raise SystemExit('Run ./scripts/setup.sh first; Node.js and frontend dependencies are required')
     api_port, ui_port = port('BACKEND_PORT', 8000), port('FRONTEND_PORT', 3000)
-    env = {**os.environ, 'API_BASE_URL': f'http://127.0.0.1:{api_port}', 'NEXT_TELEMETRY_DISABLED': '1'}
+    env = {**os.environ, 'API_BASE_URL': f'http://127.0.0.1:{api_port}', 'NEXT_TELEMETRY_DISABLED': '1',
+           'SIGNALFOUNDRY_MODE': 'local-demo', 'NEXT_PUBLIC_SIGNALFOUNDRY_MODE': 'local-demo'}
     processes: list[subprocess.Popen] = []
 
     def interrupted(_signum, _frame):

@@ -1,34 +1,36 @@
-# Production readiness
+# Production launch gates
 
-This project demonstrates a usable research workflow. It is not ready to accept paying customers or untrusted multi-user traffic.
+Status: **release-candidate implementation; launch blocked pending configuration and independent environment verification**. Local tests and mocks cannot prove Clerk, Convex, Stripe, live worker networking, or container operations in your account.
 
-## Before any hosted beta
+## Implemented for review
 
-- Add real authentication and server-derived tenant identity; never accept tenant identifiers as proof of authorization
-- Replace the shared local workspace with isolated tenant/user data and test cross-tenant access at every resource boundary
-- Add CSRF protections, session security, rate limits, usage quotas and abuse controls appropriate to the chosen hosting topology
-- Put research in a durable worker queue with per-tenant limits, cancellation, retries, idempotency and progress events
-- Run crawlers in isolated, egress-controlled workers with an outbound allow/deny policy, DNS-rebinding protection, strict redirect handling and observability
-- Migrate SQLite to PostgreSQL through explicit migrations; configure backups, restore exercises and retention/deletion policies
-- Add a tested provider for real candidate discovery; obey its license, privacy obligations and request limits
-- Add real contact enrichment and email verification only under an authorized vendor contract; retain provenance and verification timestamps
-- Treat sourced text as untrusted. Protect decision/generation adapters against prompt injection, require supported facts and validate outputs
-- Validate targeting judgments against labeled examples; calibrate thresholds rather than treating model confidence as truth
-- Add audit logs, provider health metrics and cost ceilings, without storing sensitive data or secrets in logs
-- Complete dependency/security review, accessibility testing, legal/privacy review and operational incident preparation
+- Explicit SaaS vs local-demo modes, fail-closed configuration, Clerk session/org authentication boundary
+- Convex tenant-scoped indexed data model and authorization wrappers; admin/member restrictions
+- Durable bounded research jobs with retry, idempotency, cancellation and quota accounting
+- Stateless authenticated worker, bounded SSRF-resistant fetches and sanitized errors
+- Server-side Stripe Checkout/Portal, signature-checked webhook processing, deduplicated subscription projection and fail-closed commercial entitlements
+- Reproducible local checks and CI definition; separate worker deployment specification
 
-## Before outbound automation or revenue
+These are code capabilities, not claims that cloud accounts are configured or the release is operationally ready.
 
-- User-reviewed sending authorization, connected mailbox scopes, unsubscribe/suppression rules and jurisdiction-specific compliance
-- Delivery reputation controls and explicit limits; the MVP sends no email
-- Billing provider, metering, plan entitlements, cancellation/refund terms and auditability
-- Domain/name availability and trademark clearance; “SignalFoundry” is a working title only
+## Must pass before customer access
 
-## Intentional limits
+- [ ] Review and approve the code/PR; required CI passes on the exact release commit
+- [ ] Build and run both container images on the target architecture; verify non-root filesystem, readiness, restarts, grace periods, limits, and no exposed demo API
+- [ ] Select/configure Clerk, Convex, Stripe test and live projects separately; official codegen and approved Convex deployment pass
+- [ ] Complete actual two-user/two-organization browser acceptance: login/recovery/logout, switch org while requests are in flight, member vs admin, removed member, expired JWT, ID substitution on every entity/API
+- [ ] Test real Convex scheduler behavior across worker timeouts, duplicated requests, worker restart, cancellation races and quota exhaustion
+- [ ] Approve Stripe price, currency, commercial limits, tax, cancellation/refund policy; finish test-mode billing and webhook replay/out-of-order tests
+- [ ] Resolve the original GitGuardian incident using its exact filename/line and incident evidence; no current-code cleanup can prove the historical alert is false or rotate a secret
+- [ ] Configure TLS, network isolation, allowed host/origin, secrets management, rotation, provider budgets and abuse controls
+- [ ] Connect metrics/log alerts; verify worker-not-ready, job failure/backlog, billing webhook failure, high auth errors and resource usage alerts reach an owner
+- [ ] Rehearse backup/export and isolated restore; record recovery point/time objectives and authorized rollback plan
+- [ ] Approve privacy notice, product terms, data retention/deletion, business/site research policy, legal company identity and support contact
+- [ ] Decide whether licensed discovery/contact verification is needed. It remains unconfigured; no real contact verification is claimed
+- [ ] Finish accessibility, responsive UI and target-browser acceptance with the real auth widgets
 
-- One local workspace and no identity verification
-- Single-page public website extraction rather than complete web search or deep crawling
-- No purchased lead database, CRM sync, contact verification or mailbox integration
-- Static evidence-grounded draft templates instead of an enabled generative provider
-- Synchronous, bounded small-batch research rather than production job orchestration
-- Demo signals are fictional. Real pages produce evidence at retrieval time; unknown publication dates stay null
+## Product honesty
+
+Demo accounts/evidence remain explicitly fictional. Public website observations are not verified buying events. Manual research accepts supplied public company domains only. Contact discovery, email verification, automatic sending and commercial lead-data licensing are not supplied. Drafts are human-reviewed suggestions and are never sent.
+
+See [setup](SAAS_SETUP.md), [operations](OPERATIONS.md), and [verification evidence](VERIFICATION.md).

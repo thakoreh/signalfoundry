@@ -7,8 +7,9 @@ import type {
   Campaign,
   Health,
   WorkspaceData,
+  ResearchJob,
 } from "@/lib/types";
-import { api, errorMessage, jsonBody } from "@/lib/api";
+import { errorMessage, jsonBody } from "@/lib/api";
 import {
   filterAccounts,
   formatDate,
@@ -17,15 +18,36 @@ import {
   signalCount,
   sourceCount,
   replaceSelectedAccount,
+  decisionEngineLabel,
+  websiteAnalysisMessage,
 } from "@/lib/utils";
 import { Icon } from "./icons";
+import { useWorkspaceSession } from "./workspace-session";
 import { Dialog } from "./dialog";
 import { ProfileEditor } from "./profile-editor";
 import { CampaignDialog } from "./campaign-dialog";
 import { AccountDrawer } from "./account-drawer";
+import { BillingPanel } from "./billing-panel";
+import { activeJob } from "@/lib/jobs";
 
-type View = "accounts" | "campaigns" | "profile" | "shortlist";
-export default function Workspace() {
+type View = "accounts" | "campaigns" | "profile" | "shortlist" | "billing";
+export default function Workspace({
+  organizationControl,
+  userControl,
+}: {
+  organizationControl?: React.ReactNode;
+  userControl?: React.ReactNode;
+}) {
+  const { api, request, mode: appMode, isAdmin } = useWorkspaceSession();
+  const isSaas = appMode === "saas";
+  const [job, setJob] = useState<ResearchJob | null>(null);
+  const [jobRevision, setJobRevision] = useState(0);
+  const [jobError, setJobError] = useState("");
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [provisionBusy, setProvisionBusy] = useState(false);
+  const researchRequest = useRef<{ campaignId: string; key: string } | null>(
+    null,
+  );
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -42,12 +64,10 @@ export default function Workspace() {
   const [sort, setSort] = useState("score");
   const [website, setWebsite] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
-  const [demoBusy, setDemoBusy] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [newCampaign, setNewCampaign] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
-  const [confirmDemo, setConfirmDemo] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
@@ -63,7 +83,7 @@ export default function Workspace() {
     setError("");
     try {
       const [w, c, h] = await Promise.all([
-        api<WorkspaceData>("/workspace"),
+        api<WorkspaceData | null>("/workspace"),
         api<Campaign[]>("/campaigns"),
         api<Health>("/health").catch(() => null),
       ]);
@@ -73,13 +93,13 @@ export default function Workspace() {
       setSelectedId((old) =>
         old && c.some((item) => item.id === old) ? old : c[0]?.id || null,
       );
-      setWebsite(w.website || "");
+      setWebsite(w?.website || "");
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [api]);
   useEffect(() => {
     void Promise.resolve().then(load);
   }, [load]);
@@ -108,7 +128,7 @@ export default function Workspace() {
     return () => {
       cancelled = true;
     };
-  }, [selectedId]);
+  }, [selectedId, api]);
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(() => setToast(""), 4500);
@@ -122,6 +142,92 @@ export default function Workspace() {
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
   }, [mobileOpen]);
+  useEffect(() => {
+    if (!isSaas || !selectedId) return;
+    const scope = new AbortController();
+    let timer: ReturnType<typeof setTimeout>;
+    let failures = 0;
+    async function poll() {
+      try {
+        const current = await api<ResearchJob | null>(
+          `/campaigns/${selectedId}/job`,
+          { signal: scope.signal },
+        );
+        if (scope.signal.aborted) return;
+        setJob(current);
+        setJobError("");
+        failures = 0;
+        if (activeJob(current)) {
+          timer = setTimeout(poll, 1500);
+          return;
+        }
+        if (current) {
+          const [list, updated] = await Promise.all([
+            api<Campaign[]>("/campaigns", { signal: scope.signal }),
+            api<Account[]>(`/campaigns/${selectedId}/accounts`, {
+              signal: scope.signal,
+            }),
+          ]);
+          if (!scope.signal.aborted) {
+            setCampaigns(list);
+            setAccounts(updated);
+          }
+        }
+      } catch (e) {
+        if (scope.signal.aborted) return;
+        setJobError(errorMessage(e));
+        timer = setTimeout(
+          poll,
+          Math.min(15000, 1500 * 2 ** Math.min(++failures, 4)),
+        );
+      }
+    }
+    void Promise.resolve().then(() => {
+      if (!scope.signal.aborted) {
+        setJob(null);
+        setJobError("");
+        void poll();
+      }
+    });
+    return () => {
+      scope.abort();
+      clearTimeout(timer);
+    };
+  }, [api, isSaas, selectedId, jobRevision]);
+  async function cancelResearch() {
+    if (!job || cancelBusy) return;
+    setCancelBusy(true);
+    setJobError("");
+    try {
+      setJob(
+        await api<ResearchJob>(`/jobs/${job.id}/cancel`, {
+          method: "POST",
+          body: "{}",
+        }),
+      );
+      setJobRevision((revision) => revision + 1);
+      setToast(
+        "Cancellation requested. Completed account research is preserved.",
+      );
+    } catch (e) {
+      setJobError(errorMessage(e));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+  async function provision() {
+    if (provisionBusy) return;
+    setProvisionBusy(true);
+    setError("");
+    try {
+      await api<WorkspaceData>("/workspace", { method: "POST", body: "{}" });
+      await load();
+    } catch (e) {
+      setError(errorMessage(e));
+    } finally {
+      setProvisionBusy(false);
+    }
+  }
   const filtered = useMemo(
     () =>
       filterAccounts(
@@ -135,7 +241,6 @@ export default function Workspace() {
   );
   const shortlisted = accounts.filter((a) => a.status === "shortlisted").length;
   const sources = accounts.reduce((total, a) => total + a.evidence.length, 0);
-  const showDemo = campaign?.mode === "demo";
   function navigate(next: View) {
     setView(next);
     setMobileOpen(false);
@@ -147,6 +252,10 @@ export default function Workspace() {
     navigate("accounts");
     if (id === selectedId) return;
     setSelectedId(id);
+    setJob(null);
+    setJobError("");
+    setSelectedAccount(null);
+    detailRequest.current += 1;
     setAccounts([]);
     setAccountLoading(true);
   }
@@ -174,6 +283,7 @@ export default function Workspace() {
     setSelectedId(c.id);
     setAccounts(await api<Account[]>(`/campaigns/${c.id}/accounts`));
     navigate("accounts");
+    setJobRevision((revision) => revision + 1);
     setToast(
       c.status === "complete"
         ? "Research complete. Your accounts are ready."
@@ -182,59 +292,37 @@ export default function Workspace() {
           : "Campaign created. Review the research status.",
     );
   }
-  async function loadDemo() {
-    setConfirmDemo(false);
-    setDemoBusy(true);
-    setError("");
-    try {
-      const w = await api<WorkspaceData>("/demo/reset", {
-        method: "POST",
-        body: "{}",
-      });
-      setWorkspace(w);
-      const c = await api<Campaign>("/campaigns", {
-        method: "POST",
-        body: jsonBody({
-          name: "B2B SaaS · Growth-stage teams",
-          mode: "demo",
-          domains: [],
-        }),
-      });
-      const completed = await api<Campaign>(`/campaigns/${c.id}/research`, {
-        method: "POST",
-        body: "{}",
-      });
-      await onCreated(completed);
-      setToast(
-        "Fictional demo loaded. Explore the evidence behind every score.",
-      );
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setDemoBusy(false);
-    }
-  }
-  function requestDemo() {
-    if (workspace?.profile || campaigns.length) setConfirmDemo(true);
-    else void loadDemo();
-  }
   async function research() {
-    if (!campaign) return;
+    if (!campaign || researchBusy || activeJob(job)) return;
     setResearchBusy(true);
     setError("");
+    const id = campaign.id;
+    if (researchRequest.current?.campaignId !== id)
+      researchRequest.current = { campaignId: id, key: crypto.randomUUID() };
     try {
-      const id = campaign.id;
-      const c = await api<Campaign>(`/campaigns/${id}/research`, {
-        method: "POST",
-        body: "{}",
-      });
-      const [list, updated] = await Promise.all([
-        api<Campaign[]>("/campaigns"),
-        api<Account[]>(`/campaigns/${id}/accounts`),
-      ]);
+      const result = await api<Campaign | ResearchJob>(
+        `/campaigns/${id}/research`,
+        {
+          method: "POST",
+          body: jsonBody(
+            isSaas ? { idempotencyKey: researchRequest.current.key } : {},
+          ),
+        },
+      );
+      researchRequest.current = null;
+      const list = await api<Campaign[]>("/campaigns");
       setCampaigns(list);
-      if (activeCampaignRef.current === id) setAccounts(updated);
-      setToast(`${c.name}: research ${c.status}`);
+      if (activeCampaignRef.current === id) {
+        if (isSaas) {
+          setJob(result as ResearchJob);
+          setJobRevision((revision) => revision + 1);
+        } else setAccounts(await api<Account[]>(`/campaigns/${id}/accounts`));
+      }
+      setToast(
+        isSaas
+          ? "Research queued. You can leave this page and return to its progress."
+          : `${campaign.name}: research ${(result as Campaign).status}`,
+      );
     } catch (e) {
       setError(errorMessage(e));
     } finally {
@@ -305,7 +393,7 @@ export default function Workspace() {
     setExportBusy(true);
     setError("");
     try {
-      const response = await fetch(`/api/campaigns/${campaign.id}/export.csv`);
+      const response = await request(`/campaigns/${campaign.id}/export.csv`);
       if (!response.ok)
         throw new Error(
           "CSV export failed. Try again after research has finished.",
@@ -350,6 +438,9 @@ export default function Workspace() {
             <span className="brand-dot">.</span>
           </span>
         </Link>
+        {organizationControl && (
+          <div className="organization-control">{organizationControl}</div>
+        )}
         <div className="workspace-switch">
           <span className="workspace-avatar">
             {initials(workspace?.profile?.company_name || "My Workspace")}
@@ -358,7 +449,13 @@ export default function Workspace() {
             <strong>
               {workspace?.profile?.company_name || "Your workspace"}
             </strong>
-            <span>Research workspace</span>
+            <span>
+              {isSaas
+                ? isAdmin
+                  ? "Organization administrator"
+                  : "Organization member"
+                : "Independent local demo"}
+            </span>
           </div>
           <span className="workspace-lock">
             <Icon name="shield" size={15} />
@@ -401,6 +498,15 @@ export default function Workspace() {
             <Icon name="target" />
             Customer profile
           </button>
+          {isSaas && (
+            <button
+              className={view === "billing" ? "active" : ""}
+              onClick={() => navigate("billing")}
+            >
+              <Icon name="shield" />
+              Plan & billing
+            </button>
+          )}
         </nav>
         <div className="sidebar-section">
           <div className="nav-label-row">
@@ -422,9 +528,7 @@ export default function Workspace() {
                 className={`campaign-nav ${selectedId === c.id ? "selected" : ""}`}
                 onClick={() => chooseCampaign(c.id)}
               >
-                <span
-                  className={`small-dot ${c.mode === "demo" ? "mint" : "blue"}`}
-                />
+                <span className="small-dot blue" />
                 <span>{c.name}</span>
               </button>
             ))
@@ -452,7 +556,11 @@ export default function Workspace() {
             <span className={`small-dot ${health ? "mint" : "gray"}`} />
             <div>
               <strong>
-                {health ? "Local workspace" : "Connecting to backend"}
+                {health
+                  ? isSaas
+                    ? "Private organization"
+                    : "Local demo workspace"
+                  : "Connecting to service"}
               </strong>
               <span>No outreach is sent</span>
             </div>
@@ -473,21 +581,21 @@ export default function Workspace() {
             <span className="breadcrumb">Workspace</span>
             <Icon name="chevron" size={12} />
             <span>
-              {view === "profile"
-                ? "Customer profile"
-                : view === "campaigns"
-                  ? "Campaigns"
-                  : view === "shortlist"
-                    ? "Shortlist"
-                    : "Account discovery"}
+              {view === "billing"
+                ? "Plan & billing"
+                : view === "profile"
+                  ? "Customer profile"
+                  : view === "campaigns"
+                    ? "Campaigns"
+                    : view === "shortlist"
+                      ? "Shortlist"
+                      : "Account research"}
             </span>
           </div>
           <div className="topbar-right">
             <span className="engine-badge">
               <span className="small-dot mint" />
-              {health?.decision_engine === "jev"
-                ? "Decision engine"
-                : "Rules-based intelligence"}
+              {decisionEngineLabel(accounts)}
             </span>
             <button
               className="help-btn"
@@ -496,9 +604,11 @@ export default function Workspace() {
             >
               <Icon name="info" size={19} />
             </button>
-            <span className="user-avatar" title="Local research workspace">
-              SF
-            </span>
+            {userControl || (
+              <span className="user-avatar" title="Independent local demo">
+                SF
+              </span>
+            )}
           </div>
         </header>
         <main className="main-content" id="main-content">
@@ -531,11 +641,29 @@ export default function Workspace() {
               <span className="modal-icon">
                 <Icon name="globe" size={30} />
               </span>
-              <h1>Let’s get connected</h1>
+              <h1>
+                {isSaas && !error
+                  ? "Initialize your organization workspace"
+                  : "Let’s get connected"}
+              </h1>
               <p>
-                SignalFoundry needs its local research server to load your
-                workspace.
+                {isSaas
+                  ? error
+                    ? "Your organization’s data is unavailable. Check your connection or try again."
+                    : isAdmin
+                      ? "Create a private research workspace for this organization."
+                      : "An administrator must initialize this organization’s workspace before you can continue."
+                  : "SignalFoundry needs its local research server to load your workspace."}
               </p>
+              {isSaas && isAdmin && !error && (
+                <button
+                  className="btn primary"
+                  disabled={provisionBusy}
+                  onClick={provision}
+                >
+                  {provisionBusy ? "Initializing…" : "Initialize workspace"}
+                </button>
+              )}
               <button className="btn primary" onClick={load}>
                 <Icon name="refresh" size={16} />
                 Retry connection
@@ -543,25 +671,9 @@ export default function Workspace() {
             </div>
           ) : (
             <>
-              {showDemo && (
-                <div className="demo-banner">
-                  <span className="demo-pill">
-                    <Icon name="spark" size={13} />
-                    DEMO WORKSPACE
-                  </span>
-                  <p>
-                    Fictional companies, contacts, and signals. Explore the
-                    workflow, not real leads.
-                  </p>
-                  <button
-                    onClick={() => setShowHelp(true)}
-                    aria-label="Learn about demo data"
-                  >
-                    <Icon name="info" size={16} />
-                  </button>
-                </div>
-              )}
-              {view === "profile" ? (
+              {view === "billing" ? (
+                <BillingPanel />
+              ) : view === "profile" ? (
                 <>
                   <div className="page-heading">
                     <div>
@@ -582,34 +694,43 @@ export default function Workspace() {
                       </button>
                     )}
                   </div>
-                  <div className="analysis-card">
-                    <div>
-                      <Icon name="globe" size={21} />
-                      <h3>Start with your website</h3>
-                      <p>Extract a draft profile from your public homepage.</p>
+                  {isAdmin && (
+                    <div className="analysis-card">
+                      <div>
+                        <Icon name="globe" size={21} />
+                        <h3>Start with your website</h3>
+                        <p>
+                          Extract a draft profile from your public homepage.
+                        </p>
+                      </div>
+                      <form onSubmit={analyze}>
+                        <label className="sr-only" htmlFor="profile-website">
+                          Your company website
+                        </label>
+                        <input
+                          id="profile-website"
+                          required
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          placeholder="https://yourcompany.com"
+                          disabled={analyzing}
+                        />
+                        <button className="btn secondary" disabled={analyzing}>
+                          {analyzing ? (
+                            <span className="spinner" />
+                          ) : (
+                            <Icon name="spark" size={16} />
+                          )}{" "}
+                          {analyzing ? "Analyzing…" : "Analyze website"}
+                        </button>
+                      </form>
                     </div>
-                    <form onSubmit={analyze}>
-                      <label className="sr-only" htmlFor="profile-website">
-                        Your company website
-                      </label>
-                      <input
-                        id="profile-website"
-                        required
-                        value={website}
-                        onChange={(e) => setWebsite(e.target.value)}
-                        placeholder="https://yourcompany.com"
-                        disabled={analyzing}
-                      />
-                      <button className="btn secondary" disabled={analyzing}>
-                        {analyzing ? (
-                          <span className="spinner" />
-                        ) : (
-                          <Icon name="spark" size={16} />
-                        )}{" "}
-                        {analyzing ? "Analyzing…" : "Analyze website"}
-                      </button>
-                    </form>
-                  </div>
+                  )}
+                  {isSaas && (
+                    <div className="notice soft">
+                      {websiteAnalysisMessage(isAdmin, Boolean(health))}
+                    </div>
+                  )}
                   <ProfileEditor
                     key={JSON.stringify(workspace.profile)}
                     profile={workspace.profile}
@@ -655,7 +776,7 @@ export default function Workspace() {
                           <div className="campaign-card-top">
                             <span className="campaign-card-icon">
                               <Icon
-                                name={c.mode === "demo" ? "spark" : "globe"}
+                                name="globe"
                                 size={24}
                               />
                             </span>
@@ -665,11 +786,7 @@ export default function Workspace() {
                               {c.status}
                             </span>
                           </div>
-                          <span className="eyebrow">
-                            {c.mode === "demo"
-                              ? "FICTIONAL DEMO"
-                              : "PUBLIC WEBSITE RESEARCH"}
-                          </span>
+                          <span className="eyebrow">PUBLIC WEBSITE RESEARCH</span>
                           <h3>{c.name}</h3>
                           <div className="campaign-card-stats">
                             <span>
@@ -751,11 +868,7 @@ export default function Workspace() {
                       icon="file"
                       label="Evidence collected"
                       value={sources}
-                      detail={
-                        showDemo
-                          ? "Fictional evidence records"
-                          : "Public evidence records"
-                      }
+                      detail="Public evidence records"
                     />
                   </div>
                   <section className="accounts-panel">
@@ -776,7 +889,7 @@ export default function Workspace() {
                           <button
                             className="btn secondary small"
                             onClick={research}
-                            disabled={researchBusy}
+                            disabled={researchBusy || activeJob(job)}
                           >
                             {researchBusy ? (
                               <span className="spinner" />
@@ -802,6 +915,42 @@ export default function Workspace() {
                         </button>
                       </div>
                     </div>
+                    {isSaas && (job || jobError) && (
+                      <div className="job-status" aria-live="polite">
+                        {job && (
+                          <>
+                            <strong>Research {job.status}</strong>
+                            <span>
+                              Attempt {job.attempt} of {job.max_attempts}
+                            </span>
+                            {activeJob(job) && (
+                              <>
+                                <span className="spinner" />
+                                <button
+                                  className="btn secondary small"
+                                  disabled={cancelBusy}
+                                  onClick={cancelResearch}
+                                >
+                                  {cancelBusy
+                                    ? "Cancelling…"
+                                    : "Cancel research"}
+                                </button>
+                                <span className="input-hint">
+                                  The person who started this run or an
+                                  administrator can cancel it.
+                                </span>
+                              </>
+                            )}
+                            {job.error && <p>{job.error}</p>}
+                          </>
+                        )}
+                        {jobError && (
+                          <p role="alert">
+                            {jobError} Status checks will retry automatically.
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {campaign.errors.length > 0 && (
                       <details className="campaign-errors">
                         <summary>
@@ -931,11 +1080,6 @@ export default function Workspace() {
                                       <strong>{a.name}</strong>
                                       <span>
                                         {a.domain}
-                                        {a.is_demo && (
-                                          <span className="tiny-demo">
-                                            DEMO
-                                          </span>
-                                        )}
                                       </span>
                                     </span>
                                   </button>
@@ -1085,9 +1229,7 @@ export default function Workspace() {
                       </span>
                       <span>
                         <Icon name="shield" size={13} />{" "}
-                        {showDemo
-                          ? "Fictional demo data"
-                          : "Evidence-led research"}
+                        Evidence-led research
                         <span className="footer-divider">·</span>Contacts are
                         not enriched
                       </span>
@@ -1119,8 +1261,6 @@ export default function Workspace() {
                   setWebsite={setWebsite}
                   analyze={analyze}
                   analyzing={analyzing}
-                  loadDemo={requestDemo}
-                  demoBusy={demoBusy}
                   profileReady={!!workspace.profile}
                   editProfile={() => navigate("profile")}
                   newCampaign={() => setNewCampaign(true)}
@@ -1162,34 +1302,6 @@ export default function Workspace() {
           statusError={statusError}
         />
       )}
-      {confirmDemo && (
-        <Dialog
-          title="Load fictional demo"
-          onClose={() => setConfirmDemo(false)}
-        >
-          <div className="dialog-heading">
-            <span className="modal-icon">
-              <Icon name="spark" size={25} />
-            </span>
-            <h2>Explore a fresh demo workspace?</h2>
-            <p>
-              This replaces your customer profile with a fictional demo profile
-              and adds a demo campaign. Your existing campaigns are kept.
-            </p>
-          </div>
-          <div className="dialog-footer">
-            <button
-              className="btn secondary"
-              onClick={() => setConfirmDemo(false)}
-            >
-              Keep my workspace
-            </button>
-            <button className="btn primary" onClick={loadDemo}>
-              Load demo profile
-            </button>
-          </div>
-        </Dialog>
-      )}
       {showHelp && (
         <Dialog
           title="How SignalFoundry works"
@@ -1219,8 +1331,7 @@ export default function Workspace() {
               <div>
                 <strong>Bring the companies to research</strong>
                 <p>
-                  Supply public business domains, or explore the clearly labeled
-                  fictional demo.
+                  Supply public business domains for research.
                 </p>
               </div>
             </li>
@@ -1238,7 +1349,7 @@ export default function Workspace() {
           <div className="notice soft">
             <Icon name="shield" size={19} />
             <span>
-              This local MVP uses rules-based extraction and grounded outreach
+              SignalFoundry uses rules-based extraction and grounded outreach
               templates. Contact enrichment and automatic prospect discovery
               aren’t connected. No emails are sent.
             </span>
@@ -1308,8 +1419,6 @@ function Welcome({
   setWebsite,
   analyze,
   analyzing,
-  loadDemo,
-  demoBusy,
   profileReady,
   editProfile,
   newCampaign,
@@ -1318,12 +1427,12 @@ function Welcome({
   setWebsite: (v: string) => void;
   analyze: (e: React.FormEvent) => Promise<void>;
   analyzing: boolean;
-  loadDemo: () => void;
-  demoBusy: boolean;
   profileReady: boolean;
   editProfile: () => void;
   newCampaign: () => void;
 }) {
+  const { mode, isAdmin } = useWorkspaceSession();
+  const isSaas = mode === "saas";
   return (
     <>
       <div className="welcome-heading">
@@ -1348,12 +1457,16 @@ function Welcome({
           <h2>
             {profileReady
               ? "Your profile is ready. Let’s find your people."
-              : "Your website is all it takes to start."}
+              : isSaas
+                ? "Define your ideal customer."
+                : "Your website is all it takes to start."}
           </h2>
           <p>
             {profileReady
               ? "Add companies to a campaign and let the evidence guide your shortlist."
-              : "We’ll read your public homepage and help shape a profile of your ideal customer."}
+              : isSaas
+                ? "Start with your team’s targeting preferences, then research public business websites."
+                : "We’ll read your public homepage and help shape a profile of your ideal customer."}
           </p>
           {profileReady ? (
             <div className="ready-actions">
@@ -1364,6 +1477,16 @@ function Welcome({
               <button className="text-btn" onClick={editProfile}>
                 Review your customer profile
               </button>
+            </div>
+          ) : isSaas && !isAdmin ? (
+            <div className="ready-actions">
+              <button className="btn primary" onClick={editProfile}>
+                Review customer profile
+              </button>
+              <p>
+                An administrator must create the profile before research can
+                begin.
+              </p>
             </div>
           ) : (
             <form onSubmit={analyze}>
@@ -1440,35 +1563,6 @@ function Welcome({
             </p>
           </div>
         </div>
-      </section>
-      <section className="demo-invitation">
-        <span className="demo-invitation-icon">
-          <Icon name="spark" size={22} />
-        </span>
-        <div>
-          <h3>Curious? Take it for a spin.</h3>
-          <p>
-            Explore a complete workspace with clearly labeled, fictional
-            research data.
-          </p>
-        </div>
-        <button
-          className="btn secondary"
-          disabled={demoBusy || analyzing}
-          onClick={loadDemo}
-        >
-          {demoBusy ? (
-            <>
-              <span className="spinner" />
-              Preparing demo…
-            </>
-          ) : (
-            <>
-              Try the demo workspace
-              <Icon name="arrow" size={16} />
-            </>
-          )}
-        </button>
       </section>
       <div className="workflow-strip">
         {[

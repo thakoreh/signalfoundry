@@ -1,0 +1,34 @@
+# Separate SaaS worker, not a replacement for compose.preview.yml.
+# Attach the authorized TLS proxy to this dedicated network; publish no host port.
+services:
+  research-worker:
+    build:
+      context: ..
+      dockerfile: deploy/worker.Dockerfile
+    restart: unless-stopped
+    environment:
+      SIGNALFOUNDRY_WORKER_URL: ${SIGNALFOUNDRY_WORKER_URL:?Set the HTTPS worker origin}
+      SIGNALFOUNDRY_WORKER_TOKEN: ${SIGNALFOUNDRY_WORKER_TOKEN:?Set an authorized server-only worker token}
+      SIGNALFOUNDRY_WORKER_ALLOW_PRIVATE_HTTP: "false"
+      DECISION_ENGINE: rules
+      FORWARDED_ALLOW_IPS: ${SIGNALFOUNDRY_TRUSTED_PROXY_IPS:?Set exact trusted TLS proxy IPs, never wildcard}
+    expose:
+      - "8001"
+    networks:
+      - worker-egress
+    read_only: true
+    user: "10001:10001"
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 256m
+    cpus: 1.0
+    pids_limit: 64
+    tmpfs:
+      - /tmp:size=16m,mode=1777,noexec,nosuid
+    stop_grace_period: 120s
+networks:
+  # Outbound public-web access is necessary. Restrict inbound at the proxy and
+  # host firewall; do not attach untrusted containers or publish the worker port.
+  worker-egress:
+    driver: bridge

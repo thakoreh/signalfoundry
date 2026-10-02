@@ -86,3 +86,20 @@ export type Health = {
   decision_engine: "rules" | "jev";
   providers: { discovery: string; contacts: string };
 };
+export type ResearchJob = {
+  id: string;
+  campaign_id: string;
+  status:
+    | "queued"
+    | "running"
+    | "retrying"
+    | "succeeded"
+    | "partial"
+    | "failed"
+    | "cancelled";
+  attempt: number;
+  max_attempts: number;
+  error: string | null;
+  created_at: string;
+  updated_at: string;
+};

@@ -18,7 +18,8 @@ class PackagingTest(unittest.TestCase):
                     'other.sqlite3-wal', 'other.sqlite3-shm', 'other.sqlite3-journal',
                     'other.sqlite-wal', 'other.db-journal', '.env', '.env.local',
                     'deploy/secrets/preview.htpasswd', 'leaked.htpasswd', '.htpasswd', 'private.key', 'private.pem',
-                    'frontend/node_modules/pkg/file.js', 'frontend/.next/build.js']
+                    'frontend/node_modules/pkg/file.js', 'frontend/.next/build.js',
+                    'frontend/.convex/local-state.json', 'frontend/test-results/trace.zip']
             keep = ['README.md', 'backend/app/main.py', 'backend/.env.example', 'frontend/package-lock.json']
             for name in omit + keep:
                 p = root / name

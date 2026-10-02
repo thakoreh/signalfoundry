@@ -1,4 +1,5 @@
 import io
+import concurrent.futures
 import socket
 import threading
 import unittest
@@ -72,6 +73,34 @@ class SecurityTest(unittest.TestCase):
         with patch('app.safety.socket.getaddrinfo', return_value=mixed), self.assertRaises(FetchError):
             resolve_public('company.com', 443)
 
+    def test_cloud_platform_dns_and_mixed_answers_are_blocked_before_connect(self):
+        # Official provider endpoints: Azure WireServer, Oracle Cloud Machine,
+        # Alibaba metadata, shared AWS/GCP IPv4 metadata, AWS/GCP IPv6 metadata.
+        services = ('168.63.129.16', '192.0.0.192', '100.100.100.200',
+                    '169.254.169.254', 'fd00:ec2::254', 'fd20:ce::254')
+        for address in services:
+            for scheme, port in (('http', 80), ('https', 443)):
+                for addresses in ([address], ['8.8.8.8', address]):
+                    answers = [(socket.AF_INET6 if ':' in ip else socket.AF_INET,
+                                socket.SOCK_STREAM, 6, '', (ip, port)) for ip in addresses]
+                    with self.subTest(service=address, scheme=scheme, mixed=len(addresses) > 1), \
+                         patch('app.safety.socket.getaddrinfo', return_value=answers), \
+                         patch('app.safety.socket.create_connection') as connect, \
+                         self.assertRaises(FetchError):
+                        fetch_public_page(f'{scheme}://public-business.com/')
+                    connect.assert_not_called()
+
+    def test_redirect_to_cloud_platform_is_revalidated(self):
+        public_answer = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('8.8.8.8', 80))]
+        platform_answer = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('168.63.129.16', 80))]
+        connection = FakeConnection(FakeResponse(302, {'Location': 'http://other-company.com/'}))
+        with patch('app.safety.socket.getaddrinfo', side_effect=[public_answer, platform_answer]), \
+             patch('app.safety.PinnedHTTPConnection', return_value=connection) as factory, \
+             self.assertRaises(FetchError):
+            fetch_public_page('http://company.com/')
+        self.assertEqual(factory.call_count, 1)
+        self.assertTrue(connection.closed)
+
     def test_dns_accepts_public_addresses(self):
         results = [(socket.AF_INET, socket.SOCK_STREAM, 6, '', ('8.8.8.8', 443)),
                    (socket.AF_INET6, socket.SOCK_STREAM, 6, '', ('2606:4700:4700::1111', 443, 0, 0))]
@@ -79,13 +108,36 @@ class SecurityTest(unittest.TestCase):
             self.assertEqual(resolve_public('company.com', 443), ['8.8.8.8', '2606:4700:4700::1111'])
 
     def test_dns_timeout_and_resolution_failure(self):
-        future = MagicMock()
-        future.result.side_effect = TimeoutError()
+        future = concurrent.futures.Future()
+        future.result = MagicMock(side_effect=TimeoutError())
+        future.cancel = MagicMock(wraps=future.cancel)
         with patch('app.safety._DNS_POOL.submit', return_value=future), self.assertRaises(FetchError):
             resolve_public('company.com', 443)
         future.cancel.assert_called_once()
         with patch('app.safety.socket.getaddrinfo', side_effect=socket.gaierror()), self.assertRaises(FetchError):
             resolve_public('company.com', 443)
+
+    def test_stalled_dns_consumes_bounded_slot_without_queue_growth(self):
+        future = concurrent.futures.Future()
+        future.set_running_or_notify_cancel()  # Represents an uninterruptible OS resolver.
+        future.result = MagicMock(side_effect=TimeoutError())
+        with patch('app.safety._DNS_SLOTS', threading.BoundedSemaphore(1)), \
+             patch('app.safety._DNS_POOL.submit', return_value=future) as submit:
+            with self.assertRaises(FetchError):
+                resolve_public('company.com', 443)
+            with self.assertRaisesRegex(FetchError, 'capacity is busy'):
+                resolve_public('other-company.com', 443)
+            self.assertEqual(submit.call_count, 1)
+            future.set_result([])  # Releases the slot only when the resolver really exits.
+
+    def test_failed_dns_submission_releases_capacity(self):
+        slots = threading.BoundedSemaphore(1)
+        with patch('app.safety._DNS_SLOTS', slots), \
+             patch('app.safety._DNS_POOL.submit', side_effect=RuntimeError('Executor shut down')):
+            with self.assertRaises(RuntimeError):
+                resolve_public('company.com', 443)
+        self.assertTrue(slots.acquire(blocking=False))
+        slots.release()
 
     def test_connection_is_pinned_without_hostname_reresolution(self):
         sock = MagicMock()

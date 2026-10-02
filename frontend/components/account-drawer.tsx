@@ -1,10 +1,17 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Account, AccountStatus, Draft, Evidence } from "@/lib/types";
-import { api, errorMessage } from "@/lib/api";
-import { formatDate, initials, safeUrl, scoreLabel } from "@/lib/utils";
+import { errorMessage } from "@/lib/api";
+import {
+  drawerFocusBoundaryTarget,
+  formatDate,
+  initials,
+  safeUrl,
+  scoreLabel,
+} from "@/lib/utils";
 import { Dialog } from "./dialog";
 import { Icon } from "./icons";
+import { useWorkspaceSession } from "./workspace-session";
 function EvidenceCard({
   evidence,
   index,
@@ -71,6 +78,7 @@ export function AccountDrawer({
   busy: boolean;
   statusError: string;
 }) {
+  const { api } = useWorkspaceSession();
   const [tab, setTab] = useState<"overview" | "evidence" | "outreach">(
     "overview",
   );
@@ -78,6 +86,87 @@ export function AccountDrawer({
   const [draftBusy, setDraftBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
+  const drawerContentRef = useRef<HTMLDivElement>(null);
+  const openerRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" &&
+      document.activeElement instanceof HTMLElement &&
+      document.activeElement !== document.body
+      ? document.activeElement
+      : null,
+  );
+  const closeRef = useRef(onClose);
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    closeRef.current = onClose;
+    busyRef.current = busy;
+  }, [onClose, busy]);
+
+  useEffect(() => {
+    const content = drawerContentRef.current;
+    const dialog = content?.closest("dialog");
+    if (!dialog) return;
+    const opener = openerRef.current;
+
+    dialog.setAttribute("role", "dialog");
+    dialog.setAttribute("aria-modal", "true");
+    const focusableSelector = [
+      "button:not([disabled])",
+      "[href]",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex=\"-1\"])",
+    ].join(",");
+    const focusable = () =>
+      Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
+        (element) => element.getAttribute("aria-hidden") !== "true",
+      );
+    const focusFirst = () => {
+      const first = focusable()[0];
+      first?.focus();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || !dialog.contains(target)) return;
+      if (event.key === "Escape") {
+        if (busyRef.current) return;
+        event.preventDefault();
+        event.stopPropagation();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const elements = focusable();
+      if (!elements.length) {
+        event.preventDefault();
+        return;
+      }
+      const next = drawerFocusBoundaryTarget(
+        elements,
+        document.activeElement,
+        event.shiftKey,
+      );
+      if (next) {
+        event.preventDefault();
+        next.focus();
+      }
+    };
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node) || dialog.contains(target)) return;
+      focusFirst();
+    };
+
+    document.addEventListener("keydown", onKeyDown, true);
+    document.addEventListener("focusin", onFocusIn, true);
+    focusFirst();
+    return () => {
+      document.removeEventListener("keydown", onKeyDown, true);
+      document.removeEventListener("focusin", onFocusIn, true);
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, [drawerContentRef]);
+
   async function generate() {
     setDraftBusy(true);
     setError("");
@@ -109,7 +198,7 @@ export function AccountDrawer({
   }
   return (
     <Dialog title={`${account.name} account details`} onClose={onClose} drawer>
-      <div className="account-head">
+      <div className="account-head" ref={drawerContentRef}>
         <div className="company-logo large">{initials(account.name)}</div>
         <div className="account-title">
           <div className="account-tags">

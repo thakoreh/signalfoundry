@@ -1,182 +1,73 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { Campaign } from "@/lib/types";
-import { api, jsonBody, errorMessage } from "@/lib/api";
+import { jsonBody, errorMessage } from "@/lib/api";
+import { parseProspectImport } from "@/lib/prospect-import";
 import { Dialog } from "./dialog";
 import { Icon } from "./icons";
-export function CampaignDialog({
-  onClose,
-  onCreated,
-}: {
-  onClose: () => void;
-  onCreated: (campaign: Campaign) => Promise<void>;
+import { useWorkspaceSession } from "./workspace-session";
+
+export function CampaignDialog({ onClose, onCreated }: {
+  onClose: () => void; onCreated: (campaign: Campaign) => Promise<void>;
 }) {
+  const { api, mode: appMode } = useWorkspaceSession();
+  const isSaas = appMode === "saas";
+  const requestKey = useRef<string | null>(null);
   const [name, setName] = useState("");
-  const [mode, setMode] = useState<"manual" | "demo">("manual");
   const [domains, setDomains] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [phase, setPhase] = useState("");
+  const [importNote, setImportNote] = useState("");
   const [created, setCreated] = useState<Campaign | null>(null);
+
+  async function importFile(file?: File) {
+    if (!file) return;
+    setError(""); setImportNote("");
+    try {
+      if (file.size > 100_000) throw new Error("Keep imports under 100 KB.");
+      const parsed = parseProspectImport(await file.text());
+      if (!parsed.domains.length) throw new Error("No valid public company websites found. Use a Website or Domain column.");
+      setDomains(parsed.domains.join("\n"));
+      setImportNote(`${parsed.domains.length} unique company websites imported${parsed.rejected ? `; ${parsed.rejected} invalid entries skipped` : ""}. Review before starting research.`);
+    } catch (e) { setError(errorMessage(e)); }
+  }
+
   async function create(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    setError("");
+    e.preventDefault(); setBusy(true); setError("");
     try {
       let campaign = created;
       if (!campaign) {
+        const parsed = parseProspectImport(domains);
+        if (!parsed.domains.length) throw new Error("Add at least one public company website.");
+        if (parsed.rejected) throw new Error(`${parsed.rejected} invalid website entries found. Remove them before starting.`);
         setPhase("Creating your campaign…");
-        campaign = await api<Campaign>("/campaigns", {
-          method: "POST",
-          body: jsonBody({
-            name: name.trim(),
-            mode,
-            domains:
-              mode === "manual"
-                ? domains
-                    .split(/[\s,]+/)
-                    .map((v) => v.trim())
-                    .filter(Boolean)
-                : [],
-          }),
-        });
+        campaign = await api<Campaign>("/campaigns", { method: "POST", body: jsonBody({ name: name.trim(), mode: "manual", domains: parsed.domains }) });
         setCreated(campaign);
       }
-      setPhase(
-        mode === "demo"
-          ? "Scoring fictional demo accounts…"
-          : "Reading public websites and scoring accounts…",
-      );
-      const result = await api<Campaign>(`/campaigns/${campaign.id}/research`, {
-        method: "POST",
-        body: "{}",
-      });
-      await onCreated(result);
+      setPhase("Reading public websites and qualifying accounts…");
+      if (!requestKey.current) requestKey.current = crypto.randomUUID();
+      const result = await api<Campaign>(`/campaigns/${campaign.id}/research`, { method: "POST", body: jsonBody(isSaas ? { idempotencyKey: requestKey.current } : {}) });
+      await onCreated(isSaas ? { ...campaign, status: "researching" } : result);
       onClose();
-    } catch (e) {
-      setError(errorMessage(e));
-    } finally {
-      setBusy(false);
-    }
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setBusy(false); }
   }
-  return (
-    <Dialog title="New research campaign" onClose={onClose} wide busy={busy}>
-      <div className="dialog-heading">
-        <span className="modal-icon">
-          <Icon name="spark" size={24} />
-        </span>
-        <span className="eyebrow">FIND YOUR NEXT RIGHT CUSTOMER</span>
-        <h2>Start a research campaign</h2>
-        <p>
-          Bring a list of company websites. We’ll turn public evidence into a
-          focused account shortlist.
-        </p>
-      </div>
-      <form onSubmit={create} className="campaign-form">
-        {error && (
-          <div className="notice error" role="alert">
-            <Icon name="info" />
-            {error}
-          </div>
-        )}
-        <label>
-          Campaign name
-          <input
-            autoFocus
-            required
-            disabled={busy || !!created}
-            value={name}
-            maxLength={200}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. B2B SaaS · North America"
-          />
-        </label>
-        <fieldset disabled={busy || !!created}>
-          <legend>Choose a research mode</legend>
-          <div className="mode-options">
-            <label
-              className={`mode-option ${mode === "manual" ? "selected" : ""}`}
-            >
-              <input
-                type="radio"
-                name="mode"
-                value="manual"
-                checked={mode === "manual"}
-                onChange={() => setMode("manual")}
-              />
-              <Icon name="globe" />
-              <strong>Public website research</strong>
-              <span>Research the company domains you supply</span>
-            </label>
-            <label
-              className={`mode-option ${mode === "demo" ? "selected" : ""}`}
-            >
-              <input
-                type="radio"
-                name="mode"
-                value="demo"
-                checked={mode === "demo"}
-                onChange={() => setMode("demo")}
-              />
-              <Icon name="spark" />
-              <strong>Explore a demo</strong>
-              <span>Try a curated set of fictional accounts</span>
-            </label>
-          </div>
-        </fieldset>
-        {mode === "manual" ? (
-          <label>
-            Company websites
-            <textarea
-              required
-              disabled={busy || !!created}
-              rows={5}
-              value={domains}
-              onChange={(e) => setDomains(e.target.value)}
-              placeholder={"company.com\nanother-company.com"}
-            />
-            <span className="input-hint">
-              One public business domain per line, up to 10. No people search or
-              verified emails.
-            </span>
-          </label>
-        ) : (
-          <div className="notice demo">
-            <Icon name="info" />
-            <span>
-              All demo accounts, people, dates, and signals are fictional.
-              They’re for evaluating the workflow only.
-            </span>
-          </div>
-        )}
-        {busy && (
-          <div className="research-progress" role="status">
-            <span className="spinner" />
-            <div>
-              <strong>{phase}</strong>
-              <p>Public websites can take a moment. Keep this window open.</p>
-            </div>
-          </div>
-        )}
-        <div className="dialog-footer">
-          <button
-            className="btn secondary"
-            type="button"
-            disabled={busy}
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button className="btn primary" disabled={busy} type="submit">
-            {busy
-              ? "Researching…"
-              : created
-                ? "Retry research"
-                : "Create & research"}
-            {!busy && <Icon name="arrow" size={16} />}
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
+  return <Dialog title="New research campaign" onClose={onClose} wide busy={busy}>
+    <div className="dialog-heading">
+      <span className="modal-icon"><Icon name="spark" size={24} /></span>
+      <span className="eyebrow">FROM PROSPECT LIST TO PRIORITY LIST</span>
+      <h2>Build your next campaign</h2>
+      <p>Import company websites, qualify them against your customer profile, then review the evidence before outreach.</p>
+    </div>
+    <form onSubmit={create} className="campaign-form">
+      {error && <div className="notice error" role="alert"><Icon name="info" />{error}</div>}
+      <label>Campaign name<input autoFocus required disabled={busy || !!created} value={name} maxLength={200} onChange={e => setName(e.target.value)} placeholder="e.g. October outbound shortlist" /></label>
+      <label>Import a prospect list<input type="file" accept=".csv,.txt,text/csv,text/plain" disabled={busy || !!created} onChange={e => { void importFile(e.target.files?.[0]); e.target.value = ""; }} /><span className="input-hint">CSV with a Website or Domain column, or a text list. Up to 100 KB. Files are parsed in your browser; only reviewed domains are submitted.</span></label>
+      {importNote && <p className="notice" role="status">{importNote}</p>}
+      <label>Company websites<textarea required disabled={busy || !!created} rows={5} value={domains} onChange={e => setDomains(e.target.value)} placeholder={"lowcode.agency\nxray.tech"} /><span className="input-hint">One public business domain per line, up to 10 subject to your plan. Duplicate domains are merged. No contact enrichment or automated sending.</span></label>
+      {busy && <div className="research-progress" role="status"><span className="spinner" /><div><strong>{phase}</strong><p>{isSaas ? "Starting a durable background job. You can leave once it has been queued." : "Public websites can take a moment. Keep this window open."}</p></div></div>}
+      <div className="dialog-footer"><button className="btn secondary" type="button" disabled={busy} onClick={onClose}>Cancel</button><button className="btn primary" disabled={busy} type="submit">{busy ? "Starting research…" : created ? "Retry research" : "Create & qualify"}{!busy && <Icon name="arrow" size={16} />}</button></div>
+    </form>
+  </Dialog>;
 }

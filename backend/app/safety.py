@@ -12,6 +12,7 @@ import io
 import re
 import socket
 import ssl
+import threading
 import time
 from dataclasses import dataclass
 from html.parser import HTMLParser
@@ -22,7 +23,19 @@ MAX_TEXT = 24_000
 MAX_REDIRECTS = 3
 FETCH_TIMEOUT = 8.0
 DNS_TIMEOUT = 2.0
-_DNS_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix='public-dns')
+# Match the worker's admitted 2 jobs x 4 domain lanes; still never queue behind
+# a stuck OS resolver. WorkerSettings validates any programmatic concurrency.
+DNS_CAPACITY = 8
+_DNS_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=DNS_CAPACITY, thread_name_prefix='public-dns')
+# OS resolver calls cannot always be interrupted. Never queue behind stalled DNS.
+_DNS_SLOTS = threading.BoundedSemaphore(DNS_CAPACITY)
+
+# Some cloud control/metadata services use addresses classified as globally
+# routable by ipaddress. Deny these exact endpoints, not neighboring public IPs.
+# Azure WireServer: https://learn.microsoft.com/en-us/azure/virtual-network/what-is-ip-address-168-63-129-16
+# Oracle Cloud Machine: https://docs.oracle.com/cloud-machine/latest/stcomputecs/ELUSE/GUID-D0905B84-1B6D-4058-BA3D-4F7385B062C1.htm
+# Oracle is already non-global in newer Python; explicit denial is version-safe.
+_PLATFORM_SERVICE_IPS = frozenset(map(ipaddress.ip_address, ('168.63.129.16', '192.0.0.192')))
 
 
 class FetchError(ValueError):
@@ -61,7 +74,14 @@ def normalize_url(raw: str) -> str:
 
 
 def resolve_public(host: str, port: int, timeout: float = DNS_TIMEOUT) -> list[str]:
-    future = _DNS_POOL.submit(socket.getaddrinfo, host, port, type=socket.SOCK_STREAM)
+    if not _DNS_SLOTS.acquire(blocking=False):
+        raise FetchError('Website DNS capacity is busy; try again later')
+    try:
+        future = _DNS_POOL.submit(socket.getaddrinfo, host, port, type=socket.SOCK_STREAM)
+    except Exception:
+        _DNS_SLOTS.release()
+        raise
+    future.add_done_callback(lambda _: _DNS_SLOTS.release())
     try:
         infos = future.result(timeout=max(0.01, timeout))
     except concurrent.futures.TimeoutError as exc:
@@ -79,7 +99,7 @@ def resolve_public(host: str, port: int, timeout: float = DNS_TIMEOUT) -> list[s
             raise FetchError('The website resolved to an invalid address') from exc
         # Reject the entire answer if even one address is non-public. Also reject
         # IPv4-mapped and translation/tunnel ranges to avoid cross-family bypasses.
-        if (not address.is_global or address.is_multicast or address.is_reserved or
+        if (address in _PLATFORM_SERVICE_IPS or not address.is_global or address.is_multicast or address.is_reserved or
                 (isinstance(address, ipaddress.IPv6Address) and
                  (address.is_site_local or address.ipv4_mapped or address.sixtofour or address.teredo or
                   address in ipaddress.ip_network('64:ff9b::/96') or
