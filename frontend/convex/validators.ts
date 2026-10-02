@@ -1,6 +1,10 @@
 import { v, type Infer } from "convex/values";
 
-export const mode = v.union(v.literal("demo"), v.literal("manual"));
+export const mode = v.union(
+  v.literal("demo"),
+  v.literal("manual"),
+  v.literal("discovery"),
+);
 export const accountStatus = v.union(
   v.literal("new"),
   v.literal("shortlisted"),
@@ -43,6 +47,16 @@ export const evidence = v.object({
   retrieved_at: v.string(),
   is_demo: v.boolean(),
 });
+export const discoveryStage = v.union(
+  v.literal("discovery"),
+  v.literal("contacts"),
+  v.literal("verification"),
+);
+export const spendStatus = v.union(
+  v.literal("reserved"),
+  v.literal("settled"),
+  v.literal("uncertain"),
+);
 export const contact = v.object({
   name: v.union(v.string(), v.null()),
   role: v.string(),
@@ -54,6 +68,23 @@ export const contact = v.object({
   ),
   source_url: v.union(v.string(), v.null()),
   note: v.string(),
+  provider: v.optional(v.union(v.string(), v.null())),
+  retrieved_at: v.optional(v.union(v.string(), v.null())),
+  employment_verified_at: v.optional(v.union(v.string(), v.null())),
+  email_checked_at: v.optional(v.union(v.string(), v.null())),
+  email_status: v.optional(
+    v.union(
+      v.literal("valid"),
+      v.literal("invalid"),
+      v.literal("catch_all"),
+      v.literal("unknown"),
+      v.literal("not_checked"),
+    ),
+  ),
+  email_verification_provider: v.optional(v.union(v.string(), v.null())),
+  license_reference: v.optional(v.union(v.string(), v.null())),
+  license_restrictions: v.optional(v.array(v.string())),
+  license_expires_at: v.optional(v.union(v.string(), v.null())),
 });
 export const scoreComponent = v.object({
   label: v.string(),
@@ -62,6 +93,12 @@ export const scoreComponent = v.object({
   reason: v.string(),
 });
 export const accountFields = {
+  source_provider: v.optional(v.union(v.string(), v.null())),
+  source_url: v.optional(v.union(v.string(), v.null())),
+  retrieved_at: v.optional(v.union(v.string(), v.null())),
+  license_reference: v.optional(v.union(v.string(), v.null())),
+  license_restrictions: v.optional(v.array(v.string())),
+  license_expires_at: v.optional(v.union(v.string(), v.null())),
   name: v.string(),
   domain: v.string(),
   description: v.string(),
@@ -101,6 +138,10 @@ export const workspace = v.object({
   created_at: v.string(),
 });
 export const campaignFields = {
+  profile_snapshot: v.optional(profile),
+  offering_website: v.optional(v.union(v.string(), v.null())),
+  target_count: v.optional(v.number()),
+  discovery_budget_used_microusd: v.optional(v.number()),
   name: v.string(),
   mode,
   status: campaignStatus,
@@ -113,6 +154,10 @@ export const campaignFields = {
 };
 export const campaign = v.object({ id: v.id("campaigns"), ...campaignFields });
 export const job = v.object({
+  stage: v.optional(v.union(discoveryStage, v.literal("complete"))),
+  reserved_microusd: v.optional(v.number()),
+  spent_microusd: v.optional(v.number()),
+  spend_status: v.optional(spendStatus),
   id: v.id("jobs"),
   campaign_id: v.id("campaigns"),
   status: jobStatus,

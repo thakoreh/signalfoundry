@@ -111,10 +111,10 @@ describe("SignalFoundry public landing page", () => {
 
     for (const boundary of [
       "Up to 10 real domains per campaign",
-      "No automatic discovery",
-      "No contact enrichment or verification",
+      "Discovery requires approved providers",
+      "Emails remain unverified",
       "No sending, replies, or meeting booking",
-      "does not discover contacts",
+      "Provider-returned emails are not independently verified",
       "current plan and limits are shown in the workspace",
       "not a verified contact",
       "Staging preview",

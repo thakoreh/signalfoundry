@@ -2,7 +2,7 @@
 
 This module MUST NOT import app.main/app.store or expose the local-demo API.
 Only an authorized server may call it. There are no retries or external side
-effects other than bounded page reads and explicitly opted-in Jev requests.
+effects other than bounded page reads and separately approved provider requests.
 """
 from __future__ import annotations
 
@@ -22,7 +22,11 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field, StringConstraints, model_validator
 
-from .models import Account, AnalyzeRequest, Profile, StrictModel, URLText
+from .models import Account, AnalyzeRequest, EmptyRequest, Profile, StrictModel, URLText
+from .discovery import DiscoveryService
+from .discovery_config import DiscoverySettings
+from .discovery_models import (ContactsRequest, ContactsResponse, DiscoverRequest,
+    DiscoverResponse, DiscoveryStatus, VerifyRequest)
 from .research import RulesDecisionProvider, infer_profile
 from .safety import FetchError, fetch_public_page, normalize_url
 from .worker_config import WorkerSettings
@@ -79,7 +83,8 @@ class WorkerBoundary:
         acquired = False
         response_started = False
         path = scope.get('path', '')
-        operation = {'/healthz': 'health', '/readyz': 'ready', '/worker/research': 'research', '/worker/analyze': 'analyze'}.get(path, 'unknown')
+        operation = {'/healthz': 'health', '/readyz': 'ready', '/worker/research': 'research', '/worker/analyze': 'analyze', '/worker/discover': 'discover',
+                     '/worker/contacts': 'contacts', '/worker/verify': 'verify', '/worker/discovery-status': 'discovery-status'}.get(path, 'unknown')
 
         async def response_send(message):
             nonlocal status, response_started
@@ -177,6 +182,7 @@ def create_worker() -> FastAPI:
     app.state.settings = settings
     app.state.fetch_page = fetch_public_page
     app.state.decision_provider = RulesDecisionProvider()
+    app.state.discovery = DiscoveryService(DiscoverySettings.from_environment())
     if settings.engine == 'jev':
         from .jev import JevDecisionProvider
         app.state.decision_provider = JevDecisionProvider.from_environment()
@@ -199,6 +205,22 @@ def create_worker() -> FastAPI:
     async def ready():
         usable = settings.ready
         return JSONResponse({'status': 'ready' if usable else 'not_ready'}, status_code=200 if usable else 503)
+
+    @app.post('/worker/discovery-status', response_model=DiscoveryStatus)
+    def discovery_status(body: EmptyRequest):
+        return app.state.discovery.status()
+
+    @app.post('/worker/discover', response_model=DiscoverResponse)
+    def discover(body: DiscoverRequest):
+        return app.state.discovery.discover(body, fetch_page=app.state.fetch_page, parallel_domains=settings.parallel_domains)
+
+    @app.post('/worker/contacts', response_model=ContactsResponse)
+    def contacts(body: ContactsRequest):
+        return app.state.discovery.contacts(body)
+
+    @app.post('/worker/verify', response_model=ContactsResponse)
+    def verify(body: VerifyRequest):
+        return app.state.discovery.verify(body)
 
     @app.post('/worker/analyze', response_model=AnalyzeResponse)
     def analyze(body: AnalyzeRequest):

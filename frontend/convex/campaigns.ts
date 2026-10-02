@@ -1,6 +1,8 @@
 import { appError } from "./lib/errors";
 import { v } from "convex/values";
-import { tenantMutation, tenantQuery } from "./lib/auth";
+import { internal } from "./_generated/api";
+import { callWorker } from "./lib/worker";
+import { tenantMutation, tenantQuery, tenantAction } from "./lib/auth";
 import {
   accountResult,
   campaignResult,
@@ -8,7 +10,14 @@ import {
   requireCampaign,
   requireWorkspace,
 } from "./lib/records";
-import { boundedLimit, normalizeDomains, text } from "./lib/validation";
+import {
+  boundedLimit,
+  normalizeDomains,
+  normalizeWebsite,
+  validateProfile,
+  text,
+} from "./lib/validation";
+import { dataVisible, MAX_DISCOVERY_TARGETS } from "./lib/discoveryPolicy";
 import * as validators from "./validators";
 
 export const list = tenantQuery({
@@ -28,13 +37,16 @@ export const create = tenantMutation({
     name: v.string(),
     mode: validators.mode,
     domains: v.array(v.string()),
+    profile_snapshot: v.optional(validators.profile),
+    offering_website: v.optional(v.union(v.string(), v.null())),
+    target_count: v.optional(v.number()),
   },
   returns: validators.campaign,
   handler: async (ctx, args) => {
     if (args.mode === "demo")
       throw appError("VALIDATION_ERROR", "Demo campaigns are not available");
     const workspace = await requireWorkspace(ctx, ctx.principal.orgId);
-    if (!workspace.profile)
+    if (!workspace.profile && !args.profile_snapshot)
       throw appError(
         "WORKSPACE_REQUIRED",
         "Save an ICP profile before creating a campaign",
@@ -49,12 +61,25 @@ export const create = tenantMutation({
         "QUOTA_EXCEEDED",
         "Workspace campaign limit reached (100); contact your administrator",
       );
+    const snapshot = validateProfile(
+      args.profile_snapshot ?? workspace.profile!,
+    );
+    const targetCount =
+      args.mode === "discovery"
+        ? boundedLimit(args.target_count, 20, MAX_DISCOVERY_TARGETS)
+        : args.domains.length;
+    const website = args.offering_website
+      ? normalizeWebsite(args.offering_website)
+      : workspace.website;
     const timestamp = iso(Date.now());
     const id = await ctx.db.insert("campaigns", {
       orgId: ctx.principal.orgId,
       createdBy: ctx.principal.userId,
       name: text(args.name, "Campaign name", 200),
       mode: args.mode,
+      profile_snapshot: snapshot,
+      offering_website: website,
+      target_count: targetCount,
       domains: normalizeDomains(args.mode, args.domains),
       status: "draft",
       created_at: timestamp,
@@ -83,7 +108,75 @@ export const accounts = tenantQuery({
         q.eq("orgId", ctx.principal.orgId).eq("campaignId", args.id),
       )
       .order("desc")
-      .take(10);
-    return rows.map(accountResult);
+      .take(MAX_DISCOVERY_TARGETS);
+    return rows.filter((row) => dataVisible(row.data)).map(accountResult);
+  },
+});
+
+export const exportAccounts = tenantQuery({
+  args: { id: v.id("campaigns") },
+  returns: v.array(validators.account),
+  handler: async (ctx, args) => {
+    await requireCampaign(ctx, ctx.principal.orgId, args.id);
+    const rows = await ctx.db
+      .query("accounts")
+      .withIndex("by_orgId_and_campaignId_and_score", (q) =>
+        q.eq("orgId", ctx.principal.orgId).eq("campaignId", args.id),
+      )
+      .order("desc")
+      .take(MAX_DISCOVERY_TARGETS);
+    const visible = rows.filter((row) => dataVisible(row.data));
+    if (
+      visible.some(
+        (row) =>
+          row.data.source_provider ||
+          row.data.contacts.some((contact) => contact.provider),
+      ) &&
+      process.env.SIGNALFOUNDRY_LICENSED_DATA_EXPORT_APPROVED !== "true"
+    )
+      throw appError(
+        "EXPORT_BLOCKED",
+        "Licensed-data export approval is required",
+      );
+    return visible.map(accountResult);
+  },
+});
+
+// A campaign preview never overwrites the organization's saved targeting profile.
+export const suggestBrief = tenantAction({
+  args: { website: v.string() },
+  returns: v.object({ profile: validators.profile, website: v.string() }),
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ profile: validators.Profile; website: string }> => {
+    const website = normalizeWebsite(args.website);
+    const lease: { version: number; lease: number } = await ctx.runMutation(
+      internal.workspaces.beginAnalyze,
+      { orgId: ctx.principal.orgId },
+    );
+    try {
+      const response = await callWorker("/worker/analyze", { website });
+      if (
+        !response ||
+        typeof response !== "object" ||
+        !("profile" in response) ||
+        !("website" in response) ||
+        typeof response.website !== "string"
+      )
+        throw appError(
+          "RESEARCH_FAILED",
+          "Website analysis returned invalid data",
+        );
+      return {
+        profile: validateProfile(response.profile as validators.Profile),
+        website: normalizeWebsite(response.website),
+      };
+    } finally {
+      await ctx.runMutation(internal.workspaces.releaseAnalyze, {
+        orgId: ctx.principal.orgId,
+        lease: lease.lease,
+      });
+    }
   },
 });

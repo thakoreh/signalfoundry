@@ -33,7 +33,7 @@ jobs:
           cache-dependency-path: backend/requirements.lock.txt
       - run: bash scripts/setup.sh
       - run: bash scripts/check.sh
-      - name: Install Chromium for landing regression checks
+      - name: Install Chromium for browser regression checks
         run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Verify desktop, mobile, keyboard, and reduced-motion behavior
@@ -43,7 +43,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: landing-browser-evidence
+          name: application-browser-evidence
           path: |
             frontend/test-results/
             frontend/playwright-report/
@@ -70,3 +70,36 @@ jobs:
       - run: docker build --file deploy/saas.Dockerfile --tag signalfoundry-saas:ci .
       - run: docker build --file deploy/worker.Dockerfile --tag signalfoundry-worker:ci .
       - run: python3 scripts/production_container_smoke.py
+  campaign-walkthrough:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      NEXT_TELEMETRY_DISABLED: '1'
+      SIGNALFOUNDRY_MODE: local-demo
+      NEXT_PUBLIC_SIGNALFOUNDRY_MODE: local-demo
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Render the labelled test-data campaign on desktop and mobile
+        run: npm run test:browser -- discovery.spec.ts --grep 'TEST DATA one complete' --project desktop-1440 --project mobile-390
+        working-directory: frontend
+      - name: Save ordered campaign screenshots and assertions
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: campaign-walkthrough-evidence
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7
+          if-no-files-found: ignore

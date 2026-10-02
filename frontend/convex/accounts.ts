@@ -1,7 +1,12 @@
 import { appError } from "./lib/errors";
 import { v } from "convex/values";
 import { tenantMutation, tenantQuery } from "./lib/auth";
-import { accountResult, requireAccount, requireWorkspace } from "./lib/records";
+import {
+  accountResult,
+  requireAccount,
+  requireWorkspace,
+  requireCampaign,
+} from "./lib/records";
 import { makeGroundedDraft } from "./lib/outreach";
 import * as validators from "./validators";
 
@@ -35,6 +40,14 @@ export const draft = tenantQuery({
         "Save an ICP profile before drafting",
       );
     const account = accountResult(row);
-    return makeGroundedDraft(account, workspace.profile);
+    const campaign = await requireCampaign(
+      ctx,
+      ctx.principal.orgId,
+      row.campaignId,
+    );
+    return makeGroundedDraft(
+      account,
+      campaign.profile_snapshot ?? workspace.profile,
+    );
   },
 });

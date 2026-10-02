@@ -98,8 +98,8 @@ export function AccountDrawer({
   const busyRef = useRef(busy);
   useEffect(() => {
     closeRef.current = onClose;
-    busyRef.current = busy;
-  }, [onClose, busy]);
+    busyRef.current = busy || draftBusy;
+  }, [onClose, busy, draftBusy]);
 
   useEffect(() => {
     const content = drawerContentRef.current;
@@ -115,12 +115,12 @@ export function AccountDrawer({
       "input:not([disabled])",
       "select:not([disabled])",
       "textarea:not([disabled])",
-      "[tabindex]:not([tabindex=\"-1\"])",
+      '[tabindex]:not([tabindex="-1"])',
     ].join(",");
     const focusable = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-        (element) => element.getAttribute("aria-hidden") !== "true",
-      );
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelector),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
     const focusFirst = () => {
       const first = focusable()[0];
       first?.focus();
@@ -197,7 +197,12 @@ export function AccountDrawer({
     }
   }
   return (
-    <Dialog title={`${account.name} account details`} onClose={onClose} drawer>
+    <Dialog
+      title={`${account.name} account details`}
+      onClose={onClose}
+      drawer
+      busy={busy || draftBusy}
+    >
       <div className="account-head" ref={drawerContentRef}>
         <div className="company-logo large">{initials(account.name)}</div>
         <div className="account-title">
@@ -364,6 +369,34 @@ export function AccountDrawer({
                 </div>
               </div>
             </section>
+            {account.source_provider && (
+              <section className="detail-section">
+                <h3>Discovery source</h3>
+                <p>Provider: {account.source_provider}</p>
+                <p className="input-hint">
+                  Retrieved: {formatDate(account.retrieved_at)}
+                </p>
+                {account.source_url &&
+                  safeUrl(account.source_url) &&
+                  !account.is_demo && (
+                    <a
+                      className="source-link"
+                      href={safeUrl(account.source_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Company discovery source
+                      <Icon name="external" size={12} />
+                    </a>
+                  )}
+                {!!account.license_restrictions?.length && (
+                  <p className="input-hint">
+                    Usage restrictions:{" "}
+                    {account.license_restrictions.join("; ")}
+                  </p>
+                )}
+              </section>
+            )}
             <section className="detail-section">
               <h3>
                 <Icon name="target" size={18} />
@@ -455,8 +488,9 @@ export function AccountDrawer({
                 People & contact coverage
               </h3>
               <p className="section-note">
-                Contact enrichment is not connected. No email addresses are
-                inferred.
+                Contacts, where available, come from a named provider. An email
+                is unverified unless separately checked. Verification does not
+                imply permission to contact.
               </p>
               {account.contacts.length ? (
                 account.contacts.map((contact, i) => (
@@ -475,11 +509,44 @@ export function AccountDrawer({
                         : contact.verification_status}
                     </span>
                     <p>{contact.note}</p>
-                    {contact.email &&
-                    contact.verification_status === "verified" ? (
-                      <p>{contact.email}</p>
+                    {contact.email ? (
+                      <p className="contact-email">
+                        {contact.email}
+                        <span className="input-hint">
+                          {contact.verification_status === "verified"
+                            ? "Independently verified"
+                            : "Provider-returned · unverified"}
+                        </span>
+                      </p>
                     ) : (
-                      <p className="input-hint">Verified email not available</p>
+                      <p className="input-hint">Email not available</p>
+                    )}
+                    {contact.provider && (
+                      <p className="input-hint">
+                        Source: {contact.provider}
+                        {contact.retrieved_at
+                          ? ` · Retrieved ${formatDate(contact.retrieved_at)}`
+                          : ""}
+                        {contact.email_checked_at
+                          ? ` · Email checked ${formatDate(contact.email_checked_at)}`
+                          : " · Email not checked"}
+                      </p>
+                    )}
+                    {contact.email_status &&
+                      contact.email_status !== "not_checked" && (
+                        <p className="input-hint">
+                          Email check result:{" "}
+                          {contact.email_status.replaceAll("_", " ")}
+                          {contact.email_verification_provider
+                            ? ` · ${contact.email_verification_provider}`
+                            : ""}
+                        </p>
+                      )}
+                    {!!contact.license_restrictions?.length && (
+                      <p className="input-hint">
+                        Usage restrictions:{" "}
+                        {contact.license_restrictions.join("; ")}
+                      </p>
                     )}
                     {contact.source_url &&
                       safeUrl(contact.source_url) &&

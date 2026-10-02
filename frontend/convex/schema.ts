@@ -2,8 +2,11 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   accountData,
+  workerAccount,
   campaignFields,
   jobStatus,
+  discoveryStage,
+  spendStatus,
   mode,
   profile,
 } from "./validators";
@@ -52,8 +55,43 @@ export default defineSchema({
       "campaignId",
       "data.domain",
     ])
-    .index("by_orgId", ["orgId"]),
+    .index("by_orgId", ["orgId"])
+    .index("by_jobId", ["jobId"]),
+  discoveryProviderWindow: defineTable({
+    provider: v.string(),
+    nextAvailableAt: v.number(),
+  }).index("by_provider", ["provider"]),
+  discoveryUsage: defineTable({
+    scope: v.string(),
+    month: v.string(),
+    committedMicrousd: v.number(),
+  }).index("by_scope_and_month", ["scope", "month"]),
+  discoverySpend: defineTable({
+    orgId: v.string(),
+    jobId: v.id("jobs"),
+    campaignId: v.id("campaigns"),
+    month: v.string(),
+    reservedMicrousd: v.number(),
+    consumedMicrousd: v.number(),
+    status: spendStatus,
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_jobId", ["jobId"])
+    .index("by_orgId_and_campaignId", ["orgId", "campaignId"]),
   jobs: defineTable({
+    stage: v.optional(v.union(discoveryStage, v.literal("complete"))),
+    targetCount: v.optional(v.number()),
+    offeringWebsite: v.optional(v.union(v.string(), v.null())),
+    reservedMicrousd: v.optional(v.number()),
+    spentMicrousd: v.optional(v.number()),
+    spendStatus: v.optional(spendStatus),
+    intermediateAccounts: v.optional(v.array(workerAccount)),
+    stageCursor: v.optional(v.number()),
+    stageInFlight: v.optional(v.boolean()),
+    retentionSweepAt: v.optional(v.number()),
+    verificationEnabled: v.optional(v.boolean()),
+    stageErrors: v.optional(v.array(v.string())),
     orgId: v.string(),
     campaignId: v.id("campaigns"),
     createdBy: v.string(),

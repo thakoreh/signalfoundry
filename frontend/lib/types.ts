@@ -18,7 +18,7 @@ export type WorkspaceData = {
 export type Campaign = {
   id: string;
   name: string;
-  mode: "demo" | "manual";
+  mode: "demo" | "manual" | "discovery";
   status: "draft" | "researching" | "complete" | "partial" | "failed";
   created_at: string;
   updated_at: string;
@@ -26,6 +26,34 @@ export type Campaign = {
   qualified_count: number;
   domains: string[];
   errors: string[];
+  profile_snapshot?: Profile | null;
+  target_count?: number;
+  offering_website?: string | null;
+};
+export type CampaignInput = {
+  name: string;
+  mode: "discovery" | "manual";
+  domains: string[];
+  profile_snapshot: Profile;
+  target_count: number;
+  offering_website: string | null;
+};
+export type ProviderReadiness = {
+  configured: boolean;
+  licensed: boolean;
+  reason: string;
+  max_cost_microusd?: number;
+};
+export type DiscoveryStatus = {
+  enabled: boolean;
+  providers: {
+    discovery: ProviderReadiness;
+    contacts: ProviderReadiness;
+    verification: ProviderReadiness;
+  };
+  max_target_count: number;
+  max_cost_microusd: number;
+  blockers: string[];
 };
 export type Evidence = {
   id: string;
@@ -44,6 +72,15 @@ export type Contact = {
   verification_status: "unverified" | "not_available" | "verified";
   source_url: string | null;
   note: string;
+  provider?: string | null;
+  retrieved_at?: string | null;
+  employment_verified_at?: string | null;
+  email_checked_at?: string | null;
+  email_status?: "valid" | "invalid" | "catch_all" | "unknown" | "not_checked";
+  email_verification_provider?: string | null;
+  license_reference?: string | null;
+  license_restrictions?: string[];
+  license_expires_at?: string | null;
 };
 export type AccountStatus = "new" | "shortlisted" | "dismissed";
 export type Account = {
@@ -66,6 +103,12 @@ export type Account = {
   contacts: Contact[];
   is_demo: boolean;
   researched_at: string;
+  source_provider?: string | null;
+  source_url?: string | null;
+  retrieved_at?: string | null;
+  license_reference?: string | null;
+  license_restrictions?: string[];
+  license_expires_at?: string | null;
   score_breakdown: {
     label: string;
     points: number;
@@ -102,4 +145,8 @@ export type ResearchJob = {
   error: string | null;
   created_at: string;
   updated_at: string;
+  stage?: "discovery" | "contacts" | "verification" | "complete";
+  reserved_microusd?: number;
+  spent_microusd?: number;
+  spend_status?: "reserved" | "settled" | "uncertain";
 };

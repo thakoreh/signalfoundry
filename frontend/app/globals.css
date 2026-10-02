@@ -4066,3 +4066,270 @@ legend {
     padding: 16px;
   }
 }
+
+/* Discovery-first campaign brief and review. */
+.campaign-edit-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.campaign-mode {
+  border: 0;
+  padding: 0;
+  margin: 0 0 22px;
+  min-width: 0;
+}
+.campaign-mode legend {
+  margin-bottom: 10px;
+  font-weight: 650;
+  font-size: 14px;
+}
+.mode-options {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.mode-option {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 9px;
+  align-items: center;
+  border: 1px solid #a6b9ae;
+  border-radius: 12px;
+  padding: 16px;
+  background: #fff;
+  cursor: pointer;
+}
+.mode-option input {
+  position: static;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 0;
+  accent-color: #236149;
+}
+.mode-option span {
+  grid-column: 1 / -1;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #52645a;
+}
+.mode-option.selected {
+  border: 2px solid #236149;
+  padding: 15px;
+  background: #eef8f1;
+}
+.campaign-brief-fields {
+  margin: 14px 0;
+}
+.target-brief-heading {
+  margin: 25px 0 14px;
+}
+.target-brief-heading p {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #53655b;
+  margin-top: 6px;
+}
+.brief-generation-actions,
+.campaign-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.discovery-readiness {
+  margin: 20px 0;
+  padding: 18px 20px;
+  border: 1px solid #a6b9ae;
+  border-radius: 12px;
+  background: #f6f8f5;
+}
+.discovery-readiness.ready {
+  border-color: #508268;
+  background: #eef8f1;
+}
+.readiness-heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 8px;
+}
+.discovery-readiness p {
+  font-size: 13px;
+  line-height: 1.65;
+  color: #4b6054;
+}
+.provider-readiness {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+}
+.provider-readiness li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+.provider-readiness .small-dot {
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+.provider-readiness li strong,
+.provider-readiness li span span {
+  display: block;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.provider-readiness li span span {
+  color: #52645a;
+  margin-top: 4px;
+}
+.readiness-blockers {
+  margin: 14px 0 0;
+  padding-left: 17px;
+  font-size: 12px;
+  color: #67512f;
+  line-height: 1.7;
+}
+.target-brief {
+  border: 1px solid #b8c8bf;
+  border-radius: 12px;
+  padding: 22px;
+  margin: 15px 0;
+  background: #fff;
+}
+.brief-offering p {
+  margin: 9px 0;
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.brief-offering a {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+  max-width: 100%;
+}
+.brief-criteria {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  border-top: 1px solid #cbd7cf;
+  padding-top: 18px;
+  margin: 18px 0;
+}
+.brief-criteria dt {
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: #56675d;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+.brief-criteria dd {
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.brief-limit {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
+  align-items: center;
+}
+.brief-limit span {
+  color: #52645a;
+  font-size: 12px;
+}
+.review-confirmation {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 0;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.review-confirmation input {
+  width: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  margin: 2px 0 0;
+  accent-color: #236149;
+}
+.review-campaign-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.review-domains p {
+  font-size: 13px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.campaign-safety-note {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 11px;
+  color: #56675d;
+  margin-top: 14px;
+}
+.campaign-snapshot {
+  padding: 16px 20px;
+  border: 1px solid #a6b9ae;
+  border-radius: 12px;
+  margin-bottom: 20px;
+  background: #f6f8f5;
+}
+.campaign-snapshot summary {
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  min-height: 28px;
+}
+.contact-email {
+  overflow-wrap: anywhere;
+}
+.contact-email .input-hint {
+  display: block;
+}
+.review-campaign-name h3,
+.detail-section p {
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .mode-options,
+  .brief-criteria,
+  .provider-readiness {
+    grid-template-columns: 1fr;
+  }
+  .target-brief {
+    padding: 16px;
+  }
+  .discovery-readiness {
+    padding: 16px;
+  }
+  .campaign-actions {
+    align-items: stretch;
+  }
+  .campaign-actions .btn,
+  .brief-generation-actions .btn {
+    flex: 1 1 auto;
+    min-height: 44px;
+  }
+}

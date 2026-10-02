@@ -43,7 +43,13 @@ export function workerConfiguration() {
   return { origin, token };
 }
 export async function callWorker(
-  path: "/worker/research" | "/worker/analyze",
+  path:
+    | "/worker/research"
+    | "/worker/analyze"
+    | "/worker/discovery-status"
+    | "/worker/discover"
+    | "/worker/contacts"
+    | "/worker/verify",
   payload: unknown,
 ): Promise<unknown> {
   const { origin, token } = workerConfiguration();

@@ -4,7 +4,8 @@ Production SaaS uses only the stateless `app.worker:app` service; Clerk handles
 identity, Convex owns all tenant data, and Stripe handles billing. Worker contract,
 authentication, deployment boundaries, and verification are documented in
 [`deploy/worker.README.md`](../deploy/worker.README.md). The worker neither imports
-nor exposes the SQLite demo below.
+nor exposes the SQLite demo below. Discovery stage contracts, fail-closed commercial
+configuration, spend accounting, and verification limits are in [DISCOVERY.md](DISCOVERY.md).
 
 ## Isolated local-demo API
 

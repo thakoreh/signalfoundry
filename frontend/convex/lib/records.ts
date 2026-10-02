@@ -1,5 +1,6 @@
 import { appError } from "./errors";
 import type { QueryCtx } from "../_generated/server";
+import { dataVisible } from "./discoveryPolicy";
 import type { Doc, Id } from "../_generated/dataModel";
 
 export const iso = (timestamp: number) => new Date(timestamp).toISOString();
@@ -24,16 +25,47 @@ export function campaignResult(row: Doc<"campaigns">) {
     qualified_count: row.qualified_count,
     domains: row.domains,
     errors: row.errors,
+    ...(row.profile_snapshot ? { profile_snapshot: row.profile_snapshot } : {}),
+    ...(row.offering_website !== undefined
+      ? { offering_website: row.offering_website }
+      : {}),
+    ...(row.target_count !== undefined
+      ? { target_count: row.target_count }
+      : {}),
+    ...(row.discovery_budget_used_microusd !== undefined
+      ? { discovery_budget_used_microusd: row.discovery_budget_used_microusd }
+      : {}),
   };
 }
 export function accountResult(row: Doc<"accounts">) {
-  return { id: row._id, campaign_id: row.campaignId, ...row.data };
+  if (!dataVisible(row.data))
+    throw appError(
+      "DATA_EXPIRED",
+      "Licensed prospect data is unavailable or expired",
+    );
+  const contacts = row.data.contacts.filter(
+    (contact) =>
+      !contact.provider ||
+      dataVisible({
+        source_provider: contact.provider,
+        license_expires_at: contact.license_expires_at,
+      }),
+  );
+  return { id: row._id, campaign_id: row.campaignId, ...row.data, contacts };
 }
 export function jobResult(row: Doc<"jobs">) {
   return {
     id: row._id,
     campaign_id: row.campaignId,
     status: row.status,
+    ...(row.stage ? { stage: row.stage } : {}),
+    ...(row.reservedMicrousd !== undefined
+      ? { reserved_microusd: row.reservedMicrousd }
+      : {}),
+    ...(row.spentMicrousd !== undefined
+      ? { spent_microusd: row.spentMicrousd }
+      : {}),
+    ...(row.spendStatus ? { spend_status: row.spendStatus } : {}),
     attempt: row.attempt,
     max_attempts: row.maxAttempts,
     error: row.error,

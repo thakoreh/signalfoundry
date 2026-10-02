@@ -12,6 +12,8 @@ export type ErrorCode =
   | "CONFIGURATION_ERROR"
   | "WORKSPACE_REQUIRED"
   | "CONFLICT"
+  | "DATA_EXPIRED"
+  | "EXPORT_BLOCKED"
   | "RESEARCH_FAILED"
   | "BILLING_UNAVAILABLE";
 export const appError = (code: ErrorCode, message: string) =>

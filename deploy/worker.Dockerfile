@@ -9,7 +9,7 @@ ENV PATH="/opt/venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 FORW
 WORKDIR /app
 COPY --from=dependencies /opt/venv /opt/venv
 # Explicit allowlist excludes SQLite repository, local API, tests, env, data.
-COPY backend/app/__init__.py backend/app/worker.py backend/app/worker_config.py backend/app/primitives.py backend/app/models.py backend/app/fixtures.py backend/app/research.py backend/app/safety.py backend/app/jev.py /app/app/
+COPY backend/app/__init__.py backend/app/worker.py backend/app/worker_config.py backend/app/primitives.py backend/app/models.py backend/app/fixtures.py backend/app/research.py backend/app/safety.py backend/app/jev.py backend/app/discovery.py backend/app/discovery_config.py backend/app/discovery_models.py backend/app/discovery_providers.py /app/app/
 COPY deploy/worker_healthcheck.py /app/worker_healthcheck.py
 USER 10001:10001
 EXPOSE 8001

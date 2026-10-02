@@ -11,6 +11,9 @@ export type FunctionName =
   | "campaigns.create"
   | "campaigns.get"
   | "campaigns.accounts"
+  | "campaigns.exportAccounts"
+  | "campaigns.suggestBrief"
+  | "discovery.status"
   | "accounts.get"
   | "accounts.setStatus"
   | "accounts.draft"
@@ -175,6 +178,11 @@ export function safeProviderError(error: unknown): {
       503,
       "Research could not be completed. Check the campaign status or try again later.",
     ],
+    DATA_EXPIRED: [410, "Licensed prospect data is unavailable or expired."],
+    EXPORT_BLOCKED: [
+      403,
+      "Licensed-data export is not approved for this workspace.",
+    ],
     CONFIGURATION_ERROR: [
       503,
       "This service is not configured. Contact your administrator.",
@@ -272,7 +280,8 @@ export async function handleApi(
         }),
       );
     }
-    if (route === "GET /billing/offer") return json(await invoke("stripe.offer"));
+    if (route === "GET /billing/offer")
+      return json(await invoke("stripe.offer"));
     if (route === "GET /health") {
       await invoke("workspaces.get");
       return json({
@@ -282,16 +291,54 @@ export async function handleApi(
         providers: { discovery: "Public websites", contacts: "Not connected" },
       });
     }
+    if (route === "GET /discovery/status")
+      return json(await invoke("discovery.status"));
+    if (route === "POST /campaigns/suggest-brief") {
+      keys(body, ["website"]);
+      return json(
+        await invoke("campaigns.suggestBrief", {
+          website: string(body.website, 2048),
+        }),
+      );
+    }
     if (route === "GET /campaigns") return json(await invoke("campaigns.list"));
     if (route === "POST /campaigns") {
-      keys(body, ["name", "mode", "domains"]);
-      if (body.mode !== "manual")
+      keys(body, [
+        "name",
+        "mode",
+        "domains",
+        "profile_snapshot",
+        "offering_website",
+        "target_count",
+      ]);
+      if (body.mode !== "manual" && body.mode !== "discovery")
         fail(400, "Choose a valid research mode.");
+      if (
+        body.target_count !== undefined &&
+        (!Number.isSafeInteger(body.target_count) ||
+          Number(body.target_count) < 1 ||
+          Number(body.target_count) > 30)
+      )
+        fail(400, "Choose 1–30 target companies.");
       return json(
         await invoke("campaigns.create", {
           name: string(body.name),
           mode: body.mode,
           domains: list(body.domains, 10),
+          ...(body.profile_snapshot !== undefined
+            ? { profile_snapshot: profile(body.profile_snapshot) }
+            : {}),
+          ...(body.offering_website !== undefined
+            ? {
+                offering_website:
+                  body.offering_website === null
+                    ? null
+                    : string(body.offering_website, 2048),
+              }
+            : {}),
+          ...(body.target_count !== undefined
+            ? { target_count: body.target_count }
+            : {}),
         }),
         201,
       );
@@ -315,7 +362,9 @@ export async function handleApi(
         );
       }
       if (method === "GET" && path[2] === "export.csv") {
-        const accounts = (await invoke("campaigns.accounts", { id })) as Account[];
+        const accounts = (await invoke("campaigns.exportAccounts", {
+          id,
+        })) as Account[];
         const csv = exportAccountsCsv(accounts);
         return new Response(csv, {
           headers: {

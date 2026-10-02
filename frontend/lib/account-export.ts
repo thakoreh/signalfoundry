@@ -20,6 +20,12 @@ export const ACCOUNT_CSV_FIELDS = [
   "researched_at",
   "decision_engine",
   "is_demo",
+  "contacts",
+  "source_provider",
+  "source_url",
+  "license_reference",
+  "license_expires_at",
+  "license_restrictions",
 ] as const;
 
 export function csvCell(value: unknown): string {
@@ -59,6 +65,12 @@ function accountValues(account: Account): unknown[] {
     account.researched_at,
     account.decision_engine,
     account.is_demo,
+    jsonCell(account.contacts),
+    account.source_provider ?? "",
+    account.source_url ?? "",
+    account.license_reference ?? "",
+    account.license_expires_at ?? "",
+    jsonCell(account.license_restrictions ?? []),
   ];
 }
 

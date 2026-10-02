@@ -1,3 +1,26 @@
+import type { Campaign, CampaignInput, DiscoveryStatus } from "./types";
+
+export function discoveryReady(status: DiscoveryStatus | null): boolean {
+  return Boolean(
+    status?.enabled &&
+    status.providers?.discovery?.configured &&
+    status.providers.discovery.licensed &&
+    status.providers?.contacts?.configured &&
+    status.providers.contacts.licensed &&
+    status.blockers?.length === 0,
+  );
+}
+
+export function createCampaign(
+  client: typeof api,
+  input: CampaignInput,
+): Promise<Campaign> {
+  return client<Campaign>("/campaigns", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {},

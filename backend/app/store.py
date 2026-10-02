@@ -75,11 +75,14 @@ class Repository:
                               (self.tenant_id,)).fetchall()
         return [Campaign.model_validate_json(r['data']) for r in rows]
 
-    def create_campaign(self, name: str, mode: str, domains: list[str]) -> Campaign:
+    def create_campaign(self, name: str, mode: str, domains: list[str], *, profile_snapshot: Profile | None = None,
+                        target_count: int = 10, offering_website: str | None = None) -> Campaign:
         timestamp = now()
         campaign = Campaign(id=new_id('cmp'), name=name, mode=mode, status='draft',
                             created_at=timestamp, updated_at=timestamp, account_count=0,
-                            qualified_count=0, domains=domains, errors=[])
+                            qualified_count=0, domains=domains, errors=[],
+                            profile_snapshot=profile_snapshot or self.workspace().profile,
+                            target_count=target_count, offering_website=offering_website)
         with self.connect() as db:
             count = db.execute('SELECT count(*) FROM campaigns WHERE tenant_id=?', (self.tenant_id,)).fetchone()[0]
             if count >= 250:

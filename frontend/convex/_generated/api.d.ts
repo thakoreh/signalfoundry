@@ -11,6 +11,7 @@
 import type * as accounts from "../accounts.js";
 import type * as billing from "../billing.js";
 import type * as campaigns from "../campaigns.js";
+import type * as discovery from "../discovery.js";
 import type * as http from "../http.js";
 import type * as jobs from "../jobs.js";
 import type * as lib_auth from "../lib/auth.js";
@@ -36,6 +37,7 @@ declare const fullApi: ApiFromModules<{
   accounts: typeof accounts;
   billing: typeof billing;
   campaigns: typeof campaigns;
+  discovery: typeof discovery;
   http: typeof http;
   jobs: typeof jobs;
   "lib/auth": typeof lib_auth;

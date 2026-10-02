@@ -8,8 +8,9 @@ import type {
   Health,
   WorkspaceData,
   ResearchJob,
+  DiscoveryStatus,
 } from "@/lib/types";
-import { errorMessage, jsonBody } from "@/lib/api";
+import { discoveryReady, errorMessage, jsonBody } from "@/lib/api";
 import {
   filterAccounts,
   formatDate,
@@ -25,6 +26,7 @@ import { Icon } from "./icons";
 import { useWorkspaceSession } from "./workspace-session";
 import { Dialog } from "./dialog";
 import { ProfileEditor } from "./profile-editor";
+import { DiscoveryReadiness, TargetBrief } from "./discovery-readiness";
 import { CampaignDialog } from "./campaign-dialog";
 import { AccountDrawer } from "./account-drawer";
 import { BillingPanel } from "./billing-panel";
@@ -40,6 +42,9 @@ export default function Workspace({
 }) {
   const { api, request, mode: appMode, isAdmin } = useWorkspaceSession();
   const isSaas = appMode === "saas";
+  const [discoveryStatus, setDiscoveryStatus] =
+    useState<DiscoveryStatus | null>(null);
+  const [discoveryChecking, setDiscoveryChecking] = useState(true);
   const [job, setJob] = useState<ResearchJob | null>(null);
   const [jobRevision, setJobRevision] = useState(0);
   const [jobError, setJobError] = useState("");
@@ -65,6 +70,7 @@ export default function Workspace({
   const [website, setWebsite] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
+  const researchLock = useRef(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [newCampaign, setNewCampaign] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
@@ -194,6 +200,20 @@ export default function Workspace({
       clearTimeout(timer);
     };
   }, [api, isSaas, selectedId, jobRevision]);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<DiscoveryStatus>("/discovery/status", { signal: controller.signal })
+      .then((result) => {
+        if (!controller.signal.aborted) setDiscoveryStatus(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setDiscoveryStatus(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDiscoveryChecking(false);
+      });
+    return () => controller.abort();
+  }, [api]);
   async function cancelResearch() {
     if (!job || cancelBusy) return;
     setCancelBusy(true);
@@ -285,15 +305,24 @@ export default function Workspace({
     navigate("accounts");
     setJobRevision((revision) => revision + 1);
     setToast(
-      c.status === "complete"
-        ? "Research complete. Your accounts are ready."
-        : c.status === "partial"
-          ? "Research finished with some gaps. Review the campaign notes."
-          : "Campaign created. Review the research status.",
+      c.status === "draft"
+        ? "Campaign draft saved. No research has started."
+        : c.status === "complete"
+          ? "Research complete. Your accounts are ready."
+          : c.status === "partial"
+            ? "Research finished with some gaps. Review the campaign notes."
+            : "Campaign created. Review the research status.",
     );
   }
   async function research() {
-    if (!campaign || researchBusy || activeJob(job)) return;
+    if (
+      !campaign ||
+      researchLock.current ||
+      activeJob(job) ||
+      (campaign.mode === "discovery" && !discoveryReady(discoveryStatus))
+    )
+      return;
+    researchLock.current = true;
     setResearchBusy(true);
     setError("");
     const id = campaign.id;
@@ -326,6 +355,7 @@ export default function Workspace({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      researchLock.current = false;
       setResearchBusy(false);
     }
   }
@@ -513,7 +543,7 @@ export default function Workspace({
             <span className="nav-label">RECENT CAMPAIGNS</span>
             <button
               className="plain-icon"
-              disabled={!workspace?.profile}
+              disabled={!workspace}
               title="New campaign"
               aria-label="New campaign"
               onClick={() => setNewCampaign(true)}
@@ -684,7 +714,7 @@ export default function Workspace({
                         serve.
                       </p>
                     </div>
-                    {workspace.profile && (
+                    {workspace && (
                       <button
                         className="btn primary"
                         onClick={() => setNewCampaign(true)}
@@ -755,11 +785,7 @@ export default function Workspace({
                     </div>
                     <button
                       className="btn primary"
-                      onClick={() =>
-                        workspace.profile
-                          ? setNewCampaign(true)
-                          : navigate("profile")
-                      }
+                      onClick={() => setNewCampaign(true)}
                     >
                       <Icon name="plus" size={17} />
                       New campaign
@@ -775,10 +801,7 @@ export default function Workspace({
                         >
                           <div className="campaign-card-top">
                             <span className="campaign-card-icon">
-                              <Icon
-                                name="globe"
-                                size={24}
-                              />
+                              <Icon name="globe" size={24} />
                             </span>
                             <span
                               className={`tag ${c.status === "complete" ? "green" : c.status === "failed" ? "red" : ""}`}
@@ -786,7 +809,11 @@ export default function Workspace({
                               {c.status}
                             </span>
                           </div>
-                          <span className="eyebrow">PUBLIC WEBSITE RESEARCH</span>
+                          <span className="eyebrow">
+                            {c.mode === "discovery"
+                              ? "CUSTOMER DISCOVERY"
+                              : "MANUAL WEBSITE RESEARCH"}
+                          </span>
                           <h3>{c.name}</h3>
                           <div className="campaign-card-stats">
                             <span>
@@ -807,13 +834,7 @@ export default function Workspace({
                       ))}
                     </div>
                   ) : (
-                    <EmptyCampaign
-                      onCreate={() =>
-                        workspace.profile
-                          ? setNewCampaign(true)
-                          : navigate("profile")
-                      }
-                    />
+                    <EmptyCampaign onCreate={() => setNewCampaign(true)} />
                   )}
                 </>
               ) : campaign ? (
@@ -844,6 +865,23 @@ export default function Workspace({
                       New campaign
                     </button>
                   </div>
+                  {campaign.profile_snapshot && (
+                    <details className="campaign-snapshot">
+                      <summary>Saved campaign target brief</summary>
+                      <TargetBrief
+                        profile={campaign.profile_snapshot}
+                        website={campaign.offering_website}
+                        targetCount={campaign.target_count}
+                        manual={campaign.mode === "manual"}
+                      />
+                    </details>
+                  )}
+                  {campaign.mode === "discovery" && !activeJob(job) && (
+                    <DiscoveryReadiness
+                      status={discoveryStatus}
+                      loading={discoveryChecking}
+                    />
+                  )}
                   <div className="stats-grid">
                     <Stat
                       icon="accounts"
@@ -889,7 +927,12 @@ export default function Workspace({
                           <button
                             className="btn secondary small"
                             onClick={research}
-                            disabled={researchBusy || activeJob(job)}
+                            disabled={
+                              researchBusy ||
+                              activeJob(job) ||
+                              (campaign.mode === "discovery" &&
+                                !discoveryReady(discoveryStatus))
+                            }
                           >
                             {researchBusy ? (
                               <span className="spinner" />
@@ -900,7 +943,9 @@ export default function Workspace({
                               ? "Researching…"
                               : campaign.status === "complete"
                                 ? "Re-research"
-                                : "Run research"}
+                                : campaign.mode === "discovery"
+                                  ? "Find customers"
+                                  : "Run research"}
                           </button>
                         )}
                         <button
@@ -919,9 +964,16 @@ export default function Workspace({
                       <div className="job-status" aria-live="polite">
                         {job && (
                           <>
-                            <strong>Research {job.status}</strong>
+                            <strong>
+                              {job.stage
+                                ? `${job.stage === "discovery" ? "Finding companies" : job.stage === "contacts" ? "Finding buyers" : job.stage === "verification" ? "Checking emails" : "Discovery"}: `
+                                : "Research "}
+                              {job.status}
+                            </strong>
                             <span>
-                              Attempt {job.attempt} of {job.max_attempts}
+                              {campaign.mode === "discovery"
+                                ? `Step ${job.attempt} · bounded by the approved budget`
+                                : `Attempt ${job.attempt} of ${job.max_attempts}`}
                             </span>
                             {activeJob(job) && (
                               <>
@@ -1078,9 +1130,7 @@ export default function Workspace({
                                     </span>
                                     <span>
                                       <strong>{a.name}</strong>
-                                      <span>
-                                        {a.domain}
-                                      </span>
+                                      <span>{a.domain}</span>
                                     </span>
                                   </button>
                                 </td>
@@ -1228,10 +1278,9 @@ export default function Workspace({
                         <strong>{accounts.length}</strong> accounts
                       </span>
                       <span>
-                        <Icon name="shield" size={13} />{" "}
-                        Evidence-led research
-                        <span className="footer-divider">·</span>Contacts are
-                        not enriched
+                        <Icon name="shield" size={13} /> Evidence-led research
+                        <span className="footer-divider">·</span>Review contact
+                        verification before outreach
                       </span>
                     </div>
                   </section>
@@ -1283,8 +1332,9 @@ export default function Workspace({
           {toast}
         </div>
       )}
-      {newCampaign && (
+      {newCampaign && workspace && (
         <CampaignDialog
+          workspace={workspace}
           onClose={() => setNewCampaign(false)}
           onCreated={onCreated}
         />
@@ -1329,9 +1379,10 @@ export default function Workspace({
             <li>
               <span>02</span>
               <div>
-                <strong>Bring the companies to research</strong>
+                <strong>Find companies from your brief</strong>
                 <p>
-                  Supply public business domains for research.
+                  Find prospective business customers, or optionally import
+                  websites you already have.
                 </p>
               </div>
             </li>
@@ -1349,9 +1400,9 @@ export default function Workspace({
           <div className="notice soft">
             <Icon name="shield" size={19} />
             <span>
-              SignalFoundry uses rules-based extraction and grounded outreach
-              templates. Contact enrichment and automatic prospect discovery
-              aren’t connected. No emails are sent.
+              Discovery and contact search require configured, licensed
+              providers. Email verification is optional; provider-returned
+              addresses stay unverified until checked. No emails are sent.
             </span>
           </div>
           <button
@@ -1446,7 +1497,7 @@ function Welcome({
           <span>right-fit customer.</span>
         </h1>
         <p>
-          Turn company websites into a focused, evidence-backed shortlist.
+          Turn your offering into a focused, evidence-backed customer shortlist.
           <br className="desktop-break" /> Know who fits, why they fit, and what
           to say next.
         </p>
@@ -1463,9 +1514,9 @@ function Welcome({
           </h2>
           <p>
             {profileReady
-              ? "Add companies to a campaign and let the evidence guide your shortlist."
+              ? "Review who you want to reach. We’ll discover companies and research the evidence."
               : isSaas
-                ? "Start with your team’s targeting preferences, then research public business websites."
+                ? "Start with your offering, then review an editable target brief before finding customers."
                 : "We’ll read your public homepage and help shape a profile of your ideal customer."}
           </p>
           {profileReady ? (
@@ -1484,8 +1535,8 @@ function Welcome({
                 Review customer profile
               </button>
               <p>
-                An administrator must create the profile before research can
-                begin.
+                You can create a campaign-specific brief. An administrator
+                manages the shared workspace profile.
               </p>
             </div>
           ) : (
@@ -1518,11 +1569,16 @@ function Welcome({
               <button
                 type="button"
                 className="text-btn full-width"
-                onClick={editProfile}
+                onClick={newCampaign}
               >
-                Or build your profile manually
+                Or describe your offering instead
               </button>
             </form>
+          )}
+          {!profileReady && isSaas && !isAdmin && (
+            <button className="btn secondary" onClick={newCampaign}>
+              Create a campaign brief
+            </button>
           )}
           <div className="start-card-note">
             <Icon name="shield" size={14} />

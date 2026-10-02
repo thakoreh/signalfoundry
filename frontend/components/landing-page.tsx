@@ -131,8 +131,9 @@ export default function LandingPage() {
               <span>not noise.</span>
             </h1>
             <p className="sf-hero-lede">
-              Turn the company domains you bring into a shortlist you can stand
-              behind. Every source, observation, and unknown stays attached.
+              Turn your offering into a customer brief and a shortlist you can
+              stand behind. Every source, observation, and unknown stays
+              attached.
             </p>
             <div className="sf-hero-actions">
               <Link className="sf-button sf-button-dark" href={SIGN_UP_HREF}>
@@ -461,9 +462,9 @@ export default function LandingPage() {
             <div className="sf-boundary">
               <span className="sf-overline">THE BOUNDARY</span>
               <p>
-                No automatic discovery
+                Discovery requires approved providers
                 <br />
-                No contact enrichment or verification
+                Emails remain unverified
                 <br />
                 No sending, replies, or meeting booking
               </p>
@@ -487,9 +488,9 @@ export default function LandingPage() {
             <details open>
               <summary>Where does research come from?</summary>
               <p>
-                From the public websites and company domains you provide. Each
-                pass keeps citations, explicit unknowns, and the observed
-                language available for review.
+                From public company websites found through approved discovery
+                providers or optional manual imports. Each pass keeps citations,
+                explicit unknowns, and observed language available for review.
               </p>
             </details>
             <details>
@@ -497,9 +498,11 @@ export default function LandingPage() {
                 Does SignalFoundry discover contacts or send outreach?
               </summary>
               <p>
-                No. It does not discover contacts, verify email addresses, send
-                campaigns, manage replies, or book meetings. It stops at account
-                research, shortlisting, human-reviewed drafts, and export.
+                Approved commercial providers can discover companies and named
+                business contacts. Provider-returned emails are not
+                independently verified. SignalFoundry does not send campaigns,
+                manage replies, or book meetings. Discovery stays unavailable
+                until credentials, licenses, and budgets are approved.
               </p>
             </details>
             <details>

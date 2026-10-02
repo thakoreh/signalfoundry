@@ -47,13 +47,18 @@ class EmptyRequest(StrictModel):
 
 class CampaignCreate(StrictModel):
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
-    mode: Literal['demo', 'manual']
+    mode: Literal['demo', 'manual', 'discovery']
     domains: list[URLText] = Field(default_factory=list, max_length=10)
+    profile_snapshot: Profile | None = None
+    target_count: int = Field(default=10, ge=1, le=30)
+    offering_website: URLText | None = None
 
     @model_validator(mode='after')
     def valid_domains(self):
         if self.mode == 'manual' and not self.domains:
             raise ValueError('Manual research requires at least one public business domain')
+        if self.mode == 'discovery' and self.domains:
+            raise ValueError('Discovery campaigns do not accept manually supplied domains')
         if self.mode == 'demo' and self.domains:
             raise ValueError('Demo campaigns use fictional fixtures; leave domains empty')
         return self
@@ -74,7 +79,7 @@ class Workspace(StrictModel):
 class Campaign(StrictModel):
     id: str
     name: str
-    mode: Literal['demo', 'manual']
+    mode: Literal['demo', 'manual', 'discovery']
     status: Literal['draft', 'researching', 'complete', 'partial', 'failed']
     created_at: str
     updated_at: str
@@ -82,6 +87,9 @@ class Campaign(StrictModel):
     qualified_count: int
     domains: list[str]
     errors: list[str]
+    profile_snapshot: Profile | None = None
+    target_count: int = Field(default=10, ge=1, le=30)
+    offering_website: str | None = None
 
 
 class Evidence(StrictModel):
@@ -102,6 +110,15 @@ class Contact(StrictModel):
     verification_status: Literal['unverified', 'not_available', 'verified']
     source_url: str | None
     note: str
+    provider: str | None = None
+    retrieved_at: str | None = None
+    employment_verified_at: str | None = None
+    email_checked_at: str | None = None
+    email_status: Literal['valid', 'invalid', 'catch_all', 'unknown', 'not_checked'] | None = None
+    email_verification_provider: str | None = None
+    license_reference: str | None = None
+    license_expires_at: str | None = None
+    license_restrictions: list[str] = Field(default_factory=list, max_length=12)
 
 
 class ScoreComponent(StrictModel):
@@ -132,6 +149,12 @@ class Account(StrictModel):
     is_demo: bool
     researched_at: str
     score_breakdown: list[ScoreComponent]
+    source_provider: str | None = None
+    source_url: str | None = None
+    retrieved_at: str | None = None
+    license_reference: str | None = None
+    license_expires_at: str | None = None
+    license_restrictions: list[str] = Field(default_factory=list, max_length=12)
 
 
 class Draft(StrictModel):
