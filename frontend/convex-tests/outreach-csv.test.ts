@@ -113,6 +113,18 @@ it("does not discard a complete business sentence merely because it mentions int
  expect(draft.body).toContain(sentence); expect(draft.basis[0]).toContain(account.evidence[0].url);
 });
 
+it("preserves a short coherent company paragraph instead of selecting a standalone pain slogan",()=>{
+ const excerpt="Your workflows break. Your team waits. Your tools don't talk to each other. We build automations that fix this. Real systems. Real results. Fast.";
+ const draft=makeGroundedDraft({...account,name:"XRAY",description:excerpt,evidence:[{...account.evidence[0],excerpt}]},profile);
+ expect(draft.body).toContain(`“${excerpt}”`);
+});
+
+it("never treats a high fit score as verification of sender offer or geographic relevance",()=>{
+ const draft=makeGroundedDraft({...account,score:88,confidence:"medium",why_fit:["Agency"],score_breakdown:[]},{...profile,description:"Free AI Opportunity Audit for businesses in Paris, Ontario."});
+ expect(draft.warning).toContain("Sender offer relevance and geographic applicability are not verified");
+ expect(draft.body).not.toContain("you are based in Paris");
+});
+
 it("grounds the sender offer in the editable supplier description rather than inventing results",()=>{
  const offer="We help agencies automate repetitive workflows.";
  const draft=makeGroundedDraft(account,{...profile,description:offer});

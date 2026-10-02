@@ -32,6 +32,18 @@ class CustomerValueTests(unittest.TestCase):
         result=RulesDecisionProvider().evaluate(profile,page,campaign_id='test')
         self.assertFalse(any(p.label=='Exclusion penalty' for p in result.score_breakdown))
 
+    def test_draft_preserves_coherent_company_paragraph(self):
+        from app.research import make_draft
+        excerpt="Your workflows break. Your team waits. Your tools don't talk to each other. We build automations that fix this. Real systems. Real results. Fast."
+        account=RulesDecisionProvider().evaluate(self.profile(),Page('https://www.xray.tech/','XRAY',excerpt,excerpt),campaign_id='test')
+        draft=make_draft(account,self.profile())
+        self.assertIn(f'“{excerpt}”',draft.body)
+
+    def test_draft_warns_sender_offer_applicability_is_not_verified(self):
+        from app.research import make_draft
+        account=RulesDecisionProvider().evaluate(self.profile(),Page('https://agency.example/','Example Agency','We build workflow automation for teams.','Agency workflow automation AI.'),campaign_id='test')
+        self.assertIn('Sender offer relevance and geographic applicability are not verified',make_draft(account,self.profile()).warning)
+
     def test_explicit_company_category_exclusion_is_preserved(self):
         profile=self.profile().model_copy(update={'exclusions':['SaaS']})
         page=Page('https://vendor.example/','Example SaaS vendor','We sell a SaaS platform.','Workflow automation SaaS platform.')

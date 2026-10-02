@@ -7,6 +7,7 @@ function completeSourceSentence(value: string | null | undefined, limit = 220): 
   let normalized = value.replace(/\s+/g, " ").trim();
   normalized = normalized.replace(/^(?:…|\.\.\.)\s*/, "");
   normalized = normalized.replace(/\s*(?:…|\.\.\.)$/, "").trim();
+  if (normalized.length >= 20 && normalized.length <= limit && /[.!?]$/.test(normalized) && !/[\u2026]|\.{3}/.test(value) && !navigationFragment.test(normalized)) return normalized;
   const sentences = normalized.match(/[^.!?]+[.!?]/g) ?? [];
   for (const sentence of sentences) {
     const candidate = sentence.trim().replace(/^['"]|['"]$/g, "");
@@ -74,7 +75,7 @@ export function makeGroundedDraft(account: Account, profile: Profile): Draft {
   ];
   let warning =
     (account.is_demo ? "FICTIONAL DEMO: do not send this sample. " : "") +
-    "Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available.";
+    "Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available. Sender offer relevance and geographic applicability are not verified; adapt your offer before using this draft.";
   if (fitUnconfirmed(account)) {
     warning += " Fit is unconfirmed; this draft does not establish relevance or buying intent.";
   }

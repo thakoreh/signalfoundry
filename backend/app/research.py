@@ -157,6 +157,9 @@ def _complete_source_sentence(value: str | None, limit: int = 220) -> str | None
     normalized = re.sub(r'\s+', ' ', value).strip()
     normalized = re.sub(r'^(?:…|\.\.\.)\s*', '', normalized)
     normalized = re.sub(r'\s*(?:…|\.\.\.)$', '', normalized).strip()
+    if (20 <= len(normalized) <= limit and re.search(r'[.!?]$', normalized)
+            and not re.search(r'…|\.{3}', value) and not _NAVIGATION_FRAGMENT.search(normalized)):
+        return normalized
     for sentence in re.findall(r'[^.!?]+[.!?]', normalized):
         candidate = sentence.strip(' \'"')
         if len(candidate) >= 20 and len(candidate) <= limit and not _NAVIGATION_FRAGMENT.search(candidate):
@@ -203,7 +206,7 @@ def make_draft(account: Account, profile: Profile) -> Draft:
              'Sender company and offer come from your editable workspace profile']
     warning = (
         ('FICTIONAL DEMO: do not send this sample. ' if account.is_demo else '') +
-        'Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available.'
+        'Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available. Sender offer relevance and geographic applicability are not verified; adapt your offer before using this draft.'
     )
     if _fit_unconfirmed(account):
         warning += ' Fit is unconfirmed; this draft does not establish relevance or buying intent.'
