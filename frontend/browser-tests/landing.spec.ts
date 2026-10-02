@@ -92,10 +92,8 @@ async function expectStage(page: Page, index: number) {
   }
   const previous = page.getByRole("button", { name: "Previous research step" });
   const next = page.getByRole("button", { name: "Next research step" });
-  if (index === 0) await expect(previous).toBeDisabled();
-  else await expect(previous).toBeEnabled();
-  if (index === 3) await expect(next).toBeDisabled();
-  else await expect(next).toBeEnabled();
+  await expect(previous).toBeEnabled();
+  await expect(next).toBeEnabled();
 }
 
 async function navigateSection(page: Page, name: string, hash: string) {
@@ -208,7 +206,7 @@ test("mobile menu opens, closes after a link, and restores focus on Escape", asy
   await noOverflow(page);
 });
 
-test("tabs support keyboard wrap, repeated selection, endpoint controls, and reversible shortlist", async ({
+test("tabs support keyboard wrap, repeated selection, wrapping controls, and reversible shortlist", async ({
   page,
 }) => {
   await openLanding(page);
@@ -227,11 +225,11 @@ test("tabs support keyboard wrap, repeated selection, endpoint controls, and rev
       page.getByRole("tab", { name: STAGES[index], exact: true }),
     ).toBeFocused();
   }
-  for (const index of [1, 2, 3]) {
+  for (const index of [1, 2, 3, 0, 1]) {
     await page.getByRole("button", { name: "Next research step" }).click();
     await expectStage(page, index);
   }
-  for (const index of [2, 1, 0]) {
+  for (const index of [0, 3, 2, 1, 0]) {
     await page.getByRole("button", { name: "Previous research step" }).click();
     await expectStage(page, index);
   }

@@ -15,6 +15,7 @@ export default function LandingMotion() {
     root.dataset.jsReady = "true";
     const media = window.matchMedia("(prefers-reduced-motion: reduce)");
     let observer: IntersectionObserver | undefined;
+    let sceneObserver: IntersectionObserver | undefined;
 
     const revealAll = () => {
       root.querySelectorAll<HTMLElement>("[data-reveal]").forEach((element) => {
@@ -62,14 +63,31 @@ export default function LandingMotion() {
     };
 
     setupReveal();
+    if (typeof IntersectionObserver !== "undefined") {
+      sceneObserver = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            (entry.target as HTMLElement).dataset.inView = String(
+              entry.isIntersecting,
+            );
+          });
+        },
+        { threshold: 0.05 },
+      );
+      root
+        .querySelectorAll<HTMLElement>("[data-motion-scene]")
+        .forEach((element) => sceneObserver?.observe(element));
+    }
     media.addEventListener("change", onMotionPreferenceChange);
     document.addEventListener("keydown", onKeyDown);
 
-    const navLinks = root.querySelectorAll<HTMLAnchorElement>("#sf-mobile-menu a");
+    const navLinks =
+      root.querySelectorAll<HTMLAnchorElement>("#sf-mobile-menu a");
     navLinks.forEach((link) => link.addEventListener("click", closeMenu));
 
     return () => {
       observer?.disconnect();
+      sceneObserver?.disconnect();
       media.removeEventListener("change", onMotionPreferenceChange);
       document.removeEventListener("keydown", onKeyDown);
       navLinks.forEach((link) => link.removeEventListener("click", closeMenu));

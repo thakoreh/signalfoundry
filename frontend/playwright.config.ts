@@ -24,10 +24,15 @@ export default defineConfig({
     video: "retain-on-failure",
   },
   projects: [
-    { name: "desktop-1188", use: { viewport: { width: 1188, height: 900 } } },
+    {
+      name: "desktop-1188",
+      testIgnore: "**/carousel-motion.spec.ts",
+      use: { viewport: { width: 1188, height: 900 } },
+    },
     { name: "desktop-1440", use: { viewport: { width: 1440, height: 960 } } },
     {
       name: "mobile-360",
+      testIgnore: "**/carousel-motion.spec.ts",
       use: {
         viewport: { width: 360, height: 800 },
         isMobile: true,
@@ -44,6 +49,7 @@ export default defineConfig({
     },
     {
       name: "tablet-768",
+      testIgnore: "**/carousel-motion.spec.ts",
       use: { viewport: { width: 768, height: 1024 }, hasTouch: true },
     },
   ],

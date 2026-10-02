@@ -45,18 +45,23 @@ test("public section navigation uses native anchors instead of Next route naviga
   }
 });
 
-test("sample walkthrough stays client-local with no backend, storage, or automatic progression", () => {
+test("sample walkthrough stays client-local with no backend or persistent storage", () => {
   const parsed = parse(demo);
   assert.match(demo, /^\s*["']use client["'];/);
   const imports = parsed.statements.filter(ts.isImportDeclaration);
   assert.ok(imports.length > 0);
   for (const statement of imports) {
     assert.ok(ts.isStringLiteral(statement.moduleSpecifier));
-    assert.equal(statement.moduleSpecifier.text, "react");
+    assert.ok(
+      ["react", "./landing-motion-provider"].includes(
+        statement.moduleSpecifier.text,
+      ),
+      `Unexpected demo dependency: ${statement.moduleSpecifier.text}`,
+    );
   }
   assert.doesNotMatch(
     demo,
-    /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|setInterval|setTimeout)\b/,
+    /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB)\b/,
   );
   assert.doesNotMatch(demo, /\b(?:import|require)\s*\(/);
 });

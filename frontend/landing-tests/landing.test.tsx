@@ -82,10 +82,15 @@ describe("SignalFoundry public landing page", () => {
     ).toHaveLength(1);
     expect(tabs[0]).toContain('aria-selected="true"');
     expect(panels).toHaveLength(4);
-    expect(panels.filter((panel) => !panel.includes(" hidden="))).toHaveLength(
-      1,
+    expect(
+      panels.filter((panel) => panel.includes('aria-hidden="false"')),
+    ).toHaveLength(1);
+    expect(panels[0]).toContain('aria-hidden="false"');
+    expect(panels.slice(1).every((panel) => panel.includes(" inert="))).toBe(
+      true,
     );
-    expect(panels[0]).not.toContain(" hidden=");
+    expect(html).toContain('aria-roledescription="carousel"');
+    expect(html).toContain('data-playing="false"');
     for (const stage of [
       "Define the ICP",
       "Import accounts",

@@ -66,17 +66,19 @@ function expectStage(index: number) {
     allTabs.filter((tab) => tab.getAttribute("aria-selected") === "true"),
   ).toEqual([allTabs[index]]);
   expect(allTabs.filter((tab) => tab.tabIndex === 0)).toEqual([allTabs[index]]);
-  expect(allPanels.filter((panel) => !panel.hidden)).toEqual([
-    allPanels[index],
-  ]);
+  expect(
+    allPanels.filter((panel) => panel.getAttribute("aria-hidden") === "false"),
+  ).toEqual([allPanels[index]]);
   allTabs.forEach((tab, tabIndex) => {
     expect(tab.textContent).toContain(STAGES[tabIndex]);
     expect(tab.getAttribute("aria-controls")).toBe(allPanels[tabIndex].id);
     expect(allPanels[tabIndex].getAttribute("aria-labelledby")).toBe(tab.id);
     expect(tab.tabIndex).toBe(tabIndex === index ? 0 : -1);
+    expect(allPanels[tabIndex].hasAttribute("inert")).toBe(tabIndex !== index);
+    expect(allPanels[tabIndex].tabIndex).toBe(tabIndex === index ? 0 : -1);
   });
-  expect(button("Previous research step").disabled).toBe(index === 0);
-  expect(button("Next research step").disabled).toBe(index === 3);
+  expect(button("Previous research step").disabled).toBe(false);
+  expect(button("Next research step").disabled).toBe(false);
 }
 
 beforeEach(async () => {
@@ -152,21 +154,15 @@ describe("interactive sample research walkthrough", () => {
     expectStage(0);
   });
 
-  it("moves forward and backward without crossing either endpoint", async () => {
-    await click(button("Previous research step"));
-    expectStage(0);
-    for (const index of [1, 2, 3]) {
-      await click(button("Next research step"));
-      expectStage(index);
-    }
-    await click(button("Next research step"));
-    expectStage(3);
-    for (const index of [2, 1, 0]) {
+  it("wraps forward and backward through all four stages", async () => {
+    for (const index of [3, 2, 1, 0, 3]) {
       await click(button("Previous research step"));
       expectStage(index);
     }
-    await click(button("Previous research step"));
-    expectStage(0);
+    for (const index of [0, 1, 2, 3, 0]) {
+      await click(button("Next research step"));
+      expectStage(index);
+    }
   });
 
   it("reverses the sample decision and retains it when changing stages", async () => {

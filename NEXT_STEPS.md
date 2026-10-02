@@ -6,21 +6,33 @@ This is a presentation-only redesign on `design/premium-research-story`, based o
 
 The owner requested one reviewable branch/PR per repository. The owner's other agent reviews and deploys. **Do not merge or deploy without that separate authorization.** No deployed environment, account, secret, provider configuration, billing behavior, database, or Convex function was changed by this work.
 
+### Motion revision requested after the first review
+
+The owner specifically asked for more Explee-like animation, fluid motion, and carousel behavior. The live reference was inspected again in the cloud browser: animated hero signal paths, moving testimonial rows, staggered content, and sticky stacking workflow cards. This revision uses original product visuals and does not copy Explee assets, testimonials, numbers, contact/sending capabilities, or commercial claims.
+
+- The research walkthrough is now a real horizontally translating four-slide carousel, with 7-second automatic progression, a progress indicator, wrapping Previous/Next controls, tabs/Arrow/Home/End keyboard control, and horizontal pointer/touch swipe
+- Autoplay runs only while at least 35% of the carousel is visible and the document is visible. Mouse hover pauses it; keyboard focus, manual selection, or a touch interaction stops it until explicitly restarted. Hidden slides are inert and removed from the accessibility tree
+- Explicit Play/Pause controls and a page-wide motion control are provided. System reduced motion disables autoplay and transitions, even if Play is attempted; all content stays available. Decorative motion pauses outside the viewport and in hidden tabs
+- Original signal-path particles, a moving evidence ribbon, layered/staggered slide entrances, and a softly floating evidence card provide visible rhythm; the ribbon becomes a readable wrapped layout with motion off
+- All motion uses local React/CSS/SVG. No animation package, external font, video asset, or runtime dependency is added. No scroll hijacking or automatic live research
+
+Local revision verification: the complete aggregate suite passed (91 backend, 41 frontend node, 64 Convex, typecheck, lint, build, and integration checks); the final focused landing suite passes 30 cases. The browser suite now contains 62 cases, including two normal-speed retained motion videos. Actual browser execution, screenshots, recordings, audits and containers must be checked on the exact PR head in CI. Earlier passing results below are historical and do not certify this revision.
+
 ### What changed
 
 - Focused centered hero, readable research proof, a quieter signal-line visual, clearer section pacing, and responsive cards
-- Four user-controlled walkthrough stages: ICP, account import, evidence, shortlist/export
+- Four controllable carousel stages: ICP, account import, evidence, shortlist/export
 - Keyboard tab controls (Arrow keys, Home/End), Previous/Next, a reversible sample shortlist, and persisted in-memory selection when switching stages
 - Sample interactions make no requests, storage writes, real imports, research jobs, exports, or account changes; explicit labels distinguish saved illustrative research from live output
 - Native fragment anchors address the reproduced `#examples#workflow` / `#examples#faq` defect; signup/signin return paths remain unchanged
-- Reduced-motion support; no automatic carousel, scroll hijacking, external fonts, video, or animation dependency
+- Reduced-motion support, explicit playback controls, and no scroll hijacking, external fonts, runtime video, or animation dependency
 - Legal-page branding retained; existing authentication, billing, tenant isolation, workspace, API, and backend code preserved
 
 ## Verification completed locally
 
 - Complete `bash scripts/check.sh` passed: 91 backend tests; packaging, deployment, launcher, preflight and worker checks; 41 frontend node tests; 64 Convex tests; 14 landing/DOM tests (15 after the focused accessibility-review additions); TypeScript; ESLint; production build; proxy integration; full-stack API workflow; public-preview standalone and hostile-header checks
 - Separate `scripts/test_saas_failclosed.py` passed: SaaS build with missing providers fails closed; no legacy/demo API fallback
-- DOM regressions exercise roving keyboard focus, repeated stage transitions, endpoint controls, reversible shortlist state, native anchor contracts, no network/storage/download effects, and honest product boundaries
+- DOM regressions exercise roving keyboard focus, repeated stage transitions, wrapping controls, reversible shortlist state, native anchor contracts, no network/storage/download effects, and honest product boundaries
 - Dependency audit at the initial test checkpoint reported zero vulnerabilities including dev dependencies; exact final-head CI repeats the repository audits
 
 Local browser navigation to the loopback preview was refused (`ERR_BLOCKED_BY_CLIENT`). This is **not** a visual QA pass. The PR adds 40 Chromium CI cases across desktop 1188/1440 and mobile/tablet 360/390/768, keyboard/menu/hash behavior, reduced motion, stable panel heights, and source screenshots. Inspect the `landing-browser-evidence` artifact for the final commit. The initial full CI run passed on `51b794b` (run `37009106124`), including all 35 browser cases, three Docker builds, worker-container smoke, dependency audits, fail-closed checks, and Gitleaks. Downloaded desktop/tablet/mobile screenshots were visually inspected. Review then corrected mobile navigation keyboard order, compact tab naming, and word spacing when mobile headings hide a line break, with targeted regression assertions. The refinement run also passed on `908950e` (run `37009983088`). A final contrast check darkened two small research labels and added five viewport-specific foreground-contrast regressions, bringing the browser suite to 40 cases. Recheck the final PR head CI; do not use an earlier run as proof of the newer head.
