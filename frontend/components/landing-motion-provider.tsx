@@ -55,7 +55,8 @@ export function LandingMotionProvider({ children }: { children: ReactNode }) {
     >
       <div
         className="sf-motion-root"
-        data-motion-paused={paused || !pageVisible}
+        data-motion-paused={paused}
+        data-motion-suspended={!pageVisible}
         data-motion-reduced={reduced}
       >
         {children}

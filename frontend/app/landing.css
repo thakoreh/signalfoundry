@@ -2490,22 +2490,19 @@
   }
 }
 /* When motion is off, every ribbon item remains visible without a moving track. */
-.sf-motion-root:is([data-motion-paused="true"], [data-motion-reduced="true"])
-  .sf-signal-ribbon {
+.sf-motion-root[data-motion-paused="true"] .sf-signal-ribbon {
   mask-image: none;
 }
-.sf-motion-root:is([data-motion-paused="true"], [data-motion-reduced="true"])
-  .sf-ribbon-track {
+.sf-motion-root[data-motion-paused="true"] .sf-ribbon-track {
   width: 100%;
 }
-.sf-motion-root:is([data-motion-paused="true"], [data-motion-reduced="true"])
-  .sf-ribbon-group {
+.sf-motion-root[data-motion-paused="true"] .sf-ribbon-group {
   flex-wrap: wrap;
   justify-content: center;
   width: 100%;
   padding-inline: 16px;
 }
-.sf-motion-root:is([data-motion-paused="true"], [data-motion-reduced="true"])
+.sf-motion-root[data-motion-paused="true"]
   .sf-ribbon-group[aria-hidden="true"] {
   display: none;
 }
@@ -2529,4 +2526,11 @@
   .sf-ribbon-group[aria-hidden="true"] {
     display: none;
   }
+}
+
+/* A background tab suspends animation clocks without changing page geometry. */
+.sf-motion-root[data-motion-suspended="true"] .sf-landing *,
+.sf-motion-root[data-motion-suspended="true"] .sf-landing *::before,
+.sf-motion-root[data-motion-suspended="true"] .sf-landing *::after {
+  animation-play-state: paused !important;
 }

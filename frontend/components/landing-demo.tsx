@@ -103,13 +103,9 @@ export default function LandingDemo() {
   };
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (
-      !event.isPrimary ||
-      event.button !== 0 ||
-      (event.target as Element).closest("a, button, input, summary")
-    )
-      return;
+    if (!event.isPrimary || event.button !== 0) return;
     setPlaying(false);
+    if ((event.target as Element).closest("a, button, input, summary")) return;
     pointer.current = {
       x: event.clientX,
       y: event.clientY,
@@ -136,6 +132,9 @@ export default function LandingDemo() {
       aria-label="Research walkthrough"
       data-playing={running}
       data-active-step={active}
+      onPointerDown={(event) => {
+        if (event.isPrimary && event.button === 0) setPlaying(false);
+      }}
       onPointerEnter={(event) => {
         if (event.pointerType === "mouse") setHovered(true);
       }}

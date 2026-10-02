@@ -162,6 +162,36 @@ describe("safe carousel playback", () => {
     expect(active()).toBe(1);
   });
 
+  it("keeps user pause independent from document visibility suspension", async () => {
+    await intersect();
+    const motionRoot = container.querySelector<HTMLElement>(".sf-motion-root")!;
+    for (const paused of [false, true]) {
+      if (paused) await click(motion());
+      expect(motionRoot.getAttribute("data-motion-paused")).toBe(
+        String(paused),
+      );
+      expect(motion().getAttribute("aria-label")).toBe(
+        paused ? "Resume page motion" : "Pause page motion",
+      );
+      await visibility("hidden");
+      expect(motionRoot.getAttribute("data-motion-suspended")).toBe("true");
+      expect(motionRoot.getAttribute("data-motion-paused")).toBe(
+        String(paused),
+      );
+      expect(motionRoot.getAttribute("data-motion-reduced")).toBe("false");
+      expect(motion().getAttribute("aria-label")).toBe(
+        paused ? "Resume page motion" : "Pause page motion",
+      );
+      expect(running()).toBe(false);
+      await visibility("visible");
+      expect(motionRoot.getAttribute("data-motion-suspended")).toBe("false");
+      expect(motionRoot.getAttribute("data-motion-paused")).toBe(
+        String(paused),
+      );
+      expect(running()).toBe(!paused);
+    }
+  });
+
   it("stops when focus enters and stays stopped after blur until explicit Play", async () => {
     await intersect();
     await act(async () => step(0).focus());
@@ -323,6 +353,63 @@ describe("safe carousel playback", () => {
     await pointer(link, "pointerdown", 200);
     await pointer(link, "pointerup", 100);
     expect(active()).toBe(2);
+  });
+
+  it.each([
+    ["evidence link", 2, "#research-panel-2 a"],
+    ["shortlist button", 3, ".sf-demo-shortlist"],
+  ] as const)(
+    "stops immediately on a held primary touch on the %s without swiping",
+    async (_label, index, selector) => {
+      await click(step(index));
+      await intersect();
+      await click(play());
+      const target = container.querySelector<HTMLElement>(selector)!;
+      await pointer(target, "pointerdown", 200, 100, {
+        isPrimary: false,
+        pointerId: 2,
+      });
+      await pointer(target, "pointerup", 100, 100, {
+        isPrimary: false,
+        pointerId: 2,
+      });
+      expect(running()).toBe(true);
+      expect(active()).toBe(index);
+      await pointer(target, "pointerdown", 200);
+      expect(running()).toBe(false);
+      await advance(14000);
+      expect(active()).toBe(index);
+      await pointer(target, "pointercancel");
+      await pointer(target, "pointerup", 100);
+      expect(active()).toBe(index);
+      await pointer(target, "pointerdown", 200);
+      await pointer(target, "pointerup", 100);
+      expect(active()).toBe(index);
+      await advance(14000);
+      expect(active()).toBe(index);
+      expect(running()).toBe(false);
+    },
+  );
+
+  it("stops on held tabs and navigation controls outside the swipe viewport without changing stage", async () => {
+    await intersect();
+    for (const selector of [
+      "#research-tab-1",
+      '[aria-label="Next research step"]',
+      '[aria-label="Previous research step"]',
+    ]) {
+      const control = container.querySelector<HTMLElement>(selector)!;
+      expect(viewport().contains(control)).toBe(false);
+      expect(running()).toBe(true);
+      await pointer(control, "pointerdown");
+      expect(running()).toBe(false);
+      await advance(14000);
+      expect(active()).toBe(0);
+      await pointer(control, "pointercancel");
+      await pointer(control, "pointerup");
+      expect(active()).toBe(0);
+      await click(play());
+    }
   });
 
   it("keeps decisions through auto rotation without requests or persistence and cleans up its timer", async () => {

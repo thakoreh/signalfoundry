@@ -16,11 +16,48 @@ test("autoplay runs only in view and pauses on hover and offscreen", async ({
   await page.clock.fastForward(7001);
   await expectActive(page, 1);
 
-  await page.locator(".sf-demo-topbar").hover();
+  const visibleGeometry = () =>
+    carousel.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      const left = Math.max(0, rect.left);
+      const right = Math.min(window.innerWidth, rect.right);
+      const top = Math.max(0, rect.top);
+      const bottom = Math.min(window.innerHeight, rect.bottom);
+      return {
+        ratio:
+          (Math.max(0, right - left) * Math.max(0, bottom - top)) /
+          (rect.width * rect.height),
+        x: (left + right) / 2,
+        y: (top + bottom) / 2,
+        scrollY: window.scrollY,
+      };
+    });
+  const beforeHover = await visibleGeometry();
+  expect(beforeHover.ratio).toBeGreaterThanOrEqual(0.35);
+  // Locator.hover() can scroll a tall mobile carousel below its visibility
+  // threshold. Move into its already-visible intersection without scrolling.
+  await page.mouse.move(beforeHover.x, beforeHover.y);
+  expect(
+    await page.evaluate(
+      ({ x, y }) =>
+        Boolean(document.elementFromPoint(x, y)?.closest(".sf-demo")),
+      beforeHover,
+    ),
+  ).toBe(true);
   await expect(carousel).toHaveAttribute("data-playing", "false");
   await page.clock.fastForward(14000);
   await expectActive(page, 1);
+  const whileHovered = await visibleGeometry();
+  expect(whileHovered.ratio).toBeGreaterThanOrEqual(0.35);
+  expect(
+    Math.abs(whileHovered.scrollY - beforeHover.scrollY),
+  ).toBeLessThanOrEqual(1);
   await page.mouse.move(1, 1);
+  const afterLeave = await visibleGeometry();
+  expect(afterLeave.ratio).toBeGreaterThanOrEqual(0.35);
+  expect(
+    Math.abs(afterLeave.scrollY - beforeHover.scrollY),
+  ).toBeLessThanOrEqual(1);
   await expect(carousel).toHaveAttribute("data-playing", "true");
 
   await page.locator("#faq").scrollIntoViewIfNeeded();
