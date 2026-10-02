@@ -1,12 +1,62 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-const source = readFileSync(new URL("../components/landing-page.tsx", import.meta.url), "utf8");
-test("public landing preserves signup/sign-in return to workspace and the complete workflow", () => {
- for (const phrase of ["/sign-up?redirect_url=/workspace", "/sign-in?redirect_url=/workspace", 'href="#workflow"', "Define the ICP", "Import accounts", "Review evidence", "Shortlist or export", "public evidence"]) assert.ok(source.toLowerCase().includes(phrase.toLowerCase()), phrase);
+import ts from "typescript";
+
+const landing = readFileSync(
+  new URL("../components/landing-page.tsx", import.meta.url),
+  "utf8",
+);
+const demo = readFileSync(
+  new URL("../components/landing-demo.tsx", import.meta.url),
+  "utf8",
+);
+
+function parse(source: string) {
+  return ts.createSourceFile(
+    "component.tsx",
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
+}
+
+function visit(node: ts.Node, check: (node: ts.Node) => void) {
+  check(node);
+  ts.forEachChild(node, (child) => visit(child, check));
+}
+
+test("public section navigation uses native anchors instead of Next route navigation", () => {
+  const sectionLinks: string[] = [];
+  visit(parse(landing), (node) => {
+    if (!ts.isJsxOpeningElement(node) && !ts.isJsxSelfClosingElement(node))
+      return;
+    for (const prop of node.attributes.properties) {
+      if (!ts.isJsxAttribute(prop) || prop.name.getText() !== "href") continue;
+      if (!prop.initializer || !ts.isStringLiteral(prop.initializer)) continue;
+      if (!prop.initializer.text.startsWith("#")) continue;
+      sectionLinks.push(prop.initializer.text);
+      assert.equal(node.tagName.getText(), "a", prop.initializer.text);
+    }
+  });
+  for (const destination of ["#workflow", "#examples", "#plans", "#faq"]) {
+    assert.ok(sectionLinks.includes(destination), destination);
+  }
 });
-test("public landing distinguishes illustrative research from customers and discloses limitations and trust routes", () => {
- for (const phrase of ["public website research example", "Lowcode Agency", "Airtable", "XRay", "No automatic discovery", "No contact enrichment or verification", "No sending, replies, or meeting booking", 'href="/privacy"', 'href="/terms"', 'href="/contact"', "Staging preview"]) assert.ok(source.includes(phrase), phrase);
- assert.ok(source.includes("not invented leads, customer logos"));
- assert.doesNotMatch(source, /Trusted by|customers include/);
+
+test("sample walkthrough stays client-local with no backend, storage, or automatic progression", () => {
+  const parsed = parse(demo);
+  assert.match(demo, /^\s*["']use client["'];/);
+  const imports = parsed.statements.filter(ts.isImportDeclaration);
+  assert.ok(imports.length > 0);
+  for (const statement of imports) {
+    assert.ok(ts.isStringLiteral(statement.moduleSpecifier));
+    assert.equal(statement.moduleSpecifier.text, "react");
+  }
+  assert.doesNotMatch(
+    demo,
+    /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|setInterval|setTimeout)\b/,
+  );
+  assert.doesNotMatch(demo, /\b(?:import|require)\s*\(/);
 });

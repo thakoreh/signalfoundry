@@ -1,4 +1,52 @@
-# SignalFoundry handoff: next steps
+# SignalFoundry premium landing: reviewer and deployment handoff
+
+## Scope and review boundary — 2026-10-02
+
+This is a presentation-only redesign on `design/premium-research-story`, based on main `6748d517aed74d8b90a75647996e812809b08b85`. Rechecked remote branches before implementation; no newer redesign branch or open PR existed. Recheck main and any external-agent work before merging.
+
+The owner requested one reviewable branch/PR per repository. The owner's other agent reviews and deploys. **Do not merge or deploy without that separate authorization.** No deployed environment, account, secret, provider configuration, billing behavior, database, or Convex function was changed by this work.
+
+### What changed
+
+- Focused centered hero, readable research proof, a quieter signal-line visual, clearer section pacing, and responsive cards
+- Four user-controlled walkthrough stages: ICP, account import, evidence, shortlist/export
+- Keyboard tab controls (Arrow keys, Home/End), Previous/Next, a reversible sample shortlist, and persisted in-memory selection when switching stages
+- Sample interactions make no requests, storage writes, real imports, research jobs, exports, or account changes; explicit labels distinguish saved illustrative research from live output
+- Native fragment anchors address the reproduced `#examples#workflow` / `#examples#faq` defect; signup/signin return paths remain unchanged
+- Reduced-motion support; no automatic carousel, scroll hijacking, external fonts, video, or animation dependency
+- Legal-page branding retained; existing authentication, billing, tenant isolation, workspace, API, and backend code preserved
+
+## Verification completed locally
+
+- Complete `bash scripts/check.sh` passed: 91 backend tests; packaging, deployment, launcher, preflight and worker checks; 41 frontend node tests; 64 Convex tests; 14 landing/DOM tests; TypeScript; ESLint; production build; proxy integration; full-stack API workflow; public-preview standalone and hostile-header checks
+- Separate `scripts/test_saas_failclosed.py` passed: SaaS build with missing providers fails closed; no legacy/demo API fallback
+- DOM regressions exercise roving keyboard focus, repeated stage transitions, endpoint controls, reversible shortlist state, native anchor contracts, no network/storage/download effects, and honest product boundaries
+- Dependency audit at the initial test checkpoint reported zero vulnerabilities including dev dependencies; exact final-head CI repeats the repository audits
+
+Local browser navigation to the loopback preview was refused (`ERR_BLOCKED_BY_CLIENT`). This is **not** a visual QA pass. The PR adds 35 Chromium CI cases across desktop 1188/1440 and mobile/tablet 360/390/768, keyboard/menu/hash behavior, reduced motion, stable panel heights, and source screenshots. Inspect the `landing-browser-evidence` artifact for the final commit. The final CI outcome and remaining visual observations must be recorded before this handoff is called ready.
+
+## Environment and migrations
+
+No new environment variables, secrets, migrations, provider grants, or runtime dependencies. `jsdom` and `@playwright/test` are test-only dependencies. CI uses Node 24. Use the repository’s recommended Node 24 locally. jsdom is pinned to 26.1.0 to avoid raising the existing Node compatibility floor.
+
+To reproduce: `bash scripts/setup.sh`, `bash scripts/check.sh`, then in `frontend`: `npx playwright install --with-deps chromium` and `npm run test:browser`. Browser tests require a local-demo production build. The fail-closed SaaS check replaces `.next`; rebuild with both `SIGNALFOUNDRY_MODE=local-demo` and `NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo` before browser testing. Browser test server uses loopback port 4302.
+
+## Before deployment
+
+1. Review the complete diff and **all exact-head CI jobs**, including browser screenshots. Keep this PR draft until the owner/reviewer accepts the design and gates
+2. Resolve any overlap with newer remote work; rerun all affected checks after integration
+3. In an authorized staging deployment, test real Clerk sign-in/sign-up/organization recovery, existing workspace research/import/draft/export, and Stripe boundaries with the already-approved test setup. Mock/local checks do not prove live provider behavior
+4. Visually check Safari/iOS, Android Chrome, 200% zoom, real touch navigation, screen-reader announcements and contrast; Chromium CI does not prove every accessibility/browser combination
+5. Measure real deployment performance under mobile throttling. No production LCP/INP/CLS guarantee is claimed from unit tests
+6. Preserve all production launch gates in the previous handoff below
+
+## Rollback
+
+No data migration is involved. If an authorized deployment needs rollback, redeploy its recorded pre-redesign image/commit or revert the landing redesign commit(s), including their tests/workflow additions, on a reviewed branch. Do not reset main or disturb unrelated external-agent work. Existing provider configuration and customer data require no rollback for this presentation-only change.
+
+---
+
+## Previous release-candidate handoff (retained history)
 
 ## Current status and source of truth
 
