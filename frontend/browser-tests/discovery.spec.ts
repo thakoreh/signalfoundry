@@ -649,7 +649,7 @@ test("manual import remains optional, validates input, and works without discove
     "invalid website entries",
   );
   expect(state.creates).toHaveLength(0);
-  await dialog.getByLabel(/^Import a prospect list\b/).setInputFiles({
+  await dialog.locator('input[type="file"]').setInputFiles({
     name: "prospects.csv",
     mimeType: "text/csv",
     buffer: Buffer.from(
