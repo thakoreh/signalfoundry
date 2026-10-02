@@ -23,6 +23,9 @@ from .store import Repository
 
 logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = [f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 8000)]
+PUBLIC_PREVIEW_READ_ONLY_DETAIL = (
+    'Website analysis and manual research are disabled in this public preview. Use an authenticated SaaS workspace for these features.'
+)
 
 
 def csv_safe(value) -> str:
@@ -60,6 +63,7 @@ class BodyLimitMiddleware:
 
 def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> FastAPI:
     configured_origin = preview_origin()
+    public_access = os.environ.get('SIGNALFOUNDRY_PUBLIC_ACCESS') == 'true'
     allowed_origins = ALLOWED_ORIGINS + ([configured_origin] if configured_origin else [])
     app = FastAPI(title='SignalFoundry local demo', version='0.1.0',
                   description='Local demo only. No authentication. Never expose this service to a public network.')
@@ -68,7 +72,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     app.state.decision_provider = RulesDecisionProvider()
     # Explicit opt-in is mandatory. Merely having unrelated credentials in the
     # environment never activates a paid provider. This branch is not used by tests.
-    if not testing and os.environ.get('DECISION_ENGINE', 'rules') == 'jev':
+    if not public_access and not testing and os.environ.get('DECISION_ENGINE', 'rules') == 'jev':
         from .jev import JevDecisionProvider
         app.state.decision_provider = JevDecisionProvider.from_environment()
     app.state.research_lock = threading.Lock()
@@ -135,6 +139,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.post('/api/workspace/analyze', response_model=Workspace)
     def analyze(body: AnalyzeRequest):
+        if public_access:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
         # Nothing persists unless both safe fetching and profile validation succeed.
         page = app.state.fetch_page(normalize_url(body.website))
         try:
@@ -173,6 +179,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.post('/api/campaigns/{campaign_id}/research', response_model=Campaign)
     def research(campaign_id: str, body: EmptyRequest):
+        if public_access:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
         campaign = get_campaign(campaign_id)
         if configured_origin and campaign.mode == "demo":
             raise HTTPException(410, "Fictional research is disabled on deployed previews")

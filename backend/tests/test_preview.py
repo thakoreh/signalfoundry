@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
 from app.config import preview_origin
 from app.main import create_app
@@ -37,6 +37,38 @@ class PreviewTest(unittest.TestCase):
                 'SIGNALFOUNDRY_DB_PATH': str(Path(tmp) / 'preview.sqlite3')}):
             with TestClient(create_app(testing=True)) as client:
                 self.assertEqual(client.get('/api/health').json()['mode'], 'public-preview')
+
+    def test_public_preview_never_initializes_jev_provider(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
+                'SIGNALFOUNDRY_PREVIEW_ORIGIN': 'https://preview.company.com',
+                'SIGNALFOUNDRY_PUBLIC_ACCESS': 'true',
+                'DECISION_ENGINE': 'jev',
+                'SIGNALFOUNDRY_DB_PATH': str(Path(tmp) / 'preview.sqlite3')}), \
+                patch('app.jev.JevDecisionProvider.from_environment', side_effect=AssertionError('Jev must not initialize in public mode')) as factory:
+            app = create_app(Path(tmp) / 'preview.sqlite3', testing=False)
+        self.assertEqual(app.state.decision_provider.name, 'rules')
+        factory.assert_not_called()
+
+    def test_public_preview_blocks_analysis_and_research_before_network_or_provider(self):
+        with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
+                'SIGNALFOUNDRY_PREVIEW_ORIGIN': 'https://preview.company.com',
+                'SIGNALFOUNDRY_PUBLIC_ACCESS': 'true',
+                'SIGNALFOUNDRY_DB_PATH': str(Path(tmp) / 'preview.sqlite3')}):
+            app = create_app(Path(tmp) / 'preview.sqlite3', testing=True)
+            app.state.fetch_page = MagicMock(side_effect=AssertionError('Public preview must not fetch websites'))
+            app.state.decision_provider.evaluate = MagicMock(side_effect=AssertionError('Public preview must not call providers'))
+            campaign = app.state.repository.create_campaign('Manual', 'manual', ['https://public-company.com/'])
+            with TestClient(app) as client:
+                headers = {'Origin': 'https://preview.company.com'}
+                analysis = client.post('/api/workspace/analyze', json={'website': 'public-company.com'}, headers=headers)
+                research = client.post(f'/api/campaigns/{campaign.id}/research', json={}, headers=headers)
+
+        for response in (analysis, research):
+            self.assertEqual(response.status_code, 403)
+            self.assertIn('disabled in this public preview', response.json()['detail'])
+            self.assertIn('authenticated SaaS workspace', response.json()['detail'])
+        app.state.fetch_page.assert_not_called()
+        app.state.decision_provider.evaluate.assert_not_called()
 
     def test_preview_origin_and_data_path_are_explicit(self):
         with tempfile.TemporaryDirectory() as tmp, patch.dict(os.environ, {
