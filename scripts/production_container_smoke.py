@@ -48,9 +48,16 @@ if configured:
     from app.fixtures import DEMO_PROFILE
     body = {'profile': DEMO_PROFILE.model_dump(), 'campaign_id': 'container_smoke', 'mode': 'demo', 'domains': []}
     status, headers, data = request('/worker/research', body, True)
-    assert status == 200 and len(data['accounts']) == 8 and data['errors'] == []
+    # Fictional research was removed from the paid worker. Never re-enable it
+    # to satisfy an obsolete smoke fixture.
+    assert status == 422
     assert len(headers['X-Request-ID']) == 32
-    assert all(a['is_demo'] and a['decision_engine'] == 'rules' for a in data['accounts'])
+    body.update(mode='manual', domains=['https://example.com/'])
+    status, headers, data = request('/worker/research', body, True)
+    # Network-none isolation must return an honest fetch failure, not fake rows.
+    assert status == 200 and data['accounts'] == [] and len(data['errors']) == 1
+    assert 'example.com' in data['errors'][0]
+    assert len(headers['X-Request-ID']) == 32
 print(json.dumps({'configured': configured, 'passed': True}))
 '''
 
@@ -85,7 +92,7 @@ def run():
                     time.sleep(0.25)
                 logs = docker('logs', name)
                 assert not token or token not in logs
-                print('PASS: worker container ' + ('configured auth, demo response, non-root isolation' if configured else 'missing-token fail-closed readiness/work'))
+                print('PASS: worker container ' + ('configured auth, fictional-mode rejection, honest offline research failure, non-root isolation' if configured else 'missing-token fail-closed readiness/work'))
             finally:
                 subprocess.run(['docker', 'rm', '--force', name], capture_output=True, timeout=15)
     print('Container smoke passed; external TLS, real credentials, cloud Convex, and paid providers remain unverified')
