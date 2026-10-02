@@ -3,7 +3,7 @@ import Stripe from "stripe";
 import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
-import { adminAction } from "./lib/auth";
+import { adminAction, tenantAction } from "./lib/auth";
 import { appError } from "./lib/errors";
 import {
   billingConfigured,
@@ -30,6 +30,19 @@ function trustedLink(value: string | null, host: string) {
   return value;
 }
 const link = v.object({ url: v.string() });
+
+export const offer = tenantAction({
+  args: {},
+  returns: v.object({ amount: v.number(), currency: v.string(), interval: v.string(), interval_count: v.number(), mode: v.union(v.literal("test"), v.literal("live")) }),
+  handler: async () => {
+    const policy = billingPolicy();
+    if (!billingConfigured() || !policy) throw appError("CONFIGURATION_ERROR", "Billing is not configured");
+    const price = await client().prices.retrieve(policy.priceId);
+    if (price.id !== policy.priceId || !price.active || (price.unit_amount !== null && (!Number.isSafeInteger(price.unit_amount) || price.unit_amount <= 0))) throw appError("CONFIGURATION_ERROR", "Configured billing price is unavailable");
+    if (price.unit_amount === null || !price.recurring) throw appError("CONFIGURATION_ERROR", "A recurring fixed-price plan is required");
+    return { amount: price.unit_amount, currency: price.currency, interval: price.recurring.interval, interval_count: price.recurring.interval_count, mode: price.livemode ? "live" as const : "test" as const };
+  },
+});
 
 export const checkout = adminAction({
   args: { requestId: v.string() },

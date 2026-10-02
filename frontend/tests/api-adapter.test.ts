@@ -333,3 +333,16 @@ test("provider internals never leak; CSV neutralizes spreadsheet formulas", asyn
     assert.ok(csvCell(value).startsWith("\"'"));
   assert.equal(csvCell('a"b'), '"a""b"');
 });
+
+test("billing offer is a tenant-readable authenticated action without a client price", async () => {
+  const result = await call("billing/offer", "GET", undefined, { orgRole: "org:member" });
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.calls.map(c => ({ name: c.name, args: c.args })), [{ name: "stripe.offer", args: {} }]);
+});
+
+test("real CSV API preserves evidence, reasons, unknowns and engines", async () => {
+ const {deps}=setup(); deps.invoke=async()=>[{name:"Public business",domain:"business.example",score:70,confidence:"medium",status:"new",description:"Public facts",why_fit:["Supported fit"],why_now:[],unknowns:["Budget unknown"],score_breakdown:[],evidence:[{id:"ev",url:"https://business.example",excerpt:"Quoted public fact",published_at:null,retrieved_at:"2026-10-01T00:00:00Z"}],researched_at:"2026-10-01T00:00:00Z",decision_engine:"jev",is_demo:false}];
+ const response=await handleApi(request("campaigns/c1/export.csv"),["campaigns","c1","export.csv"],deps);
+ assert.equal(response.status,200); const csv=await response.text();
+ for(const value of ["evidence_urls","evidence_snippets","score_breakdown","decision_engine","Budget unknown","https://business.example","Quoted public fact"]) assert.ok(csv.includes(value),value);
+});

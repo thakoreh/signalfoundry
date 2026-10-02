@@ -1,5 +1,9 @@
 import Link from "next/link";
+import LandingMotion from "./landing-motion";
 import "../app/landing.css";
+
+const SIGN_UP_HREF = "/sign-up?redirect_url=/workspace";
+const SIGN_IN_HREF = "/sign-in?redirect_url=/workspace";
 
 function Arrow({ direction = "right" }: { direction?: "right" | "down" }) {
   return (
@@ -25,7 +29,10 @@ function Arrow({ direction = "right" }: { direction?: "right" | "down" }) {
 
 function SignalMark({ compact = false }: { compact?: boolean }) {
   return (
-    <span className={`sf-brand-mark ${compact ? "sf-brand-mark-compact" : ""}`} aria-hidden="true">
+    <span
+      className={`sf-brand-mark ${compact ? "sf-brand-mark-compact" : ""}`}
+      aria-hidden="true"
+    >
       <i />
       <i />
       <i />
@@ -41,9 +48,102 @@ function CheckMark() {
   );
 }
 
+function SectionMarker({ number, children }: { number: string; children: string }) {
+  return (
+    <div className="sf-section-marker">
+      <span>{number}</span>
+      <span className="sf-marker-line" aria-hidden="true" />
+      <span>{children}</span>
+    </div>
+  );
+}
+
+function ProductOutput() {
+  return (
+    <figure className="sf-output" data-reveal="hero-art" aria-labelledby="output-caption">
+      <figcaption className="sf-output-caption" id="output-caption">
+        <span>WORKSPACE / RESEARCH EXAMPLES</span>
+        <span className="sf-live-label">
+          <span className="sf-live-dot" aria-hidden="true" />
+          saved public research
+        </span>
+      </figcaption>
+      <div className="sf-output-frame">
+        <div className="sf-output-topbar" aria-hidden="true">
+          <span className="sf-window-dots"><i /><i /><i /></span>
+          <span className="sf-window-address">signalfoundry / campaign / review</span>
+          <span className="sf-window-status">ILLUSTRATION</span>
+        </div>
+        <div className="sf-output-grid">
+          <aside className="sf-output-sidebar" aria-label="Research pass summary">
+            <span className="sf-output-eyebrow">CAMPAIGN BRIEF</span>
+            <strong>Founder-led B2B teams</strong>
+            <p>Clear proof, lean motion, visible buying context.</p>
+            <div className="sf-output-divider" />
+            <span className="sf-output-eyebrow">INPUTS</span>
+            <span className="sf-input-chip"><span aria-hidden="true">↗</span> yoursite.com</span>
+            <span className="sf-input-chip"><span aria-hidden="true">↗</span> accounts.csv</span>
+            <div className="sf-sidebar-foot">
+              <span className="sf-live-dot" aria-hidden="true" />
+              Review mode
+            </div>
+          </aside>
+          <div className="sf-output-main">
+            <div className="sf-output-main-head">
+              <div>
+                <span className="sf-output-eyebrow">PUBLIC WEBSITE EXAMPLES</span>
+                <h3>Keep the reason attached.</h3>
+              </div>
+              <span className="sf-export-chip">CSV ready</span>
+            </div>
+            <div className="sf-research-card sf-research-card-featured">
+              <div className="sf-research-card-head">
+                <span className="sf-company-token">LA</span>
+                <div>
+                  <strong>Lowcode Agency</strong>
+                  <span>agency · reviewed</span>
+                </div>
+                <span className="sf-review-state">Shortlist</span>
+              </div>
+              <p>Builds custom internal tools for growing teams.</p>
+              <div className="sf-evidence-row">
+                <span>source: homepage</span>
+                <span>ICP match: audience + offer</span>
+              </div>
+            </div>
+            <div className="sf-research-card">
+              <div className="sf-research-card-head">
+                <span className="sf-company-token sf-company-token-muted">AT</span>
+                <div>
+                  <strong>Airtable</strong>
+                  <span>software vendor · review</span>
+                </div>
+                <span className="sf-review-state sf-review-state-muted">Review</span>
+              </div>
+              <p>Flexible database platform for teams.</p>
+              <div className="sf-evidence-row">
+                <span>source: homepage</span>
+                <span>reason attached</span>
+              </div>
+            </div>
+            <div className="sf-output-note">
+              <span className="sf-note-mark" aria-hidden="true"><CheckMark /></span>
+              <span>Evidence stays with the account when you draft or export.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p className="sf-output-footnote">Illustrative output shape from saved public research. Not a live account list.</p>
+    </figure>
+  );
+}
+
 export default function LandingPage() {
   return (
-    <main className="sf-landing">
+    <main
+      className="sf-landing"
+      data-motion-policy="prefers-reduced-motion"
+    >
       <Link className="sf-skip-link" href="#workflow">
         Skip to workflow
       </Link>
@@ -56,282 +156,183 @@ export default function LandingPage() {
             <b>.</b>
           </span>
         </Link>
-        <nav className="sf-nav-links" aria-label="Primary navigation">
+        <nav className="sf-nav-links" id="sf-mobile-menu" aria-label="Primary navigation">
           <Link href="#workflow">Workflow</Link>
-          <Link href="#examples">Research examples</Link>
+          <Link href="#output">Product output</Link>
+          <Link href="#plans">Scope &amp; plans</Link>
           <Link href="#faq">FAQ</Link>
+          <Link href={SIGN_IN_HREF}>Sign in</Link>
         </nav>
-        <Link className="sf-button sf-button-dark sf-nav-button" href="/workspace">
-          Open workspace <Arrow />
-        </Link>
+        <div className="sf-nav-actions">
+          <Link className="sf-button sf-button-accent sf-nav-cta" href={SIGN_UP_HREF}>
+            Create workspace <Arrow />
+          </Link>
+          <LandingMotion />
+        </div>
       </header>
 
       <section className="sf-hero sf-shell" aria-labelledby="hero-title">
-        <div className="sf-hero-copy">
+        <div className="sf-hero-copy" data-reveal="hero">
           <p className="sf-kicker">
             <span className="sf-kicker-dot" aria-hidden="true" />
-            Public preview / evidence-led account research
+            Public-web research / reviewable by design
           </p>
           <h1 id="hero-title">
             Research signal,
             <br />
-            <em>not noise.</em>
+            <span>not noise.</span>
           </h1>
           <p className="sf-hero-lede">
-            SignalFoundry helps founders and sales teams turn a clear customer
-            point of view into a shortlist they can actually explain.
+            Turn a clear customer point of view into an evidence-backed shortlist
+            your team can explain, review, and export.
           </p>
           <div className="sf-hero-actions">
-            <Link className="sf-button sf-button-dark" href="/workspace">
-              Start in the workspace <Arrow />
+            <Link className="sf-button sf-button-dark" href={SIGN_UP_HREF}>
+              Create a workspace <Arrow />
             </Link>
             <Link className="sf-text-link" href="#workflow">
-              See the workflow <Arrow />
+              Explore the workflow <Arrow />
             </Link>
           </div>
+          <div className="sf-hero-login">
+            Already have a workspace? <Link href={SIGN_IN_HREF}>Sign in</Link>
+          </div>
           <div className="sf-hero-meta" aria-label="Product scope">
-            <span>
-              <CheckMark /> Company research
-            </span>
-            <span>
-              <CheckMark /> Evidence you can review
-            </span>
-            <span>
-              <CheckMark /> Draft or export when ready
-            </span>
+            <span><CheckMark /> Company research</span>
+            <span><CheckMark /> Public evidence you can review</span>
+            <span><CheckMark /> Drafts and CSV export</span>
           </div>
         </div>
-
-        <div
-          className="sf-hero-art"
-          role="img"
-          aria-label="A SignalFoundry research board connecting a customer profile to public website evidence and a shortlist"
-        >
-          <div className="sf-art-caption">
-            <span>RESEARCH BOARD</span>
-            <span className="sf-art-caption-status">
-              <span className="sf-status-dot" aria-hidden="true" />
-              reviewable output
-            </span>
-          </div>
-          <div className="sf-art-stage">
-            <svg className="sf-signal-map" viewBox="0 0 600 490" aria-hidden="true">
-              <path className="sf-map-line sf-map-line-muted" d="M105 88C178 88 168 180 242 180" />
-              <path className="sf-map-line sf-map-line-muted" d="M105 88C177 88 190 302 242 302" />
-              <path className="sf-map-line" d="M358 180c50 0 45-92 129-92" />
-              <path className="sf-map-line" d="M358 180c57 0 46 122 129 122" />
-              <path className="sf-map-line sf-map-line-muted" d="M358 302c48 0 54 0 129 0" />
-              <path className="sf-map-line-dash" d="M242 180h116" />
-              <path className="sf-map-line-dash" d="M242 302h116" />
-              <circle className="sf-map-node sf-map-node-root" cx="105" cy="88" r="9" />
-              <circle className="sf-map-node sf-map-node-mid" cx="242" cy="180" r="7" />
-              <circle className="sf-map-node sf-map-node-mid" cx="242" cy="302" r="7" />
-              <circle className="sf-map-node sf-map-node-end" cx="487" cy="88" r="7" />
-              <circle className="sf-map-node sf-map-node-end" cx="487" cy="302" r="7" />
-            </svg>
-            <div className="sf-art-profile sf-art-panel">
-              <span className="sf-panel-index">01 / BRIEF</span>
-              <strong>Modern sales teams</strong>
-              <span className="sf-panel-note">Lean motion, clear proof</span>
-              <div className="sf-panel-rule" />
-              <span className="sf-panel-label">ICP signal</span>
-              <span className="sf-panel-value">Founder-led B2B</span>
-            </div>
-            <div className="sf-art-evidence sf-art-panel">
-              <span className="sf-panel-index">02 / EVIDENCE</span>
-              <strong>Public website signals</strong>
-              <span className="sf-panel-note">Language, offer, audience</span>
-              <div className="sf-signal-bars" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-                <i />
-              </div>
-            </div>
-            <div className="sf-art-shortlist sf-art-panel">
-              <span className="sf-panel-index">03 / SHORTLIST</span>
-              <div className="sf-shortlist-row">
-                <span className="sf-mini-avatar sf-mini-avatar-one">L</span>
-                <span>
-                  <strong>Lowcode Agency</strong>
-                  <small>agency</small>
-                </span>
-                <span className="sf-mini-tag">strong fit</span>
-              </div>
-              <div className="sf-shortlist-row">
-                <span className="sf-mini-avatar sf-mini-avatar-two">A</span>
-                <span>
-                  <strong>Airtable</strong>
-                  <small>software vendor</small>
-                </span>
-                <span className="sf-mini-tag sf-mini-tag-muted">review</span>
-              </div>
-            </div>
-            <div className="sf-art-stamp">SIGNAL / FOUND</div>
-          </div>
-          <p className="sf-art-footnote">
-            A visual sample of the output shape — not a live account list.
-          </p>
-        </div>
+        <ProductOutput />
       </section>
 
-      <section className="sf-intro sf-shell" aria-labelledby="intro-title">
-        <div className="sf-section-marker">
-          <span>01</span>
-          <span className="sf-marker-line" aria-hidden="true" />
-          <span>THE SIGNAL GAP</span>
+      <section className="sf-signal-gap sf-shell" aria-labelledby="signal-gap-title" data-reveal="intro">
+        <div className="sf-signal-gap-label">
+          <SectionMarker number="01">THE SIGNAL GAP</SectionMarker>
+          <span className="sf-vertical-note">POINT OF VIEW → PROOF</span>
         </div>
-        <div className="sf-intro-content">
-          <h2 id="intro-title">
-            The best account list is not the longest one. It is the one you can
-            defend.
-          </h2>
+        <div>
+          <h2 id="signal-gap-title">The best account list is not the longest one. It is the one you can defend.</h2>
           <p>
-            Start with a point of view, not a blank search box. SignalFoundry
-            keeps your ideal customer profile close to the research so every
-            shortlist decision has a visible reason behind it.
+            Start with an ICP you can recognize. SignalFoundry keeps the brief,
+            public evidence, and decision trail together so the shortlist stays
+            useful after the research pass ends.
           </p>
-        </div>
-      </section>
-
-      <section className="sf-proof sf-shell" aria-labelledby="proof-title">
-        <div className="sf-proof-visual" aria-label="Evidence ledger product proof">
-          <div className="sf-ledger-topline">
-            <span>ACCOUNT RESEARCH / PUBLIC SOURCES</span>
-            <span>VISIBLE BY DESIGN</span>
-          </div>
-          <div className="sf-ledger-head">
-            <span>Account</span>
-            <span>Observed signal</span>
-            <span>Next move</span>
-          </div>
-          <div className="sf-ledger-row sf-ledger-row-featured">
-            <span className="sf-ledger-account">
-              <span className="sf-ledger-badge">LA</span>
-              <strong>Lowcode Agency</strong>
-            </span>
-            <span>Builds custom internal tools for growing teams</span>
-            <span className="sf-ledger-action">Shortlist</span>
-          </div>
-          <div className="sf-ledger-row">
-            <span className="sf-ledger-account">
-              <span className="sf-ledger-badge sf-ledger-badge-blue">AT</span>
-              <strong>Airtable</strong>
-            </span>
-            <span>Flexible database platform for teams</span>
-            <span className="sf-ledger-action sf-ledger-action-muted">Review</span>
-          </div>
-          <div className="sf-ledger-row">
-            <span className="sf-ledger-account">
-              <span className="sf-ledger-badge sf-ledger-badge-amber">XR</span>
-              <strong>XRay</strong>
-            </span>
-            <span>Consultancy-led operating model</span>
-            <span className="sf-ledger-action sf-ledger-action-muted">Review</span>
-          </div>
-          <div className="sf-ledger-footer">
-            <span className="sf-ledger-pulse" aria-hidden="true" />
-            Evidence stays attached to the decision
-          </div>
-        </div>
-        <div className="sf-proof-copy">
-          <p className="sf-kicker">PRODUCT PROOF / NO BLACK BOX</p>
-          <h2 id="proof-title">The output is a research trail, not a magic score.</h2>
-          <p>
-            See the source-shaped clues behind a recommendation: what a company
-            says, who it serves, and how that maps to your brief. Keep the useful
-            context when you move from research to a draft or CSV export.
-          </p>
-          <Link className="sf-text-link" href="#examples">
-            See a public website research example <Arrow />
-          </Link>
         </div>
       </section>
 
       <section className="sf-workflow sf-shell" id="workflow" aria-labelledby="workflow-title">
-        <div className="sf-section-heading">
+        <div className="sf-section-heading" data-reveal="workflow">
           <div>
-            <div className="sf-section-marker">
-              <span>02</span>
-              <span className="sf-marker-line" aria-hidden="true" />
-              <span>THE WORKFLOW</span>
-            </div>
+            <SectionMarker number="02">THE WORKFLOW</SectionMarker>
             <h2 id="workflow-title">A point of view in. A usable shortlist out.</h2>
           </div>
           <p>
-            Move from website to ICP to company domains or CSV, then decide what
-            deserves a closer look.
+            Bring the brief and the company domains you already have. Move from
+            research to review without losing the why.
           </p>
         </div>
+        <div className="sf-workflow-track" aria-hidden="true"><span /></div>
         <ol className="sf-step-list">
-          <li className="sf-step">
+          <li className="sf-step" data-reveal="workflow-step" style={{ "--sf-reveal-delay": "60ms" } as React.CSSProperties}>
             <span className="sf-step-number">01</span>
-            <div>
-              <h3>Start with your website</h3>
-              <p>Use your own site as a starting signal for the customer profile you want to test.</p>
-            </div>
-            <Arrow direction="down" />
+            <span className="sf-step-icon sf-step-icon-input" aria-hidden="true">↗</span>
+            <h3>Define the ICP</h3>
+            <p>Describe audience, offer, language, and the public signals worth checking.</p>
           </li>
-          <li className="sf-step">
+          <li className="sf-step" data-reveal="workflow-step" style={{ "--sf-reveal-delay": "140ms" } as React.CSSProperties}>
             <span className="sf-step-number">02</span>
-            <div>
-              <h3>Shape the ICP</h3>
-              <p>Review the profile: audience, offer, language, and the evidence that should matter.</p>
-            </div>
-            <Arrow direction="down" />
+            <span className="sf-step-icon" aria-hidden="true"><span /></span>
+            <h3>Import accounts</h3>
+            <p>Bring real company domains or CSV rows. Research starts from what you provide.</p>
           </li>
-          <li className="sf-step">
+          <li className="sf-step" data-reveal="workflow-step" style={{ "--sf-reveal-delay": "220ms" } as React.CSSProperties}>
             <span className="sf-step-number">03</span>
-            <div>
-              <h3>Import company domains or CSV</h3>
-              <p>Bring the accounts you already have. Research works from the companies you give it.</p>
-            </div>
-            <Arrow direction="down" />
+            <span className="sf-step-icon sf-step-icon-evidence" aria-hidden="true"><span /><span /><span /></span>
+            <h3>Review evidence</h3>
+            <p>Read public-homepage findings, citations, and explicit unknowns before deciding.</p>
           </li>
-          <li className="sf-step sf-step-last">
+          <li className="sf-step sf-step-last" data-reveal="workflow-step" style={{ "--sf-reveal-delay": "300ms" } as React.CSSProperties}>
             <span className="sf-step-number">04</span>
-            <div>
-              <h3>Rank, shortlist, draft or export</h3>
-              <p>Review public evidence, keep the strongest accounts, then draft or export the next pass.</p>
-            </div>
-            <span className="sf-step-end" aria-hidden="true"><CheckMark /></span>
+            <span className="sf-step-icon sf-step-icon-output" aria-hidden="true"><CheckMark /></span>
+            <h3>Shortlist or export</h3>
+            <p>Keep the strongest accounts, draft a human-reviewed template, or preserve the CSV.</p>
           </li>
         </ol>
       </section>
 
-      <section className="sf-examples sf-shell" id="examples" aria-labelledby="examples-title">
-        <div className="sf-examples-copy">
-          <div className="sf-section-marker">
-            <span>03</span>
-            <span className="sf-marker-line" aria-hidden="true" />
-            <span>SHOW YOUR WORK</span>
+      <section className="sf-output-proof sf-shell" id="output" aria-labelledby="output-proof-title">
+        <div className="sf-proof-ledger" data-reveal="proof">
+          <div className="sf-ledger-header">
+            <span>ACCOUNT RESEARCH / PUBLIC SOURCES</span>
+            <span>VISIBLE BY DESIGN</span>
           </div>
+          <div className="sf-ledger-columns" aria-hidden="true">
+            <span>Account</span><span>Observed signal</span><span>Next move</span>
+          </div>
+          <div className="sf-ledger-row sf-ledger-row-featured">
+            <span className="sf-ledger-account"><span className="sf-ledger-badge">LA</span><strong>Lowcode Agency</strong></span>
+            <span>Custom internal tools for growing teams</span>
+            <span className="sf-ledger-action">Shortlist</span>
+          </div>
+          <div className="sf-ledger-row">
+            <span className="sf-ledger-account"><span className="sf-ledger-badge sf-ledger-badge-muted">AT</span><strong>Airtable</strong></span>
+            <span>Flexible database platform for teams</span>
+            <span className="sf-ledger-action sf-ledger-action-muted">Review</span>
+          </div>
+          <div className="sf-ledger-row">
+            <span className="sf-ledger-account"><span className="sf-ledger-badge sf-ledger-badge-muted">XR</span><strong>XRay</strong></span>
+            <span>Consultancy-led operating model</span>
+            <span className="sf-ledger-action sf-ledger-action-muted">Review</span>
+          </div>
+          <div className="sf-ledger-footer"><span className="sf-live-dot" aria-hidden="true" />Evidence stays attached to the decision</div>
+        </div>
+        <div className="sf-proof-copy" data-reveal="proof-copy">
+          <p className="sf-kicker">03 / PRODUCT OUTPUT</p>
+          <h2 id="output-proof-title">Not a magic score. A research trail.</h2>
+          <p>
+            See the public language, offer, and audience clues behind a shortlist
+            decision. Keep useful context when the next move is a draft, a review,
+            or an evidence-preserving CSV export.
+          </p>
+          <ul className="sf-check-list">
+            <li><CheckMark /> Citations and source excerpts</li>
+            <li><CheckMark /> Confidence kept separate from verified contacts</li>
+            <li><CheckMark /> Unknowns called out instead of filled in</li>
+          </ul>
+          <Link className="sf-text-link" href="#examples">See the public research example <Arrow /></Link>
+        </div>
+      </section>
+
+      <section className="sf-examples sf-shell" id="examples" aria-labelledby="examples-title">
+        <div className="sf-examples-copy" data-reveal="examples-copy">
+          <SectionMarker number="04">SHOW YOUR WORK</SectionMarker>
           <h2 id="examples-title">Classify what is in front of you before you write to it.</h2>
           <p>
-            These are live-smoke classifications used to show the shape of a
-            research pass. They are not invented leads, customer logos, or a claim
-            that these companies use SignalFoundry.
+            These examples show the shape of a public website research pass. They
+            are not invented leads, customer logos, or a claim that these companies
+            use SignalFoundry.
           </p>
           <p className="sf-example-disclaimer">Public website research example</p>
         </div>
-        <div className="sf-example-table" role="table" aria-label="Public website research examples">
+        <div className="sf-example-table" role="table" aria-label="Public website research examples" data-reveal="examples-table">
           <div className="sf-example-table-head" role="row">
             <span role="columnheader">Company</span>
             <span role="columnheader">Classification</span>
             <span role="columnheader">Read</span>
           </div>
           <div className="sf-example-table-row" role="row">
-            <span role="cell" className="sf-example-company"><span className="sf-example-dot sf-example-dot-green" aria-hidden="true" />Lowcode Agency</span>
+            <span role="cell" className="sf-example-company"><span className="sf-example-dot" aria-hidden="true" />Lowcode Agency</span>
             <span role="cell">agency</span>
             <span role="cell" className="sf-example-read">Services-led</span>
           </div>
           <div className="sf-example-table-row" role="row">
-            <span role="cell" className="sf-example-company"><span className="sf-example-dot sf-example-dot-blue" aria-hidden="true" />Airtable</span>
+            <span role="cell" className="sf-example-company"><span className="sf-example-dot" aria-hidden="true" />Airtable</span>
             <span role="cell">software vendor</span>
             <span role="cell" className="sf-example-read">Product-led</span>
           </div>
           <div className="sf-example-table-row" role="row">
-            <span role="cell" className="sf-example-company"><span className="sf-example-dot sf-example-dot-amber" aria-hidden="true" />XRay</span>
+            <span role="cell" className="sf-example-company"><span className="sf-example-dot" aria-hidden="true" />XRay</span>
             <span role="cell">consultancy</span>
             <span role="cell" className="sf-example-read">Expertise-led</span>
           </div>
@@ -342,69 +343,102 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <section className="sf-scope sf-shell" id="plans" aria-labelledby="scope-title">
+        <div className="sf-scope-copy" data-reveal="scope-copy">
+          <SectionMarker number="05">SCOPE &amp; PLANS</SectionMarker>
+          <h2 id="scope-title">The paywall is around workspace capacity, not clarity.</h2>
+          <p>
+            You should know what the product can do before a plan appears. The
+            workspace shows the current plan, limits, and any paid boundary before
+            research runs. No invented price is printed on this preview.
+          </p>
+          <Link className="sf-button sf-button-dark" href={SIGN_UP_HREF}>See the workspace plan <Arrow /></Link>
+        </div>
+        <div className="sf-scope-grid" data-reveal="scope-grid">
+          <article className="sf-scope-card sf-scope-card-primary">
+            <span className="sf-scope-card-label">IN THE WORKSPACE</span>
+            <h3>Start with the work you can review.</h3>
+            <ul className="sf-scope-list">
+              <li><CheckMark /> Editable ICP and campaign brief</li>
+              <li><CheckMark /> Up to 10 real domains per campaign</li>
+              <li><CheckMark /> Saved public research with citations</li>
+              <li><CheckMark /> Human-reviewed drafts and CSV export</li>
+            </ul>
+          </article>
+          <article className="sf-scope-card">
+            <span className="sf-scope-card-label">CLEAR BOUNDARY</span>
+            <h3>Research stops before risky automation.</h3>
+            <ul className="sf-scope-list sf-scope-list-muted">
+              <li><span className="sf-scope-minus" aria-hidden="true">—</span> No automatic discovery</li>
+              <li><span className="sf-scope-minus" aria-hidden="true">—</span> No contact enrichment or verification</li>
+              <li><span className="sf-scope-minus" aria-hidden="true">—</span> No sending, replies, or meeting booking</li>
+              <li><span className="sf-scope-minus" aria-hidden="true">—</span> No claim that confidence means buying intent</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
       <section className="sf-boundaries sf-shell" id="faq" aria-labelledby="faq-title">
-        <div className="sf-boundaries-heading">
-          <div className="sf-section-marker">
-            <span>04</span>
-            <span className="sf-marker-line" aria-hidden="true" />
-            <span>THE FINE PRINT</span>
-          </div>
+        <div className="sf-boundaries-heading" data-reveal="faq-heading">
+          <SectionMarker number="06">THE FINE PRINT</SectionMarker>
           <h2 id="faq-title">Useful because it knows where to stop.</h2>
           <p>
-            SignalFoundry is an account-research workspace, not a complete outbound
-            stack. The honest boundary is part of the product.
+            The honest boundary is part of the product. Here is what a public
+            research workspace does and does not promise.
           </p>
         </div>
-        <div className="sf-faq-list">
+        <div className="sf-faq-list" data-reveal="faq-list">
           <details open>
             <summary>Where does research come from?</summary>
-            <p>From the public websites and company domains you provide. Review the evidence before you decide what to keep.</p>
+            <p>From the public websites and company domains you provide. Each pass keeps citations, explicit unknowns, and the observed language available for review.</p>
           </details>
           <details>
-            <summary>Does it discover contacts or send outreach?</summary>
-            <p>No. The preview does not discover contacts, does not verify email addresses, and does not send campaigns. It stops at account research, shortlisting, and draft or export.</p>
+            <summary>Does SignalFoundry discover contacts or send outreach?</summary>
+            <p>No. It does not discover contacts, verify email addresses, send campaigns, manage replies, or book meetings. It stops at account research, shortlisting, human-reviewed drafts, and export.</p>
           </details>
           <details>
             <summary>Are the named companies customers or sample leads?</summary>
-            <p>No. Lowcode Agency, Airtable, and XRay are shown only as a public website research example so you can see classification language.</p>
+            <p>No. Lowcode Agency, Airtable, and XRay are shown only as a public website research example so you can see classification language and output shape.</p>
           </details>
           <details>
             <summary>How do plans and limits work?</summary>
-            <p>There is no arbitrary price or credit promise on this staging preview. Your plan and limits are visible in the workspace.</p>
+            <p>The current plan and limits are shown in the workspace before a research run or paid boundary. This public preview does not hardcode a price, trial, refund, or credit promise.</p>
+          </details>
+          <details>
+            <summary>What does a confidence label mean?</summary>
+            <p>Confidence describes uncertainty in an automated classification or fit assessment. It is not a verified contact, a guarantee of buying intent, or a performance claim.</p>
           </details>
         </div>
       </section>
 
-      <section className="sf-final sf-shell" aria-labelledby="final-title">
+      <section className="sf-final sf-shell" aria-labelledby="final-title" data-reveal="final">
         <div className="sf-final-mark" aria-hidden="true"><SignalMark compact /></div>
         <div>
           <p className="sf-kicker">READY WHEN YOUR BRIEF IS</p>
           <h2 id="final-title">Make your next account list easier to believe.</h2>
+          <p className="sf-final-note">Create the workspace. Bring the signal. Keep the reasons.</p>
         </div>
-        <Link className="sf-button sf-button-light" href="/workspace">
-          Open the workspace <Arrow />
-        </Link>
+        <Link className="sf-button sf-button-light" href={SIGN_UP_HREF}>Create a workspace <Arrow /></Link>
       </section>
 
       <footer className="sf-footer sf-shell">
         <div className="sf-footer-brand">
           <Link className="sf-brand" href="/" aria-label="SignalFoundry home">
             <SignalMark />
-            <span>
-              Signal<span className="sf-brand-light">Foundry</span>
-              <b>.</b>
-            </span>
+            <span>Signal<span className="sf-brand-light">Foundry</span><b>.</b></span>
           </Link>
           <p>Evidence-led account research for founders and sales teams.</p>
         </div>
         <div className="sf-footer-links" aria-label="Footer navigation">
           <Link href="#workflow">Workflow</Link>
+          <Link href="#output">Product output</Link>
+          <Link href="#plans">Scope &amp; plans</Link>
           <Link href="#faq">FAQ</Link>
           <Link href="/privacy">Privacy</Link>
           <Link href="/terms">Terms</Link>
           <Link href="/contact">Contact</Link>
         </div>
-        <p className="sf-footer-note">Staging preview — not a production service.</p>
+        <p className="sf-footer-note">Staging preview. Not a production service.</p>
       </footer>
     </main>
   );

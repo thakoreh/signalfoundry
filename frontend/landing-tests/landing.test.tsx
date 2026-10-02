@@ -11,7 +11,8 @@ describe("SignalFoundry public landing page", () => {
     const text = output.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
 
     expect(text).toContain("Research signal, not noise.");
-    expect(output).toContain("/workspace");
+    expect(output).toContain("/sign-up?redirect_url=/workspace");
+    expect(output).toContain("/sign-in?redirect_url=/workspace");
     expect(output).toContain("#workflow");
     expect(output).toContain("website");
     expect(output).toContain("ICP");
@@ -22,9 +23,11 @@ describe("SignalFoundry public landing page", () => {
     expect(output).toContain("export");
   });
 
-  it("labels live-smoke examples as research examples rather than customer proof", () => {
+  it("keeps the product output concrete and labels examples honestly", () => {
     const output = html();
 
+    expect(output).toContain("saved public research");
+    expect(output).toContain("source: homepage");
     expect(output).toContain("public website research example");
     expect(output).toContain("Lowcode Agency");
     expect(output).toContain("agency");
@@ -36,16 +39,28 @@ describe("SignalFoundry public landing page", () => {
     expect(output).not.toContain("customers include");
   });
 
-  it("sets honest product boundaries and links to preview legal pages", () => {
+  it("ships a no-js-safe motion hook and accessible mobile navigation control", () => {
     const output = html();
 
+    expect(output).toContain('data-reveal="hero"');
+    expect(output).toContain('data-reveal="workflow"');
+    expect(output).toContain('aria-controls="sf-mobile-menu"');
+    expect(output).toContain('aria-expanded="false"');
+    expect(output).toContain("prefers-reduced-motion");
+  });
+
+  it("explains scope and paywall boundaries without inventing pricing", () => {
+    const output = html();
+
+    expect(output).toContain("Up to 10 real domains");
     expect(output).toContain("does not discover contacts");
-    expect(output).toContain("does not verify email addresses");
-    expect(output).toContain("does not send campaigns");
-    expect(output).toContain("plan and limits are visible in the workspace");
+    expect(output).toContain("No contact enrichment or verification");
+    expect(output).toContain("No sending, replies, or meeting booking");
+    expect(output).toContain("current plan and limits are shown in the workspace");
     expect(output).toContain('href="/privacy"');
     expect(output).toContain('href="/terms"');
     expect(output).toContain('href="/contact"');
-    expect(output).toContain("staging preview");
+    expect(output).toContain("Staging preview");
+    expect(output).not.toMatch(/\$\d/);
   });
 });

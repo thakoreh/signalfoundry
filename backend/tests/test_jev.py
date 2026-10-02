@@ -8,7 +8,9 @@ import httpx
 
 from app.fixtures import DEMO_PROFILE
 from app.jev import JevDecisionProvider, MODEL
+from app.models import Profile
 from app.providers import ProviderNotConfigured, UnconfiguredContacts, UnconfiguredDiscovery
+from app.research import RulesDecisionProvider, make_draft
 from app.safety import Page
 
 PAGE = Page('https://company.com/', 'Public Company', 'Workflow automation',
@@ -35,6 +37,61 @@ class JevTest(unittest.TestCase):
         self.assertEqual(provider.name, 'rules')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('no server key', account.unknowns[0])
+
+    def test_provider_sends_targeting_fields_not_supplier_profile(self):
+        profile = Profile(
+            company_name='Grand River AI',
+            description='Supplier biography that must not influence target qualification.',
+            industries=['Agency'],
+            company_sizes=['11–50'],
+            geographies=['Canada'],
+            buyer_roles=['Founder', 'Operations'],
+            keywords=['automation'],
+            exclusions=['Recruiting'],
+        )
+        def handler(request):
+            payload = json.loads(request.content)
+            state = payload['state']
+            self.assertNotIn('icp', state)
+            self.assertEqual(state['targeting'], {
+                'industries': ['Agency'],
+                'company_sizes': ['11–50'],
+                'geographies': ['Canada'],
+                'buyer_roles': ['Founder', 'Operations'],
+                'keywords': ['automation'],
+                'exclusions': ['Recruiting'],
+            })
+            serialized = json.dumps(state)
+            self.assertNotIn('Grand River AI', serialized)
+            self.assertNotIn('Supplier biography', serialized)
+            instructions = payload['questions']['qualification']['instructions'].lower()
+            self.assertIn('missing evidence', instructions)
+            self.assertIn('explicit exclusion', instructions)
+            self.assertIn('not require every', instructions)
+            return httpx.Response(200, json=response_data())
+
+        provider = JevDecisionProvider(self.api_key, transport=httpx.MockTransport(handler))
+        account = provider.evaluate(profile, PAGE, campaign_id='cmp_test')
+        self.assertEqual(account.decision_engine, 'jev')
+
+    def test_grounded_draft_uses_complete_company_evidence_and_warns_on_unconfirmed_fit(self):
+        profile = Profile(
+            company_name='Grand River AI',
+            description='A supplier profile that is editable but not target evidence.',
+            industries=['Agency'], company_sizes=[], geographies=[],
+            buyer_roles=['Founder'], keywords=['automation'], exclusions=[],
+        )
+        page = Page(
+            'https://target.example/', 'Target Company',
+            'We build custom AI software that replaces off-the-shelf SaaS.',
+            'Home Back Integrations … to streamline operations, from internal tools and CRMs to AI-powered automation.',
+        )
+        account = RulesDecisionProvider().evaluate(profile, page, campaign_id='cmp_test')
+        draft = make_draft(account, profile)
+        self.assertIn('We build custom AI software that replaces off-the-shelf SaaS.', draft.body)
+        self.assertNotIn('… to streamline', draft.body)
+        self.assertNotIn('Back Integrations', draft.body)
+        self.assertIn('Fit is unconfirmed', draft.warning)
 
     def test_mocked_official_contract_and_expected_score_scale(self):
         calls = []
@@ -208,3 +265,20 @@ class JevTest(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class JevMetadataTests(unittest.TestCase):
+    def test_target_page_identity_metadata_reaches_the_provider(self):
+        from uuid import uuid4
+        seen=[]
+        def capture(request):
+            seen.append(json.loads(request.content))
+            return httpx.Response(503)
+        page=Page('https://company.example/','Example software vendor','We build collaboration software.','Navigation and workflow text.')
+        profile=Profile(company_name='Supplier',description='Not target evidence',industries=['B2B SaaS'],keywords=['workflow'],company_sizes=[],geographies=[],buyer_roles=[],exclusions=[])
+        JevDecisionProvider(uuid4().hex,transport=httpx.MockTransport(capture)).evaluate(profile,page,campaign_id='metadata-test')
+        self.assertEqual(seen[0]['state']['website'].get('title'),page.title)
+        self.assertEqual(seen[0]['state']['website'].get('description'),page.description)
+        self.assertIn('industry',seen[0]['questions']['fit_score']['criteria'][3].lower())
+        self.assertIn('keyword',seen[0]['questions']['fit_score']['criteria'][3].lower())
+        self.assertIn('unconfigured',seen[0]['questions']['fit_score']['instructions'].lower())

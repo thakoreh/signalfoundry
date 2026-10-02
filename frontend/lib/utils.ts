@@ -75,6 +75,43 @@ export function scoreLabel(score: number) {
       : "Explore fit";
 }
 
+export function decisionEngineLabel(
+  accounts: Pick<Account, "decision_engine">[],
+): string {
+  const engines = new Set(accounts.map((account) => account.decision_engine));
+  if (engines.size === 0) return "Decision engine";
+  if (engines.size > 1) return "Mixed decision engines";
+  return engines.has("jev")
+    ? "Jev intelligence"
+    : "Rules-based intelligence";
+}
+
+export function websiteAnalysisMessage(
+  isAdmin: boolean,
+  serviceReady: boolean,
+): string {
+  if (!isAdmin)
+    return "You can review this profile. An organization administrator can change targeting preferences.";
+  return serviceReady
+    ? "Analyze your public website or define your customer profile below. The research service is responding; review and edit the draft before saving."
+    : "Analyze your public website or define your customer profile below. Service status is unavailable right now, so you can define the profile manually or retry analysis later.";
+}
+
+export function drawerFocusBoundaryTarget(
+  elements: readonly HTMLElement[],
+  active: Element | null,
+  backwards: boolean,
+): HTMLElement | null {
+  if (!elements.length) return null;
+  const first = elements[0];
+  const last = elements[elements.length - 1];
+  const index = active ? elements.indexOf(active as HTMLElement) : -1;
+  if (index < 0) return backwards ? last : first;
+  if (backwards && index === 0) return last;
+  if (!backwards && index === elements.length - 1) return first;
+  return null;
+}
+
 export function signalCount(evidence: Evidence[]): number {
   return evidence.filter((e) => e.kind === "signal").length;
 }

@@ -19,3 +19,21 @@ class CustomerValueTests(unittest.TestCase):
         account=RulesDecisionProvider().evaluate(self.profile(),page,campaign_id='customer-test')
         self.assertEqual(account.industry,'Agency')
         self.assertGreaterEqual(account.score,65)
+
+    def test_software_customer_segment_does_not_trigger_agency_exclusion(self):
+        profile=self.profile().model_copy(update={'industries':['B2B SaaS'],'exclusions':['Agency']})
+        page=Page('https://vendor.example/','Software Vendor','A software platform for collaboration.','Agency customer stories. Workflow automation.')
+        result=RulesDecisionProvider().evaluate(profile,page,campaign_id='test')
+        self.assertFalse(any(p.label=='Exclusion penalty' for p in result.score_breakdown))
+
+    def test_agency_saas_customer_segment_is_not_its_company_category(self):
+        profile=self.profile().model_copy(update={'exclusions':['SaaS']})
+        page=Page('https://agency.example/','Example Agency','We develop tools for SaaS customers.','Agency workflow automation for SaaS customers.')
+        result=RulesDecisionProvider().evaluate(profile,page,campaign_id='test')
+        self.assertFalse(any(p.label=='Exclusion penalty' for p in result.score_breakdown))
+
+    def test_explicit_company_category_exclusion_is_preserved(self):
+        profile=self.profile().model_copy(update={'exclusions':['SaaS']})
+        page=Page('https://vendor.example/','Example SaaS vendor','We sell a SaaS platform.','Workflow automation SaaS platform.')
+        result=RulesDecisionProvider().evaluate(profile,page,campaign_id='test')
+        self.assertTrue(any(p.label=='Exclusion penalty' for p in result.score_breakdown))

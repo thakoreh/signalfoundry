@@ -18,6 +18,8 @@ import {
   signalCount,
   sourceCount,
   replaceSelectedAccount,
+  decisionEngineLabel,
+  websiteAnalysisMessage,
 } from "@/lib/utils";
 import { Icon } from "./icons";
 import { useWorkspaceSession } from "./workspace-session";
@@ -593,9 +595,7 @@ export default function Workspace({
           <div className="topbar-right">
             <span className="engine-badge">
               <span className="small-dot mint" />
-              {health?.decision_engine === "jev"
-                ? "Decision engine"
-                : "Rules-based intelligence"}
+              {decisionEngineLabel(accounts)}
             </span>
             <button
               className="help-btn"
@@ -728,9 +728,7 @@ export default function Workspace({
                   )}
                   {isSaas && (
                     <div className="notice soft">
-                      {isAdmin
-                        ? "Analyze your public website or define your customer profile below. Your administrator must configure the research worker before website analysis is available."
-                        : "You can review this profile. An organization administrator can change targeting preferences."}
+                      {websiteAnalysisMessage(isAdmin, Boolean(health))}
                     </div>
                   )}
                   <ProfileEditor

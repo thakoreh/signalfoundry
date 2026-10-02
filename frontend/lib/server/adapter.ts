@@ -1,4 +1,6 @@
 import type { RuntimeConfig } from "../runtime-config.ts";
+import type { Account } from "../types.ts";
+import { exportAccountsCsv } from "../account-export.ts";
 
 export type FunctionName =
   | "workspaces.get"
@@ -17,6 +19,7 @@ export type FunctionName =
   | "jobs.cancel"
   | "jobs.forCampaign"
   | "billing.status"
+  | "stripe.offer"
   | "stripe.checkout"
   | "stripe.portal";
 export type Session = {
@@ -269,6 +272,7 @@ export async function handleApi(
         }),
       );
     }
+    if (route === "GET /billing/offer") return json(await invoke("stripe.offer"));
     if (route === "GET /health") {
       await invoke("workspaces.get");
       return json({
@@ -311,25 +315,8 @@ export async function handleApi(
         );
       }
       if (method === "GET" && path[2] === "export.csv") {
-        const accounts = (await invoke("campaigns.accounts", { id })) as Array<
-          Record<string, unknown>
-        >;
-        const fields = [
-          "name",
-          "domain",
-          "industry",
-          "score",
-          "confidence",
-          "status",
-          "description",
-          "is_demo",
-        ];
-        const csv = [
-          fields.map(csvCell).join(","),
-          ...accounts.map((account) =>
-            fields.map((field) => csvCell(account[field])).join(","),
-          ),
-        ].join("\r\n");
+        const accounts = (await invoke("campaigns.accounts", { id })) as Account[];
+        const csv = exportAccountsCsv(accounts);
         return new Response(csv, {
           headers: {
             ...privateHeaders,

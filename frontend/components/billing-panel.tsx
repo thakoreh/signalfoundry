@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { displayedEntitlement } from "@/lib/billing";
+import { displayedEntitlement, billingOfferLabel, type BillingOffer } from "@/lib/billing";
 import { errorMessage, jsonBody } from "@/lib/api";
 import { useWorkspaceSession } from "./workspace-session";
 export type BillingStatus = {
@@ -18,14 +18,22 @@ export function BillingPanel() {
   const [now, setNow] = useState(() => Date.now());
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [error, setError] = useState("");
+  const [offer, setOffer] = useState<BillingOffer | null>(null);
+  const [offerError, setOfferError] = useState("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const requestId = useRef<{ action: string; id: string } | null>(null);
   const refresh = useCallback(async () => {
     setLoading(true);
     setError("");
+    setOfferError("");
+    setOffer(null);
     try {
-      setBilling(await api<BillingStatus>("/billing"));
+      const [status, price] = await Promise.allSettled([api<BillingStatus>("/billing"), api<BillingOffer>("/billing/offer")]);
+      if (status.status === "rejected") throw status.reason;
+      setBilling(status.value);
+      if (price.status === "fulfilled") setOffer(price.value);
+      else setOfferError(errorMessage(price.reason));
       setNow(Date.now());
     } catch (e) {
       setError(errorMessage(e));
@@ -125,7 +133,7 @@ export function BillingPanel() {
             <p>
               An administrator must complete Stripe price, webhook, and
               plan-limit configuration before paid research can be enabled.
-              Fictional demo research remains available.
+              No fictional research records are created.
             </p>
           ) : (
             <>
@@ -136,6 +144,14 @@ export function BillingPanel() {
                     ? "The last verified billing period has ended. Refresh your status or review your subscription in Stripe. Research remains subject to server authorization."
                     : "Review the plan’s price and terms in Stripe Checkout before subscribing. No payment is taken on this page."}
               </p>
+              {offer && (
+                <div aria-label="Subscription offer">
+                  <p className="plan-price"><strong>{billingOfferLabel(offer)}</strong></p>
+                  <span className={`tag ${offer.mode === "test" ? "amber" : "green"}`}>{offer.mode === "test" ? "Test mode" : "Live billing"}</span>
+                  {offer.mode === "test" && <p>Sandbox checkout only. This workspace is not collecting real payments.</p>}
+                </div>
+              )}
+              {offerError && <p role="alert">Unable to confirm the plan price. Refresh to retry. {offerError}</p>}
               {billing.monthly_research_limit !== null && (
                 <p>
                   Research allowance: {billing.monthly_research_limit} runs per
@@ -160,7 +176,7 @@ export function BillingPanel() {
                 <div className="billing-actions">
                   <button
                     className="btn primary"
-                    disabled={busy}
+                    disabled={busy || (billing.status === "none" && !offer)}
                     onClick={() =>
                       open(billing.status === "none" ? "checkout" : "portal")
                     }

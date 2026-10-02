@@ -16,3 +16,9 @@ export function displayedEntitlement(
     billing.current_period_end > now
   );
 }
+
+export type BillingOffer = { amount: number; currency: string; interval: string; interval_count: number; mode: "test" | "live" };
+export function billingOfferLabel(offer: BillingOffer): string {
+ const amount = new Intl.NumberFormat("en-CA", { style: "currency", currency: offer.currency.toUpperCase(), currencyDisplay: "code" }).format(offer.amount / 100).replaceAll("\u00a0", " ");
+ return `${amount} / ${offer.interval_count === 1 ? offer.interval : `${offer.interval_count} ${offer.interval}s`}`;
+}

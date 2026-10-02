@@ -17,6 +17,7 @@ import type * as lib_auth from "../lib/auth.js";
 import type * as lib_billingPolicy from "../lib/billingPolicy.js";
 import type * as lib_errors from "../lib/errors.js";
 import type * as lib_fixtures from "../lib/fixtures.js";
+import type * as lib_outreach from "../lib/outreach.js";
 import type * as lib_records from "../lib/records.js";
 import type * as lib_validation from "../lib/validation.js";
 import type * as lib_worker from "../lib/worker.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/billingPolicy": typeof lib_billingPolicy;
   "lib/errors": typeof lib_errors;
   "lib/fixtures": typeof lib_fixtures;
+  "lib/outreach": typeof lib_outreach;
   "lib/records": typeof lib_records;
   "lib/validation": typeof lib_validation;
   "lib/worker": typeof lib_worker;

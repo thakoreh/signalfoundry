@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { displayedEntitlement } from "../lib/billing.ts";
+import { displayedEntitlement, billingOfferLabel } from "../lib/billing.ts";
 test("cached billing entitlement is displayed active only before verified expiry", () => {
   const billing = {
     configured: true,
@@ -25,4 +25,9 @@ test("client time never grants access without configured verified entitlement an
     },
   ])
     assert.equal(displayedEntitlement(billing, 0), false);
+});
+
+test("plan price displays authoritative currency, minor units and recurring interval", () => {
+ assert.equal(billingOfferLabel({ amount: 2900, currency: "cad", interval: "month", interval_count: 1, mode: "test" }), "CAD 29.00 / month");
+ assert.equal(billingOfferLabel({ amount: 9900, currency: "usd", interval: "month", interval_count: 3, mode: "live" }), "USD 99.00 / 3 months");
 });

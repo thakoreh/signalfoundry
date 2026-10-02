@@ -63,7 +63,18 @@ class RulesDecisionProvider:
                              (inferred_industry == 'Unknown' and matches(x, page.title))]
         matched_roles = [x for x in profile.buyer_roles if matches(x, text)]
         matched_signals = [x for x in SIGNAL_TERMS if matches(x, text)]
-        exclusions = [x for x in profile.exclusions if matches(x, text)]
+        # Category exclusions describe this company, not customers mentioned in
+        # its navigation/use cases. Free-form exclusions require identity evidence.
+        exclusions = []
+        for term in profile.exclusions:
+            categories = {label for label, terms in INDUSTRY_TERMS.items()
+                          if matches(label, term) or any(matches(t, term) for t in terms)}
+            excluded = (inferred_industry in categories) if categories else any(
+                matches(term, source) for source in (page.title, page.description))
+            if fixture is not None:
+                excluded = matches(term, text)
+            if excluded:
+                exclusions.append(term)
         def part(label, actual, targets, max_points, cap):
             if not targets:
                 return ScoreComponent(label=label, points=0, max_points=max_points,
@@ -137,18 +148,64 @@ def demo_accounts(profile: Profile, campaign_id: str) -> list[Account]:
                             fixture=item) for item in FIXTURES]
 
 
+_NAVIGATION_FRAGMENT = re.compile(r'^(?:(?:back|home|menu|see all|platform|integrations|tools|products?)[\s.!?,:;|-]*)+$', re.I)
+
+
+def _complete_source_sentence(value: str | None, limit: int = 220) -> str | None:
+    if not value:
+        return None
+    normalized = re.sub(r'\s+', ' ', value).strip()
+    normalized = re.sub(r'^(?:…|\.\.\.)\s*', '', normalized)
+    normalized = re.sub(r'\s*(?:…|\.\.\.)$', '', normalized).strip()
+    for sentence in re.findall(r'[^.!?]+[.!?]', normalized):
+        candidate = sentence.strip(' \'"')
+        if len(candidate) >= 20 and len(candidate) <= limit and not _NAVIGATION_FRAGMENT.search(candidate):
+            return candidate
+    if len(normalized) <= limit and len(normalized) >= 20 and not _NAVIGATION_FRAGMENT.search(normalized):
+        return normalized
+    return None
+
+
+def _draft_source(account: Account) -> tuple[Evidence | None, str | None]:
+    evidence = sorted(account.evidence, key=lambda item: 0 if item.kind == 'company' else 1)
+    for item in evidence:
+        excerpt = _complete_source_sentence(item.excerpt)
+        if excerpt:
+            return item, excerpt
+    return None, _complete_source_sentence(account.description)
+
+
+def _display_name(account: Account) -> str:
+    return re.split(r'\s*[:|–—]\s*', account.name, maxsplit=1)[0].strip()[:120] or account.domain
+
+
+def _fit_unconfirmed(account: Account) -> bool:
+    return account.confidence == 'low' or account.score < 65 or any(
+        'qualification is unknown' in reason.lower() or 'qualification unknown' in reason.lower()
+        for reason in account.why_fit + [part.reason for part in account.score_breakdown]
+    )
+
+
 def make_draft(account: Account, profile: Profile) -> Draft:
-    cited = next((x for x in account.evidence if x.kind == 'fit'), account.evidence[0] if account.evidence else None)
-    observed = cited.excerpt if cited else account.description
-    # Quote a bounded source excerpt instead of manufacturing products, ROI,
-    # headcount, funding events, recipient identity, or personalized claims.
-    body = (f'Hi {account.name} team,\n\n'
-            f'Your website includes this description: “{observed[:220]}”\n\n'
-            f'I’m reaching out from {profile.company_name}. Would a short conversation to see whether there is a relevant fit be useful?\n\n'
+    cited, observed = _draft_source(account)
+    name = _display_name(account)
+    source_line = (f'Your website includes this description: “{observed}”'
+                   if observed else
+                   'I could not find a complete, citable description on the available page.')
+    offer = _complete_source_sentence(profile.description, limit=400)
+    sender_line = (f'I’m reaching out from {profile.company_name}. ' +
+                   (offer or '[Add your specific offer and its relevance before using this draft.]'))
+    body = (f'Hi {name} team,\n\n'
+            f'{source_line}\n\n'
+            f'{sender_line}\n\nWould it be useful to explore whether this is relevant to your team?\n\n'
             '[Your name]')
-    basis = [f'{cited.title}: {cited.url}' if cited else 'Account description; no independent source available',
-             'Sender company name comes from your editable workspace profile']
-    return Draft(subject=f'A question for {account.name}'[:180], body=body, basis=basis,
-                 engine='grounded_template',
-                 warning=('FICTIONAL DEMO: do not send this sample. ' if account.is_demo else '') +
-                         'Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available.')
+    basis = [f'{cited.title}: {cited.url}' if cited else 'Available page content; no complete independent source sentence was found',
+             'Sender company and offer come from your editable workspace profile']
+    warning = (
+        ('FICTIONAL DEMO: do not send this sample. ' if account.is_demo else '') +
+        'Draft only; nothing is sent. Review quoted website text, recipient, relevance, and applicable outreach requirements before use. No verified contact is available.'
+    )
+    if _fit_unconfirmed(account):
+        warning += ' Fit is unconfirmed; this draft does not establish relevance or buying intent.'
+    return Draft(subject=f'A question for {name}'[:180], body=body, basis=basis,
+                 engine='grounded_template', warning=warning)

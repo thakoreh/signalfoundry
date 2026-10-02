@@ -24,6 +24,7 @@ const functionKinds: Record<FunctionName, "query" | "mutation" | "action"> = {
   "jobs.cancel": "mutation",
   "jobs.forCampaign": "query",
   "billing.status": "query",
+  "stripe.offer": "action",
   "stripe.checkout": "action",
   "stripe.portal": "action",
 };

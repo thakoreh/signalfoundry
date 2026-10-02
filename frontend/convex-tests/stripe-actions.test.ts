@@ -10,9 +10,11 @@ const fake = vi.hoisted(() => ({
   listSubscriptions: vi.fn(),
   retrieveSubscription: vi.fn(),
   createPortal: vi.fn(),
+  retrievePrice: vi.fn(),
 }));
 vi.mock("stripe", () => ({
   default: class {
+    prices = { retrieve: fake.retrievePrice };
     customers = { create: fake.createCustomer };
     checkout = {
       sessions: { create: fake.createSession, retrieve: fake.retrieveSession },
@@ -194,4 +196,23 @@ describe("Stripe action contract mocks (no provider network)", () => {
       return_url: "https://app.example.com/workspace",
     });
   });
+});
+
+describe("authoritative Stripe plan offer (offline contract)", () => {
+  it("lets a member read the configured Stripe price and test mode without a billing write", async () => {
+    const { t } = await setup();
+    fake.retrievePrice.mockResolvedValue({ id: "price_approved", active: true, unit_amount: 2900, currency: "cad", recurring: { interval: "month", interval_count: 1 }, livemode: false });
+    const member = t.withIdentity({ ...identity, o: { id: "org_alpha", rol: "member" } });
+    const offer = await member.action(api.stripe.offer, {});
+    expect(offer).toEqual({ amount: 2900, currency: "cad", interval: "month", interval_count: 1, mode: "test" });
+    expect(fake.retrievePrice).toHaveBeenCalledWith("price_approved");
+    expect(fake.createSession).not.toHaveBeenCalled();
+    expect(fake.createCustomer).not.toHaveBeenCalled();
+  });
+});
+
+it.each([{ active: false }, { id: "price_wrong" }, { unit_amount: -1 }])("rejects an invalid authoritative billing offer %j", async invalid => {
+ const { admin } = await setup();
+ fake.retrievePrice.mockResolvedValue({ id: "price_approved", active: true, unit_amount: 2900, currency: "cad", recurring: { interval: "month", interval_count: 1 }, livemode: false, ...invalid });
+ await expect(admin.action(api.stripe.offer, {})).rejects.toThrow(/Configured billing price is unavailable/);
 });
