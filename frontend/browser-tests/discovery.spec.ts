@@ -297,6 +297,8 @@ async function mockWorkspace(page: Page, options: Options = {}) {
   return state;
 }
 
+// Scope editable fields by their semantic control role. Radio-card labels also
+// mention company websites, so broad getByLabel text matches the wrong control.
 async function openCampaign(page: Page, profile = true) {
   const response = await page.goto("/workspace");
   expect(response?.status()).toBe(200);
@@ -311,7 +313,7 @@ async function openCampaign(page: Page, profile = true) {
   const dialog = page.getByRole("dialog", { name: "New customer campaign" });
   await expect(dialog).toBeVisible();
   await dialog
-    .getByLabel("Campaign name", { exact: true })
+    .getByRole("textbox", { name: "Campaign name", exact: true })
     .fill("October discovery");
   return dialog;
 }
@@ -375,21 +377,24 @@ test("description-only discovery needs no profile, URL, or prospect list and sav
     dialog.getByRole("radio", { name: /^Find customers/ }),
   ).toBeChecked();
   await expect(
-    dialog.getByLabel("Company websites", { exact: false }),
+    dialog.getByRole("textbox", { name: /^Company websites\b/ }),
   ).toHaveCount(0);
   await dialog
-    .getByLabel("What does your offering help customers do?")
+    .getByRole("textbox", {
+      name: "What does your offering help customers do?",
+      exact: true,
+    })
     .fill(PROFILE.description);
   await dialog.getByRole("button", { name: "Suggest from offering" }).click();
   await expect(dialog.getByText(/Draft targeting hypotheses/)).toBeVisible();
-  await expect(dialog.getByLabel("Buyer roles", { exact: false })).toHaveValue(
-    "Head of Sales, Revenue Operations",
-  );
-  await expect(dialog.getByLabel("Geographies", { exact: false })).toHaveValue(
-    "",
-  );
+  await expect(
+    dialog.getByRole("textbox", { name: /^Buyer roles\b/ }),
+  ).toHaveValue("Head of Sales, Revenue Operations");
+  await expect(
+    dialog.getByRole("textbox", { name: /^Geographies\b/ }),
+  ).toHaveValue("");
   await dialog
-    .getByLabel("Buyer roles", { exact: false })
+    .getByRole("textbox", { name: /^Buyer roles\b/ })
     .fill("VP of Sales, Revenue Operations");
   await capture(page, testInfo, "offering-only-editable-brief");
   await review(dialog);
@@ -433,19 +438,22 @@ test("website suggestions stay editable and back, cancel, escape, and reopen do 
   await clickTwice(
     dialog.getByRole("button", { name: "Draft brief from website" }),
   );
-  await expect(dialog.getByLabel("Your company or product name")).toHaveValue(
-    "Northstar from website",
-  );
+  await expect(
+    dialog.getByRole("textbox", {
+      name: "Your company or product name",
+      exact: true,
+    }),
+  ).toHaveValue("Northstar from website");
   expect(state.suggestions).toHaveLength(1);
   await dialog
-    .getByLabel("Industries", { exact: false })
+    .getByRole("textbox", { name: /^Industries\b/ })
     .fill("Financial services");
   await review(dialog);
   await dialog.getByRole("checkbox").check();
   await dialog.getByRole("button", { name: "Back to edit" }).click();
-  await expect(dialog.getByLabel("Industries", { exact: false })).toHaveValue(
-    "Financial services",
-  );
+  await expect(
+    dialog.getByRole("textbox", { name: /^Industries\b/ }),
+  ).toHaveValue("Financial services");
   await review(dialog);
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
@@ -453,12 +461,12 @@ test("website suggestions stay editable and back, cancel, escape, and reopen do 
   await page
     .getByRole("button", { name: "Create your first campaign", exact: true })
     .click();
-  await expect(dialog.getByLabel("Campaign name", { exact: true })).toHaveValue(
-    "",
-  );
-  await expect(dialog.getByLabel("Industries", { exact: false })).toHaveValue(
-    "B2B SaaS",
-  );
+  await expect(
+    dialog.getByRole("textbox", { name: "Campaign name", exact: true }),
+  ).toHaveValue("");
+  await expect(
+    dialog.getByRole("textbox", { name: /^Industries\b/ }),
+  ).toHaveValue("B2B SaaS");
   await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
   await expect(dialog).toHaveCount(0);
   expect(state.creates).toHaveLength(0);
@@ -524,7 +532,7 @@ test("optional email verification does not block discovery and repeated clicks q
   const state = await mockWorkspace(page, { maxTargets: 5 });
   const dialog = await openCampaign(page);
   await expect(
-    dialog.getByLabel("Maximum companies to find", { exact: false }),
+    dialog.getByRole("spinbutton", { name: /^Maximum companies to find\b/ }),
   ).toHaveValue("5");
   await expect(
     dialog.getByText("Discovery providers ready", { exact: true }),
@@ -609,7 +617,10 @@ test("a website-preview failure preserves edits and allows description-only hypo
     "Describe your offering instead",
   );
   await expect(
-    dialog.getByLabel("What does your offering help customers do?"),
+    dialog.getByRole("textbox", {
+      name: "What does your offering help customers do?",
+      exact: true,
+    }),
   ).toHaveValue(PROFILE.description);
   await dialog.getByRole("button", { name: "Suggest from offering" }).click();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
@@ -629,7 +640,7 @@ test("manual import remains optional, validates input, and works without discove
   const dialog = await openCampaign(page);
   await dialog.getByRole("radio", { name: /^Manual import/ }).check();
   await dialog
-    .getByLabel("Company websites", { exact: false })
+    .getByRole("textbox", { name: /^Company websites\b/ })
     .fill("localhost\nexample.com");
   await dialog
     .getByRole("button", { name: "Review campaign", exact: true })
@@ -638,20 +649,18 @@ test("manual import remains optional, validates input, and works without discove
     "invalid website entries",
   );
   expect(state.creates).toHaveLength(0);
-  await dialog
-    .getByLabel("Import a prospect list", { exact: false })
-    .setInputFiles({
-      name: "prospects.csv",
-      mimeType: "text/csv",
-      buffer: Buffer.from(
-        "Company,Website\nAlpha,https://alpha.example.com/about\nDuplicate,alpha.example.com\nBeta,beta.example.com\n",
-      ),
-    });
+  await dialog.getByLabel(/^Import a prospect list\b/).setInputFiles({
+    name: "prospects.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(
+      "Company,Website\nAlpha,https://alpha.example.com/about\nDuplicate,alpha.example.com\nBeta,beta.example.com\n",
+    ),
+  });
   await expect(
     dialog.getByText(/2 unique company websites imported/),
   ).toBeVisible();
   await expect(
-    dialog.getByLabel("Company websites", { exact: false }),
+    dialog.getByRole("textbox", { name: /^Company websites\b/ }),
   ).toHaveValue("alpha.example.com\nbeta.example.com");
   await review(dialog);
   await expect(dialog.getByText("2 supplied company websites")).toBeVisible();
@@ -916,10 +925,13 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
   const dialog = await openCampaign(page, false);
   await test.step("1. Describe the fictional offering", async () => {
     await dialog
-      .getByLabel("Campaign name", { exact: true })
+      .getByRole("textbox", { name: "Campaign name", exact: true })
       .fill("TEST DATA October customer discovery");
     await dialog
-      .getByLabel("What does your offering help customers do?")
+      .getByRole("textbox", {
+        name: "What does your offering help customers do?",
+        exact: true,
+      })
       .fill(
         "TEST DATA: We help B2B SaaS sales teams improve their pipeline and sales operations.",
       );
@@ -927,10 +939,10 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
       dialog.getByRole("radio", { name: /^Find customers/ }),
     ).toBeChecked();
     await expect(
-      dialog.getByLabel("Company websites", { exact: false }),
+      dialog.getByRole("textbox", { name: /^Company websites\b/ }),
     ).toHaveCount(0);
     await dialog
-      .getByLabel("Campaign name", { exact: true })
+      .getByRole("textbox", { name: "Campaign name", exact: true })
       .scrollIntoViewIfNeeded();
     await record(filenames[0]);
   });
@@ -938,17 +950,19 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
     await dialog.getByRole("button", { name: "Suggest from offering" }).click();
     await expect(dialog.getByText(/Draft targeting hypotheses/)).toBeVisible();
     await dialog
-      .getByLabel("Buyer roles", { exact: false })
+      .getByRole("textbox", { name: /^Buyer roles\b/ })
       .fill("Head of Sales, Revenue Operations");
-    await dialog.getByLabel("Company size", { exact: false }).fill("11–50");
     await dialog
-      .getByLabel("Geographies", { exact: false })
+      .getByRole("textbox", { name: /^Company size\b/ })
+      .fill("11–50");
+    await dialog
+      .getByRole("textbox", { name: /^Geographies\b/ })
       .fill("United States");
     await dialog
-      .getByLabel("Exclusions", { exact: false })
+      .getByRole("textbox", { name: /^Exclusions\b/ })
       .fill("Consumer apps");
     await dialog
-      .getByLabel("Maximum companies to find", { exact: false })
+      .getByRole("spinbutton", { name: /^Maximum companies to find\b/ })
       .fill("5");
     await dialog
       .getByText("EDITABLE TARGET BRIEF", { exact: true })
@@ -1104,10 +1118,13 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
     unavailable.workspace.name = "TEST DATA Northstar";
     const unavailableDialog = await openCampaign(page, false);
     await unavailableDialog
-      .getByLabel("Campaign name", { exact: true })
+      .getByRole("textbox", { name: "Campaign name", exact: true })
       .fill("TEST DATA provider setup required");
     await unavailableDialog
-      .getByLabel("What does your offering help customers do?")
+      .getByRole("textbox", {
+        name: "What does your offering help customers do?",
+        exact: true,
+      })
       .fill("TEST DATA: We help B2B SaaS sales teams improve their pipeline.");
     await unavailableDialog
       .getByRole("button", { name: "Suggest from offering" })
