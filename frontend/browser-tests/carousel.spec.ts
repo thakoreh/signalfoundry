@@ -4,6 +4,7 @@ import {
   openCarousel,
   expectActive,
   swipeCarousel,
+  activateCenteredDecision,
 } from "./carousel-helpers";
 
 test("autoplay runs only in view and pauses on hover and offscreen", async ({
@@ -170,14 +171,31 @@ test("slides interpolate horizontally, inactive content is inert, and real swipe
     "false",
   );
   const decision = page.locator(".sf-demo-shortlist");
-  if (info.project.use.isMobile) await decision.tap();
-  else await decision.click();
+  await activateCenteredDecision(
+    page,
+    decision,
+    Boolean(info.project.use.isMobile),
+  );
   await expect(decision).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Next research step" }).click();
   await expectActive(page, 0);
   await page.getByRole("button", { name: "Previous research step" }).click();
   await expectActive(page, 3);
   await expect(decision).toHaveAttribute("aria-pressed", "true");
+  // Three swipe-to-decision cycles must work; a successful retry is insufficient.
+  for (const pressed of [false, true]) {
+    await swipeCarousel(page, "left", Boolean(info.project.use.isMobile));
+    await expectActive(page, 0);
+    await swipeCarousel(page, "right", Boolean(info.project.use.isMobile));
+    await expectActive(page, 3);
+    await expect(decision).toHaveAttribute("aria-pressed", String(!pressed));
+    await activateCenteredDecision(
+      page,
+      decision,
+      Boolean(info.project.use.isMobile),
+    );
+    await expect(decision).toHaveAttribute("aria-pressed", String(pressed));
+  }
   await swipeCarousel(page, "left", Boolean(info.project.use.isMobile));
   await expectActive(page, 0);
 });

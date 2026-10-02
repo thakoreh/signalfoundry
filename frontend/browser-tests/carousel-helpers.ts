@@ -1,4 +1,9 @@
-import { expect, test as base, type Page } from "@playwright/test";
+import {
+  expect,
+  test as base,
+  type Page,
+  type Locator,
+} from "@playwright/test";
 
 export const test = base.extend<{ carouselHealth: void }>({
   carouselHealth: [
@@ -49,11 +54,80 @@ export async function expectActive(page: Page, index: number) {
   ).toHaveCount(3);
 }
 
+export async function waitForCarouselSettled(page: Page) {
+  await expect
+    .poll(
+      async () =>
+        page.locator(".sf-demo-track").evaluate((element) => {
+          const active = Number(
+            element.closest(".sf-demo")!.getAttribute("data-active-step"),
+          );
+          const x = new DOMMatrixReadOnly(getComputedStyle(element).transform)
+            .m41;
+          const atEndpoint =
+            Math.abs(x + active * element.getBoundingClientRect().width) <= 1;
+          const moving = element
+            .getAnimations({ subtree: true })
+            .some(
+              (animation) =>
+                animation.pending || animation.playState === "running",
+            );
+          return atEndpoint && !moving;
+        }),
+      {
+        message:
+          "Carousel must reach its active slide and finish entrance animations before the next gesture",
+      },
+    )
+    .toBe(true);
+}
+
+export async function activateCenteredDecision(
+  page: Page,
+  decision: Locator,
+  touch: boolean,
+) {
+  await waitForCarouselSettled(page);
+  await decision.evaluate((element) =>
+    element.scrollIntoView({
+      block: "center",
+      inline: "nearest",
+      behavior: "instant",
+    }),
+  );
+  await expect(decision).toBeInViewport({ ratio: 1 });
+  const geometry = await decision.evaluate((element) => {
+    const box = element.getBoundingClientRect();
+    const x = box.x + box.width / 2;
+    const y = box.y + box.height / 2;
+    const hit = document.elementFromPoint(x, y);
+    return {
+      width: box.width,
+      height: box.height,
+      y,
+      screenHeight: window.innerHeight,
+      hit: hit === element || Boolean(hit && element.contains(hit)),
+    };
+  });
+  expect(
+    Math.abs(geometry.y - geometry.screenHeight / 2),
+    "Decision target should be centered, not touching a viewport edge",
+  ).toBeLessThanOrEqual(2);
+  expect(
+    geometry.hit,
+    "The visible decision button must receive the touch",
+  ).toBe(true);
+  const position = { x: geometry.width / 2, y: geometry.height / 2 };
+  if (touch) await decision.tap({ position });
+  else await decision.click({ position });
+}
+
 export async function swipeCarousel(
   page: Page,
   direction: "left" | "right",
   touch: boolean,
 ) {
+  await waitForCarouselSettled(page);
   const viewport = page.locator(".sf-demo-viewport");
   await viewport.scrollIntoViewIfNeeded();
   const box = (await viewport.boundingBox())!;
