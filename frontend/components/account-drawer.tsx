@@ -290,7 +290,7 @@ export function AccountDrawer({
       <div className="account-action-row">
         <button
           className={`btn ${account.status === "shortlisted" ? "shortlisted" : "primary"}`}
-          disabled={busy}
+          disabled={busy || account.suppress_workspace}
           onClick={() =>
             onStatusChange(
               account.status === "shortlisted" ? "new" : "shortlisted",
@@ -322,16 +322,32 @@ export function AccountDrawer({
           }}
         >
           {account.status === "dismissed"
-            ? "Restore account"
+            ? account.suppress_workspace
+              ? "Restore & allow future searches"
+              : "Restore account"
             : "Pass on this company"}
         </button>
         {account.status === "shortlisted" && (
           <button
             className="btn secondary"
-            disabled={busy}
+            disabled={busy || account.suppress_workspace}
             onClick={() => void onStatusChange("new")}
           >
             Needs research
+          </button>
+        )}
+        {account.suppress_workspace && account.status !== "dismissed" && (
+          <button
+            className="btn secondary"
+            disabled={busy}
+            onClick={() =>
+              void onStatusChange(account.status, {
+                reason: null,
+                suppress_workspace: false,
+              })
+            }
+          >
+            Allow future searches
           </button>
         )}
       </div>

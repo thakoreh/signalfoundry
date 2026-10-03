@@ -210,7 +210,7 @@ class Repository:
                               campaign_id=excluded.campaign_id,account_id=excluded.account_id,
                               reason=excluded.reason,updated_at=excluded.updated_at''',
                            (self.tenant_id, domain, account.campaign_id, account.id, update.reason, timestamp))
-            elif suppress_workspace is False or (update.status != 'dismissed' and not update.preserve_workspace_suppression):
+            elif suppress_workspace is False:
                 db.execute('DELETE FROM workspace_suppressions WHERE tenant_id=? AND domain=?',
                            (self.tenant_id, domain))
             account = self._reviewed_account(db, account)

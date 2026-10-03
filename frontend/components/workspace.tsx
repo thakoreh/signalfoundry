@@ -390,9 +390,6 @@ export default function Workspace({
         body: jsonBody({
           status: next,
           ...feedback,
-          ...(next !== "dismissed" && !feedback.preserve_workspace_suppression
-            ? { reason: null, suppress_workspace: false }
-            : {}),
         }),
       });
       if (request === detailRequest.current)
@@ -415,7 +412,7 @@ export default function Workspace({
     }
   }
   async function toggleShortlist(account: Account) {
-    if (statusLock.current) return;
+    if (statusLock.current || account.suppress_workspace) return;
     statusLock.current = true;
     setStatusBusy(true);
     setError("");
@@ -1254,7 +1251,9 @@ export default function Workspace({
                                           : "Add to shortlist"
                                       }
                                       aria-label={`${a.status === "shortlisted" ? "Remove" : "Add"} ${a.name} ${a.status === "shortlisted" ? "from" : "to"} shortlist`}
-                                      disabled={statusBusy}
+                                      disabled={
+                                        statusBusy || a.suppress_workspace
+                                      }
                                       onClick={() => toggleShortlist(a)}
                                     >
                                       <Icon name="bookmark" size={18} />

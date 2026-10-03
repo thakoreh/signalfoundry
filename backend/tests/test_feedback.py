@@ -77,8 +77,10 @@ class FeedbackTest(unittest.TestCase):
         self.assertIsNone(foreign.set_account_status(self.account.id, 'dismissed', suppress_workspace=True))
         foreign.restore_workspace_domain(self.account.domain)
         self.assertTrue(self.repo.is_workspace_suppressed(self.account.domain))
-        # Legacy status-only restore must clear suppression, too.
-        restored = self.review(status='new').json()
+        # Review status is separate from workspace scope: only explicit restore clears it.
+        kept_scope = self.review(status='new').json()
+        self.assertTrue(kept_scope['suppress_workspace'])
+        restored = self.review(status='new', suppress_workspace=False).json()
         self.assertFalse(restored['suppress_workspace'])
         self.assertIsNone(restored['review_reason'])
         self.repo.save_research(second.id, demo_accounts(DEMO_PROFILE, second.id), [])
@@ -155,6 +157,31 @@ class FeedbackTest(unittest.TestCase):
         self.client.post(f'/api/campaigns/{campaign.id}/research', json={})
         self.assertEqual(self.repo.account(account.id).researched_at, before)
         self.assertTrue(self.repo.account(account.id).suppress_workspace)
+
+    def test_status_only_changes_and_undo_preserve_another_campaign_exclusion(self):
+        second = self.repo.create_campaign('Existing second campaign', 'demo', [])
+        self.repo.save_research(second.id, demo_accounts(DEMO_PROFILE, second.id), [])
+        other = next(a for a in self.repo.accounts(second.id) if a.domain == self.account.domain)
+        self.repo.set_account_status(self.account.id, 'dismissed', suppress_workspace=True)
+        for status in ['new', 'shortlisted', 'dismissed', 'new']:
+            response = self.client.patch(f'/api/accounts/{other.id}', json={'status': status})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()['status'], status)
+            self.assertTrue(response.json()['suppress_workspace'])
+            self.assertTrue(self.repo.is_workspace_suppressed(other.domain))
+        foreign = Repository(self.path, 'foreign-tenant')
+        foreign.save_profile(DEMO_PROFILE)
+        third = foreign.create_campaign('Foreign campaign', 'demo', [])
+        foreign.save_research(third.id, demo_accounts(DEMO_PROFILE, third.id), [])
+        foreign_account = next(a for a in foreign.accounts(third.id) if a.domain == other.domain)
+        self.assertFalse(foreign.set_account_status(foreign_account.id, 'shortlisted', suppress_workspace=False).suppress_workspace)
+        self.assertTrue(self.repo.is_workspace_suppressed(other.domain))
+        restored = self.client.patch(f'/api/accounts/{other.id}', json={'status': 'shortlisted', 'suppress_workspace': False})
+        self.assertEqual(restored.status_code, 200)
+        self.assertFalse(restored.json()['suppress_workspace'])
+        self.assertFalse(self.repo.is_workspace_suppressed(other.domain))
+        # Status changes cannot create scope either, after an explicit restoration.
+        self.assertFalse(self.client.patch(f'/api/accounts/{other.id}', json={'status': 'new'}).json()['suppress_workspace'])
 
     def test_undo_can_preserve_an_existing_workspace_suppression_without_creating_one(self):
         second = self.repo.create_campaign('Pre-existing campaign', 'demo', [])

@@ -50,12 +50,14 @@ Responses include `review_reason`, an ISO UTC `reviewed_at`, and the current
 A Pass is saved for that campaign and exact company domain. It does not exclude
 an industry, geography, or similar companies. Only explicit
 `suppress_workspace: true` prevents that domain from appearing as a new result
-in another campaign in the same workspace. `new`/`shortlisted`, or explicit
-`suppress_workspace: false`, removes workspace suppression. The current reviewed
-row remains available for Undo. Narrow Undo intent can send
-`preserve_workspace_suppression: true` with a non-dismissed status and no reason
-or `suppress_workspace` field: this retains an already-existing global exclusion,
-but never creates one. Ordinary Keep/Restore behavior still clears suppression.
+in another campaign in the same workspace. Ordinary status changes, including
+`new`/`shortlisted` and legacy status-only requests, preserve existing workspace
+suppression. Only explicit `suppress_workspace: false` or the named restoration
+endpoint removes it. Responses reflect the current workspace scope even when the
+review status is `new` or `shortlisted`. The current reviewed row remains available
+for Undo. The compatibility intent `preserve_workspace_suppression: true` remains
+valid with a non-dismissed status, no reason, and no `suppress_workspace` field;
+it never creates an exclusion or authorizes a contradictory scope change.
 Domain matching normalizes case, `www.`, and a
 trailing dot; it never uses a subdomain wildcard.
 

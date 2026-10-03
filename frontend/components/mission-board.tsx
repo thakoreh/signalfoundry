@@ -124,7 +124,7 @@ export function MissionBoard({
           </div>
           <div className="mission-review-count">
             <strong>{unknown.length}</strong>
-            <span>with criteria still unknown</span>
+            <span>waiting with criteria unknown</span>
           </div>
           <div className="mission-review-count">
             <strong>{kept.length}</strong>

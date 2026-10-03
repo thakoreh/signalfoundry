@@ -159,7 +159,7 @@ describe("persistent, scoped review feedback", () => {
     );
   });
 
-  it("requires explicit workspace scope, isolates tenants, and reverses suppression via legacy Keep", async () => {
+  it("requires explicit workspace scope, isolates tenants, and only explicit restore clears suppression", async () => {
     const { admin, stranger, research } = await setup();
     const {
       campaignId,
@@ -193,9 +193,15 @@ describe("persistent, scoped review feedback", () => {
       (await admin.query(api.accounts.get, { id: account.id }))
         .suppress_workspace,
     ).toBe(true);
+    const keptScope = await admin.mutation(api.accounts.setStatus, {
+      id: account.id,
+      status: "shortlisted",
+    });
+    expect(keptScope.suppress_workspace).toBe(true);
     const restored = await admin.mutation(api.accounts.setStatus, {
       id: account.id,
       status: "shortlisted",
+      suppress_workspace: false,
     });
     expect(restored).toMatchObject({
       status: "shortlisted",
@@ -501,6 +507,60 @@ describe("persistent, scoped review feedback", () => {
     const draft = await admin.query(api.accounts.draft, { id: account.id });
     expect(draft).toHaveProperty("body");
     expect(draft.body).toContain(DEMO_PROFILE.company_name);
+  });
+
+  it("status-only changes and Undo cannot clear another campaign's workspace exclusion", async () => {
+    const { admin, stranger, research } = await setup();
+    const {
+      accounts: [first],
+    } = await research();
+    const {
+      accounts: [second],
+    } = await research();
+    await admin.mutation(api.accounts.setStatus, {
+      id: first.id,
+      status: "dismissed",
+      suppress_workspace: true,
+    });
+    for (const status of ["new", "shortlisted", "dismissed", "new"] as const) {
+      const changed = await admin.mutation(api.accounts.setStatus, {
+        id: second.id,
+        status,
+      });
+      expect(changed).toMatchObject({ status, suppress_workspace: true });
+      expect(
+        (await admin.query(api.accounts.get, { id: first.id }))
+          .suppress_workspace,
+      ).toBe(true);
+    }
+    const {
+      accounts: [foreign],
+    } = await research(stranger);
+    const otherTenant = await stranger.mutation(api.accounts.setStatus, {
+      id: foreign.id,
+      status: "shortlisted",
+      suppress_workspace: false,
+    });
+    expect(otherTenant.suppress_workspace).toBe(false);
+    expect(
+      (await admin.query(api.accounts.get, { id: first.id }))
+        .suppress_workspace,
+    ).toBe(true);
+    const restored = await admin.mutation(api.accounts.setStatus, {
+      id: second.id,
+      status: "shortlisted",
+      suppress_workspace: false,
+    });
+    expect(restored.suppress_workspace).toBe(false);
+    expect(
+      (await admin.query(api.accounts.get, { id: first.id }))
+        .suppress_workspace,
+    ).toBe(false);
+    const absent = await admin.mutation(api.accounts.setStatus, {
+      id: second.id,
+      status: "new",
+    });
+    expect(absent.suppress_workspace).toBe(false);
   });
 
   it("Undo preserves pre-existing workspace suppression without granting permission to create it", async () => {

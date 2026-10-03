@@ -321,9 +321,10 @@ async function mockWorkspace(page: Page, options: Options = {}) {
       target.status = feedback.status;
       target.review_reason = feedback.reason ?? null;
       target.reviewed_at = NOW;
-      target.suppress_workspace = feedback.preserve_workspace_suppression
-        ? target.suppress_workspace
-        : Boolean(feedback.suppress_workspace);
+      target.suppress_workspace =
+        feedback.suppress_workspace === undefined
+          ? target.suppress_workspace
+          : Boolean(feedback.suppress_workspace);
       state.suppressions = state.suppressions.filter(
         (item) => item.domain !== target.domain,
       );
@@ -1517,6 +1518,12 @@ test("an existing workspace exclusion stays selected when another campaign recor
     page.getByRole("button", { name: "Review next company" }),
   ).toHaveCount(0);
   await expect(
+    page.getByRole("button", {
+      name: `Add ${account.name} to shortlist`,
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await expect(
     page.getByRole("region", { name: "Customer mission overview" }),
   ).toContainText("Your exclusions are respected");
   await page
@@ -1525,6 +1532,9 @@ test("an existing workspace exclusion stays selected when another campaign recor
   const drawer = page.getByRole("dialog", {
     name: "TEST DATA Research Co account details",
   });
+  await expect(
+    drawer.getByRole("button", { name: "Add to shortlist", exact: true }),
+  ).toBeDisabled();
   await drawer.getByRole("button", { name: "Pass on this company" }).click();
   await expect(
     drawer.getByRole("checkbox", { name: /Also suppress this domain/ }),
@@ -1547,6 +1557,14 @@ test("an existing workspace exclusion stays selected when another campaign recor
     drawer.getByRole("button", { name: "Generate outreach draft" }),
   ).toBeDisabled();
   await capture(page, testInfo, "suppressed-history-not-actionable");
+  await drawer
+    .getByRole("button", { name: "Allow future searches", exact: true })
+    .click();
+  await expect(
+    drawer.getByRole("button", { name: "Add to shortlist", exact: true }),
+  ).toBeEnabled();
+  expect(state.accounts[0].suppress_workspace).toBe(false);
+  expect(state.suppressions).toEqual([]);
   expect(state.unknown).toEqual([]);
 });
 
@@ -1612,5 +1630,56 @@ test("audience cards are keyboard operable and respect reduced motion", async ({
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
   expect(state.creates).toHaveLength(0);
+  expect(state.unknown).toEqual([]);
+});
+
+test("suppressed kept history requires explicit restoration before review status changes", async ({
+  page,
+}, testInfo) => {
+  const { campaign, account } = missionFixture();
+  account.status = "shortlisted";
+  account.suppress_workspace = true;
+  const state = await mockWorkspace(page, {
+    campaigns: [campaign],
+    accounts: [account],
+  });
+  state.suppressions.push({
+    domain: account.domain,
+    reason: "competitor",
+    updated_at: NOW,
+  });
+  await page.goto("/workspace");
+  await expect(
+    page.getByRole("button", {
+      name: `Remove ${account.name} from shortlist`,
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: `View ${account.name} details`, exact: true })
+    .click();
+  const drawer = page.getByRole("dialog", {
+    name: `${account.name} account details`,
+  });
+  await expect(
+    drawer.getByRole("button", { name: "Shortlisted", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    drawer.getByRole("button", { name: "Needs research", exact: true }),
+  ).toBeDisabled();
+  await capture(page, testInfo, "suppressed-shortlist-controls");
+  await drawer
+    .getByRole("button", { name: "Allow future searches", exact: true })
+    .click();
+  await expect(
+    drawer.getByRole("button", { name: "Shortlisted", exact: true }),
+  ).toBeEnabled();
+  await expect(
+    drawer.getByRole("button", { name: "Needs research", exact: true }),
+  ).toBeEnabled();
+  expect(state.accounts[0].status).toBe("shortlisted");
+  expect(state.accounts[0].suppress_workspace).toBe(false);
+  expect(state.suppressions).toEqual([]);
+  await capture(page, testInfo, "explicit-restoration-keeps-review-state");
   expect(state.unknown).toEqual([]);
 });

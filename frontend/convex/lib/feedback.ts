@@ -149,10 +149,7 @@ export async function saveReviewFeedback(
     };
     if (suppression) await ctx.db.patch(suppression._id, data);
     else await ctx.db.insert("workspaceSuppressions", data);
-  } else if (
-    update.suppress_workspace === false ||
-    (update.status !== "dismissed" && !update.preserve_workspace_suppression)
-  ) {
+  } else if (update.suppress_workspace === false) {
     if (suppression) await ctx.db.delete(suppression._id);
   }
   return {
