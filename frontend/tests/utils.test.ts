@@ -56,9 +56,9 @@ test("missing publication dates remain unknown", () => {
   assert.equal(formatDate("bad"), "Date unknown");
 });
 test("score labels match filter thresholds", () => {
-  assert.equal(scoreLabel(65), "Strong fit");
-  assert.equal(scoreLabel(50), "Potential fit");
-  assert.equal(scoreLabel(20), "Explore fit");
+  assert.equal(scoreLabel(65), "More language matches");
+  assert.equal(scoreLabel(50), "Some language matches");
+  assert.equal(scoreLabel(20), "Needs research");
 });
 
 test("no-signal placeholder text never counts as evidence", () => {
@@ -85,7 +85,7 @@ test("decision engine labels are neutral, truthful, and flag fallback mixing", (
   );
   assert.equal(
     decisionEngineLabel([{ decision_engine: "rules" }]),
-    "Rules-based intelligence",
+    "Transparent rules",
   );
   assert.equal(
     decisionEngineLabel([

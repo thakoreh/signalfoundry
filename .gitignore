@@ -25,3 +25,7 @@ deploy/secrets/
 coverage/
 test-results/
 playwright-report/
+
+# Explicit real-business walkthrough artifacts
+frontend/real-test-results/
+frontend/real-playwright-report/

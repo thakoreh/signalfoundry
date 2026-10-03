@@ -4,7 +4,8 @@ Production SaaS uses only the stateless `app.worker:app` service; Clerk handles
 identity, Convex owns all tenant data, and Stripe handles billing. Worker contract,
 authentication, deployment boundaries, and verification are documented in
 [`deploy/worker.README.md`](../deploy/worker.README.md). The worker neither imports
-nor exposes the SQLite demo below.
+nor exposes the SQLite demo below. Discovery stage contracts, fail-closed commercial
+configuration, spend accounting, and verification limits are in [DISCOVERY.md](DISCOVERY.md).
 
 ## Isolated local-demo API
 
@@ -36,6 +37,58 @@ OpenAPI: http://127.0.0.1:8000/docs. The frontend proxies `/api/*` to this API.
 - Preserve previous records on failed fetches and retain previous failed-domain results during partial re-runs
 
 Existing account scores are snapshots. Editing the ICP does not silently rescore them; re-run a campaign to update its scores. A failed refresh may still have retained accounts: the response status refers to the latest run and its errors explain the failures. Research is a bounded synchronous operation; one run at a time, with 409 on overlapping requests. No job queue or background worker is claimed.
+
+## Review feedback and suppression
+
+`PATCH /api/accounts/{id}` accepts `status` (`new`, `shortlisted`, or `dismissed`),
+an optional `reason` (`wrong_industry`, `wrong_geography`, `wrong_size`,
+`existing_customer`, `competitor`, `not_relevant`, or `other`), and optional
+`suppress_workspace`. Reasons and `suppress_workspace: true` require `dismissed`.
+Responses include `review_reason`, an ISO UTC `reviewed_at`, and the current
+`suppress_workspace` state. A status-only legacy request remains supported.
+
+A Pass is saved for that campaign and exact company domain. It does not exclude
+an industry, geography, or similar companies. Only explicit
+`suppress_workspace: true` prevents that domain from appearing as a new result
+in another campaign in the same workspace. Ordinary status changes, including
+`new`/`shortlisted` and legacy status-only requests, preserve existing workspace
+suppression. Only explicit `suppress_workspace: false` or the named restoration
+endpoint removes it. Responses reflect the current workspace scope even when the
+review status is `new` or `shortlisted`. The current reviewed row remains available
+for Undo. The compatibility intent `preserve_workspace_suppression: true` remains
+valid with a non-dismissed status, no reason, and no `suppress_workspace` field;
+it never creates an exclusion or authorizes a contradictory scope change.
+Domain matching normalizes case, `www.`, and a
+trailing dot; it never uses a subdomain wildcard.
+
+The latest user decision is stored independently of account rows so it survives
+reruns and account-row replacement. The metadata stores tenant, campaign, account,
+domain, decision, reason, and timestamp only, without copying licensed company,
+contact, or evidence payloads or extending their retention deadlines. In SaaS,
+Clerk organization context supplies the tenant; the local demo still uses a fixed
+server-controlled tenant.
+
+Suppression can be reversed even after its original account row expires or is
+removed. The local API exposes bounded, keyset-paginated
+`GET /api/workspace/suppressions?limit=50&after=...` and
+`POST /api/workspace/suppressions/restore {"domain":"company.com"}`. SaaS exposes
+`accounts.suppressions` with Convex pagination and `accounts.restoreSuppression`.
+These recovery paths always use the current tenant and do not restore expired
+licensed data. Restoring the workspace domain does not erase a campaign's Pass.
+
+Reviewed Passes and workspace-suppressed domains are filtered before manual
+website fetch/decision calls and before discovery candidate website fetches or
+PDL enrichment. Historical dismissed rows are not automatically refreshed. The
+server derives a bounded exclusion snapshot (at most 100 exact domains) for worker
+requests; overflow stops dispatch rather than truncating exclusions. Discovery
+rechecks current tenant feedback after readiness and before every paid stage,
+and persistence rechecks again to discard late in-flight refreshes. An already
+issued external call cannot be recalled. The generic Exa company search still
+incurs its approved query cost even if all returned candidates are excluded;
+Exa's company category does not support `excludeDomains`.
+
+Outreach draft endpoints also check current workspace suppression, independently
+of cached account flags, and require restoration before generating a draft.
 
 ## Truthfulness and scope
 

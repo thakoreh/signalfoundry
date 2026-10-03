@@ -8,8 +8,10 @@ import type {
   Health,
   WorkspaceData,
   ResearchJob,
+  DiscoveryStatus,
+  ReviewFeedback,
 } from "@/lib/types";
-import { errorMessage, jsonBody } from "@/lib/api";
+import { discoveryReady, errorMessage, jsonBody } from "@/lib/api";
 import {
   filterAccounts,
   formatDate,
@@ -25,8 +27,11 @@ import { Icon } from "./icons";
 import { useWorkspaceSession } from "./workspace-session";
 import { Dialog } from "./dialog";
 import { ProfileEditor } from "./profile-editor";
+import { DiscoveryReadiness, TargetBrief } from "./discovery-readiness";
 import { CampaignDialog } from "./campaign-dialog";
 import { AccountDrawer } from "./account-drawer";
+import { SuppressionPanel } from "./suppression-panel";
+import { MissionBoard } from "./mission-board";
 import { BillingPanel } from "./billing-panel";
 import { activeJob } from "@/lib/jobs";
 
@@ -40,6 +45,9 @@ export default function Workspace({
 }) {
   const { api, request, mode: appMode, isAdmin } = useWorkspaceSession();
   const isSaas = appMode === "saas";
+  const [discoveryStatus, setDiscoveryStatus] =
+    useState<DiscoveryStatus | null>(null);
+  const [discoveryChecking, setDiscoveryChecking] = useState(true);
   const [job, setJob] = useState<ResearchJob | null>(null);
   const [jobRevision, setJobRevision] = useState(0);
   const [jobError, setJobError] = useState("");
@@ -65,12 +73,14 @@ export default function Workspace({
   const [website, setWebsite] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [researchBusy, setResearchBusy] = useState(false);
+  const researchLock = useRef(false);
   const [exportBusy, setExportBusy] = useState(false);
   const [newCampaign, setNewCampaign] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
+  const statusLock = useRef(false);
   const [statusError, setStatusError] = useState("");
   const detailRequest = useRef(0);
   const activeCampaignRef = useRef(selectedId);
@@ -194,6 +204,20 @@ export default function Workspace({
       clearTimeout(timer);
     };
   }, [api, isSaas, selectedId, jobRevision]);
+  useEffect(() => {
+    const controller = new AbortController();
+    api<DiscoveryStatus>("/discovery/status", { signal: controller.signal })
+      .then((result) => {
+        if (!controller.signal.aborted) setDiscoveryStatus(result);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setDiscoveryStatus(null);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setDiscoveryChecking(false);
+      });
+    return () => controller.abort();
+  }, [api]);
   async function cancelResearch() {
     if (!job || cancelBusy) return;
     setCancelBusy(true);
@@ -239,8 +263,9 @@ export default function Workspace({
       ),
     [accounts, query, status, fit, sort, view],
   );
-  const shortlisted = accounts.filter((a) => a.status === "shortlisted").length;
-  const sources = accounts.reduce((total, a) => total + a.evidence.length, 0);
+  const shortlisted = accounts.filter(
+    (a) => a.status === "shortlisted" && !a.suppress_workspace,
+  ).length;
   function navigate(next: View) {
     setView(next);
     setMobileOpen(false);
@@ -285,15 +310,24 @@ export default function Workspace({
     navigate("accounts");
     setJobRevision((revision) => revision + 1);
     setToast(
-      c.status === "complete"
-        ? "Research complete. Your accounts are ready."
-        : c.status === "partial"
-          ? "Research finished with some gaps. Review the campaign notes."
-          : "Campaign created. Review the research status.",
+      c.status === "draft"
+        ? "Campaign draft saved. No research has started."
+        : c.status === "complete"
+          ? "Research complete. Your accounts are ready."
+          : c.status === "partial"
+            ? "Research finished with some gaps. Review the campaign notes."
+            : "Campaign created. Review the research status.",
     );
   }
   async function research() {
-    if (!campaign || researchBusy || activeJob(job)) return;
+    if (
+      !campaign ||
+      researchLock.current ||
+      activeJob(job) ||
+      (campaign.mode === "discovery" && !discoveryReady(discoveryStatus))
+    )
+      return;
+    researchLock.current = true;
     setResearchBusy(true);
     setError("");
     const id = campaign.id;
@@ -326,6 +360,7 @@ export default function Workspace({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      researchLock.current = false;
       setResearchBusy(false);
     }
   }
@@ -340,15 +375,22 @@ export default function Workspace({
       if (request === detailRequest.current) setStatusError(errorMessage(e));
     }
   }
-  async function changeStatus(next: AccountStatus) {
-    if (!selectedAccount) return;
+  async function changeStatus(
+    next: AccountStatus,
+    feedback: ReviewFeedback = {},
+  ) {
+    if (!selectedAccount || statusLock.current) return false;
+    statusLock.current = true;
     const request = ++detailRequest.current;
     setStatusBusy(true);
     setStatusError("");
     try {
       const a = await api<Account>(`/accounts/${selectedAccount.id}`, {
         method: "PATCH",
-        body: jsonBody({ status: next }),
+        body: jsonBody({
+          status: next,
+          ...feedback,
+        }),
       });
       if (request === detailRequest.current)
         setSelectedAccount((current) => replaceSelectedAccount(current, a));
@@ -357,16 +399,21 @@ export default function Workspace({
         next === "shortlisted"
           ? "Account added to your shortlist"
           : next === "dismissed"
-            ? "Account dismissed"
+            ? "Passed. This domain stays dismissed on the next campaign run."
             : "Account restored",
       );
+      return true;
     } catch (e) {
       if (request === detailRequest.current) setStatusError(errorMessage(e));
+      return false;
     } finally {
+      statusLock.current = false;
       setStatusBusy(false);
     }
   }
   async function toggleShortlist(account: Account) {
+    if (statusLock.current || account.suppress_workspace) return;
+    statusLock.current = true;
     setStatusBusy(true);
     setError("");
     try {
@@ -385,6 +432,7 @@ export default function Workspace({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      statusLock.current = false;
       setStatusBusy(false);
     }
   }
@@ -513,7 +561,7 @@ export default function Workspace({
             <span className="nav-label">RECENT CAMPAIGNS</span>
             <button
               className="plain-icon"
-              disabled={!workspace?.profile}
+              disabled={!workspace}
               title="New campaign"
               aria-label="New campaign"
               onClick={() => setNewCampaign(true)}
@@ -684,7 +732,7 @@ export default function Workspace({
                         serve.
                       </p>
                     </div>
-                    {workspace.profile && (
+                    {workspace && (
                       <button
                         className="btn primary"
                         onClick={() => setNewCampaign(true)}
@@ -739,6 +787,7 @@ export default function Workspace({
                       setToast("Customer profile saved");
                     }}
                   />
+                  <SuppressionPanel />
                 </>
               ) : view === "campaigns" ? (
                 <>
@@ -755,11 +804,7 @@ export default function Workspace({
                     </div>
                     <button
                       className="btn primary"
-                      onClick={() =>
-                        workspace.profile
-                          ? setNewCampaign(true)
-                          : navigate("profile")
-                      }
+                      onClick={() => setNewCampaign(true)}
                     >
                       <Icon name="plus" size={17} />
                       New campaign
@@ -775,10 +820,7 @@ export default function Workspace({
                         >
                           <div className="campaign-card-top">
                             <span className="campaign-card-icon">
-                              <Icon
-                                name="globe"
-                                size={24}
-                              />
+                              <Icon name="globe" size={24} />
                             </span>
                             <span
                               className={`tag ${c.status === "complete" ? "green" : c.status === "failed" ? "red" : ""}`}
@@ -786,14 +828,18 @@ export default function Workspace({
                               {c.status}
                             </span>
                           </div>
-                          <span className="eyebrow">PUBLIC WEBSITE RESEARCH</span>
+                          <span className="eyebrow">
+                            {c.mode === "discovery"
+                              ? "CUSTOMER DISCOVERY"
+                              : "MANUAL WEBSITE RESEARCH"}
+                          </span>
                           <h3>{c.name}</h3>
                           <div className="campaign-card-stats">
                             <span>
                               <strong>{c.account_count}</strong> accounts
                             </span>
                             <span>
-                              <strong>{c.qualified_count}</strong> qualified
+                              <strong>{c.qualified_count}</strong> higher-ranked
                             </span>
                           </div>
                           <div className="campaign-card-footer">
@@ -807,13 +853,7 @@ export default function Workspace({
                       ))}
                     </div>
                   ) : (
-                    <EmptyCampaign
-                      onCreate={() =>
-                        workspace.profile
-                          ? setNewCampaign(true)
-                          : navigate("profile")
-                      }
-                    />
+                    <EmptyCampaign onCreate={() => setNewCampaign(true)} />
                   )}
                 </>
               ) : campaign ? (
@@ -832,8 +872,8 @@ export default function Workspace({
                       </h1>
                       <p>
                         {view === "shortlist"
-                          ? "The accounts you’ve saved for a more thoughtful next step."
-                          : "Cut through the noise. Focus on the companies that fit, with the evidence to prove it."}
+                          ? "The accounts you’ve kept for a more thoughtful next step."
+                          : "Start with a focused audience. Review what the evidence supports, and keep the companies worth a closer look."}
                       </p>
                     </div>
                     <button
@@ -844,33 +884,44 @@ export default function Workspace({
                       New campaign
                     </button>
                   </div>
-                  <div className="stats-grid">
-                    <Stat
-                      icon="accounts"
-                      label="Accounts researched"
-                      value={campaign.account_count}
-                      detail="In this campaign"
-                    />
-                    <Stat
-                      icon="target"
-                      label="Qualified accounts"
-                      value={campaign.qualified_count}
-                      detail="Fit score of 65 or higher"
-                      green
-                    />
-                    <Stat
-                      icon="bookmark"
-                      label="Your shortlist"
-                      value={shortlisted}
-                      detail="Selected for the next step"
-                    />
-                    <Stat
-                      icon="file"
-                      label="Evidence collected"
-                      value={sources}
-                      detail="Public evidence records"
-                    />
-                  </div>
+                  <MissionBoard
+                    campaign={campaign}
+                    accounts={accounts}
+                    profile={campaign.profile_snapshot ?? workspace.profile}
+                    job={job}
+                    onReview={openAccount}
+                  />
+                  {campaign.profile_snapshot && (
+                    <details className="campaign-snapshot">
+                      <summary>Saved campaign target brief</summary>
+                      <TargetBrief
+                        profile={campaign.profile_snapshot}
+                        website={campaign.offering_website}
+                        targetCount={campaign.target_count}
+                        manual={campaign.mode === "manual"}
+                      />
+                    </details>
+                  )}
+                  {campaign.mode === "discovery" &&
+                    !activeJob(job) &&
+                    (accounts.length ? (
+                      <details className="campaign-snapshot capability-details">
+                        <summary>
+                          {discoveryReady(discoveryStatus)
+                            ? "Research capabilities and optional contact coverage"
+                            : "New discovery unavailable · review provider status"}
+                        </summary>
+                        <DiscoveryReadiness
+                          status={discoveryStatus}
+                          loading={discoveryChecking}
+                        />
+                      </details>
+                    ) : (
+                      <DiscoveryReadiness
+                        status={discoveryStatus}
+                        loading={discoveryChecking}
+                      />
+                    ))}
                   <section className="accounts-panel">
                     <div className="table-heading">
                       <div>
@@ -889,7 +940,12 @@ export default function Workspace({
                           <button
                             className="btn secondary small"
                             onClick={research}
-                            disabled={researchBusy || activeJob(job)}
+                            disabled={
+                              researchBusy ||
+                              activeJob(job) ||
+                              (campaign.mode === "discovery" &&
+                                !discoveryReady(discoveryStatus))
+                            }
                           >
                             {researchBusy ? (
                               <span className="spinner" />
@@ -900,7 +956,9 @@ export default function Workspace({
                               ? "Researching…"
                               : campaign.status === "complete"
                                 ? "Re-research"
-                                : "Run research"}
+                                : campaign.mode === "discovery"
+                                  ? "Find customers"
+                                  : "Run research"}
                           </button>
                         )}
                         <button
@@ -909,9 +967,12 @@ export default function Workspace({
                           disabled={
                             !accounts.length || exportBusy || accountLoading
                           }
+                          title="Includes every campaign status, including passed companies. Contact data is filtered by access and export permissions."
                         >
                           <Icon name="download" size={15} />
-                          {exportBusy ? "Exporting…" : "Export CSV"}
+                          {exportBusy
+                            ? "Exporting…"
+                            : "Export full campaign CSV"}
                         </button>
                       </div>
                     </div>
@@ -919,9 +980,16 @@ export default function Workspace({
                       <div className="job-status" aria-live="polite">
                         {job && (
                           <>
-                            <strong>Research {job.status}</strong>
+                            <strong>
+                              {job.stage
+                                ? `${job.stage === "discovery" ? "Finding companies" : job.stage === "contacts" ? "Finding buyers" : job.stage === "verification" ? "Checking emails" : "Discovery"}: `
+                                : "Research "}
+                              {job.status}
+                            </strong>
                             <span>
-                              Attempt {job.attempt} of {job.max_attempts}
+                              {campaign.mode === "discovery"
+                                ? `Step ${job.attempt} · bounded by the approved budget`
+                                : `Attempt ${job.attempt} of ${job.max_attempts}`}
                             </span>
                             {activeJob(job) && (
                               <>
@@ -1015,7 +1083,7 @@ export default function Workspace({
                             onChange={(e) => setFit(e.target.value)}
                           >
                             <option value="all">All fit scores</option>
-                            <option value="high">Strong fit · 65+</option>
+                            <option value="high">More matches · 65+</option>
                             <option value="other">Below 65</option>
                           </select>
                           <Icon name="down" size={13} />
@@ -1026,7 +1094,7 @@ export default function Workspace({
                             value={sort}
                             onChange={(e) => setSort(e.target.value)}
                           >
-                            <option value="score">Best fit first</option>
+                            <option value="score">Highest match score</option>
                             <option value="score-low">Lowest fit first</option>
                             <option value="name">Company A–Z</option>
                           </select>
@@ -1034,6 +1102,13 @@ export default function Workspace({
                         </label>
                       </div>
                     </div>
+                    {!accountLoading && filtered.length > 0 && (
+                      <p className="mobile-table-cue">
+                        <Icon name="arrow" size={13} />
+                        Swipe for match score, evidence and status. Tap a
+                        company to review.
+                      </p>
+                    )}
                     {accountLoading ? (
                       <div className="table-loading" role="status">
                         <span className="spinner" />
@@ -1047,7 +1122,7 @@ export default function Workspace({
                               <th scope="col">Company</th>
                               <th scope="col">Profile</th>
                               <th scope="col">
-                                Fit score <Icon name="down" size={11} />
+                                Match score <Icon name="down" size={11} />
                               </th>
                               <th scope="col">Evidence</th>
                               <th scope="col">Status</th>
@@ -1078,8 +1153,10 @@ export default function Workspace({
                                     </span>
                                     <span>
                                       <strong>{a.name}</strong>
-                                      <span>
-                                        {a.domain}
+                                      <span>{a.domain}</span>
+                                      <span className="mobile-review-link">
+                                        Review company{" "}
+                                        <Icon name="arrow" size={11} />
                                       </span>
                                     </span>
                                   </button>
@@ -1126,7 +1203,10 @@ export default function Workspace({
                                   >
                                     <span>
                                       <Icon name="file" size={13} />
-                                      {sourceCount(a.evidence)} sources
+                                      {sourceCount(a.evidence)}{" "}
+                                      {sourceCount(a.evidence) === 1
+                                        ? "source"
+                                        : "sources"}
                                     </span>
                                     <span
                                       className={
@@ -1152,11 +1232,13 @@ export default function Workspace({
                                 <td>
                                   <span className={`status-tag ${a.status}`}>
                                     <span />
-                                    {a.status === "new"
-                                      ? "To review"
-                                      : a.status === "shortlisted"
-                                        ? "Shortlisted"
-                                        : "Dismissed"}
+                                    {a.suppress_workspace
+                                      ? "Suppressed"
+                                      : a.status === "new"
+                                        ? "To review"
+                                        : a.status === "shortlisted"
+                                          ? "Shortlisted"
+                                          : "Dismissed"}
                                   </span>
                                 </td>
                                 <td>
@@ -1169,7 +1251,9 @@ export default function Workspace({
                                           : "Add to shortlist"
                                       }
                                       aria-label={`${a.status === "shortlisted" ? "Remove" : "Add"} ${a.name} ${a.status === "shortlisted" ? "from" : "to"} shortlist`}
-                                      disabled={statusBusy}
+                                      disabled={
+                                        statusBusy || a.suppress_workspace
+                                      }
                                       onClick={() => toggleShortlist(a)}
                                     >
                                       <Icon name="bookmark" size={18} />
@@ -1228,10 +1312,9 @@ export default function Workspace({
                         <strong>{accounts.length}</strong> accounts
                       </span>
                       <span>
-                        <Icon name="shield" size={13} />{" "}
-                        Evidence-led research
-                        <span className="footer-divider">·</span>Contacts are
-                        not enriched
+                        <Icon name="shield" size={13} /> Evidence-led research
+                        <span className="footer-divider">·</span>Review contact
+                        verification before outreach
                       </span>
                     </div>
                   </section>
@@ -1241,8 +1324,8 @@ export default function Workspace({
                     </span>
                     <div>
                       <strong>
-                        A good score starts a conversation. Evidence makes it
-                        relevant.
+                        A score helps you prioritize. Your judgment decides the
+                        next step.
                       </strong>
                       <p>
                         Open any account to explore its fit, timing signals, and
@@ -1283,8 +1366,9 @@ export default function Workspace({
           {toast}
         </div>
       )}
-      {newCampaign && (
+      {newCampaign && workspace && (
         <CampaignDialog
+          workspace={workspace}
           onClose={() => setNewCampaign(false)}
           onCreated={onCreated}
         />
@@ -1293,6 +1377,7 @@ export default function Workspace({
         <AccountDrawer
           key={selectedAccount.id}
           account={selectedAccount}
+          profile={campaign?.profile_snapshot ?? workspace?.profile}
           onClose={() => {
             ++detailRequest.current;
             setSelectedAccount(null);
@@ -1329,9 +1414,10 @@ export default function Workspace({
             <li>
               <span>02</span>
               <div>
-                <strong>Bring the companies to research</strong>
+                <strong>Find companies from your brief</strong>
                 <p>
-                  Supply public business domains for research.
+                  Find prospective business customers, or optionally import
+                  websites you already have.
                 </p>
               </div>
             </li>
@@ -1349,9 +1435,9 @@ export default function Workspace({
           <div className="notice soft">
             <Icon name="shield" size={19} />
             <span>
-              SignalFoundry uses rules-based extraction and grounded outreach
-              templates. Contact enrichment and automatic prospect discovery
-              aren’t connected. No emails are sent.
+              Discovery and contact search require configured, licensed
+              providers. Email verification is optional; provider-returned
+              addresses stay unverified until checked. No emails are sent.
             </span>
           </div>
           <button
@@ -1364,36 +1450,6 @@ export default function Workspace({
         </Dialog>
       )}
     </div>
-  );
-}
-function Stat({
-  icon,
-  label,
-  value,
-  detail,
-  green = false,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-  detail: string;
-  green?: boolean;
-}) {
-  return (
-    <article className={`stat-card ${green ? "highlight-stat" : ""}`}>
-      <div className="stat-label">
-        <span>{label}</span>
-        <Icon name={icon} size={18} />
-      </div>
-      <div className="stat-value">
-        {value}
-        <span>{green && <Icon name="spark" size={22} />}</span>
-      </div>
-      <div className="stat-detail">
-        {green && <span className="small-dot mint" />}
-        {detail}
-      </div>
-    </article>
   );
 }
 function EmptyCampaign({ onCreate }: { onCreate: () => void }) {
@@ -1446,7 +1502,7 @@ function Welcome({
           <span>right-fit customer.</span>
         </h1>
         <p>
-          Turn company websites into a focused, evidence-backed shortlist.
+          Turn your offering into a focused, evidence-backed customer shortlist.
           <br className="desktop-break" /> Know who fits, why they fit, and what
           to say next.
         </p>
@@ -1463,9 +1519,9 @@ function Welcome({
           </h2>
           <p>
             {profileReady
-              ? "Add companies to a campaign and let the evidence guide your shortlist."
+              ? "Review who you want to reach. We’ll discover companies and research the evidence."
               : isSaas
-                ? "Start with your team’s targeting preferences, then research public business websites."
+                ? "Start with your offering, then review an editable target brief before finding customers."
                 : "We’ll read your public homepage and help shape a profile of your ideal customer."}
           </p>
           {profileReady ? (
@@ -1484,8 +1540,8 @@ function Welcome({
                 Review customer profile
               </button>
               <p>
-                An administrator must create the profile before research can
-                begin.
+                You can create a campaign-specific brief. An administrator
+                manages the shared workspace profile.
               </p>
             </div>
           ) : (
@@ -1518,11 +1574,16 @@ function Welcome({
               <button
                 type="button"
                 className="text-btn full-width"
-                onClick={editProfile}
+                onClick={newCampaign}
               >
-                Or build your profile manually
+                Or describe your offering instead
               </button>
             </form>
+          )}
+          {!profileReady && isSaas && !isAdmin && (
+            <button className="btn secondary" onClick={newCampaign}>
+              Create a campaign brief
+            </button>
           )}
           <div className="start-card-note">
             <Icon name="shield" size={14} />

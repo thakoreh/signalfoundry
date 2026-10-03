@@ -1,3 +1,206 @@
+# Approval-led customer missions: release candidate — 2026-10-03
+
+This section supersedes the older review-ownership and implementation status below.
+The release remains on `feat/discovery-first-campaigns` / PR #3. Main and the legacy
+local-demo tree are preserved. Merge and production changes require the release
+owner's coordinated go/no-go after exact-head CI and environment acceptance.
+
+## Release scope
+
+- Website or offering text → explicit buyer-language starting suggestions → one
+  editable audience → immutable approved campaign brief → bounded research
+- Seller category and buyer category are separated. Unknown buyers stay unknown;
+  explicit buyer answers take priority. These suggestions are transparent rules,
+  not semantic AI market research or a verified ideal customer profile
+- Company discovery needs approved Exa access, rights and budget. Contacts are a
+  separate explicit opt-in, default false even for legacy campaigns. Company-only
+  data boundaries reject unsolicited contacts at checkpoint, storage and read
+- A mission summary shows the actual next decision, current research stage and
+  review queue. No unattended agent, background monitoring or outreach is claimed
+- Account criteria show Matched / Not matched / Unknown with saved source links.
+  Undated signal words earn no urgency points; unknown required geography or size
+  prevents a high-ranked heuristic result; hard exclusions cannot be outscored
+- Pass reasons persist per campaign/domain. Workspace domain suppression is an
+  explicit choice, reversible in the account or Customer profile. Suppressed and
+  passed domains are excluded before further research/enrichment, with save-time
+  race checks. The generic Exa company-search query still has its approved cost: its
+  API does not support exclusion domains in company mode, so candidate filtering
+  occurs before follow-on website reads and paid contact requests. Historical rows
+  remain history and full-campaign CSV includes all
+  statuses; a CSV is not a kept-only export
+- Source/rights/expiry gates stay independent. Unknown or unverified email remains
+  labelled. No paid call, new key, subscription or outreach has been created
+
+## Release evidence and remaining gates
+
+The final exact commit, CI URL, screenshot artifacts and final check counts must
+be recorded after all review fixes. Historical counts below are not proof for a
+new head. Local Chromium cannot start in this runtime (`socket EPERM`); rendered
+browser evidence must come from the actual exact-head CI artifact, then be visually
+inspected at desktop/mobile widths. Synthetic UI flows stay labelled TEST DATA.
+
+A separate real public-business flow can use the existing opt-in CI job with its
+isolated database and real HTTP research. That proves the manual public-web path,
+not Exa/PDL access, buying intent, live billing, or an autonomous customer source.
+
+Still required before calling production shipped:
+1. Verify the final PR commit and all required CI/container/browser jobs
+2. Establish authorized deployment access and inspect the actual Coolify resource,
+   selected branch/commit, Dockerfile, domains, build/runtime settings and deployment
+   trigger. Do not infer that merging deploys this app
+3. Keep the SaaS frontend (`deploy/saas.Dockerfile`), stateless worker
+   (`deploy/worker.Dockerfile`) and Convex system of record separate. The root
+   Dockerfile is the unrelated single-workspace local-demo/preview architecture
+4. Deploy the compatible worker contract first, then additive Convex schema/indexes
+   and functions using official codegen, then the frontend. Keep new contact
+   selection optional/default false and new feedback fields/tables additive. No
+   schema narrowing, destructive reset or implicit customer data migration
+5. Exercise real Clerk session/organization switching, role boundaries, cancellation,
+   suppression/restore, expired/revoked data, legacy campaigns, export and the
+   existing Stripe test-mode flow in an approved staging environment
+6. Keep commercial discovery disabled until existing secure credentials, separate
+   data rights and explicit budgets are verified. A key is not a licensing grant
+
+## Rollback
+
+Disable discovery launch and paid enrichment before rollback. Cancel queued runs
+without releasing unknown-spend reservations. Preserve spend ledgers and user
+feedback/suppression records. Roll back frontend/worker images to the recorded
+prior release while retaining the compatible additive Convex schema and access
+filters. Never restore an old database snapshot over new user/billing activity,
+reactivate provider rights, or delete customer data as a deployment shortcut.
+
+---
+
+# Discovery-first campaigns: reviewer handoff
+
+## Current scope — 2026-10-02
+
+Branch `feat/discovery-first-campaigns` starts from merged main
+`496834f1df134a70a065d6b1de9c22dd531056b5` (premium motion/carousel PR #2).
+This is one new **draft review PR**. Preserve concurrent work on main. The owner’s
+other agent reviews and deploys; this change does not authorize merge or deployment.
+
+The core workflow is now offering URL/description → generated **editable** target
+brief → explicit review → Find customers → company discovery/public evidence and
+rules qualification → named contact lookup → optional independent verification →
+shortlist/drafts/export. Manual import is secondary. Company size and geography
+are search criteria, not established firmographic facts. Consumer/community
+acquisition is future work; this first implementation is deliberately B2B.
+
+### Implemented
+
+- Description-only local targeting hypotheses and URL-based profile previews,
+  editable buyer roles, industry, size, geography, signals and exclusions
+- Campaign-specific immutable profile snapshots for research and drafts, so
+  changing a workspace profile cannot silently retarget an existing campaign
+- Real Exa company search and PDL Person Search adapters with fixed official
+  endpoints, public-DNS pinning, bounded requests/results and no automatic paid
+  retries. Jev is an optional manual qualifier and is never the lead source
+- Convex stages with transactional tenant/global monthly budget reservations,
+  per-job ceilings, exact-operation claims, conservative consumed reservations,
+  cancellation, partial-result retention and unknown-spend holds
+- A shared-account PDL rate gate spaced at least 6.1 seconds between claims,
+  respecting the documented default 10 requests/minute
+- Source/license references, retrieval and expiry times, independently checked
+  email fields, per-provider access revocation, display/export filtering and
+  bounded scheduled physical retention sweeps. No provider cache or shared
+  cross-customer contact pool exists
+- Existing Clerk organization/role boundaries, Stripe configuration and billing
+  requirements, manual research, evidence and landing motion remain in place
+
+### Honest limitations
+
+No provider keys, subscriptions, prices, credentials, access grants, contracts,
+paid calls, outreach, schema pushes or deployments were created. No independent
+email verifier is configured or implemented: returned work emails remain visibly
+unverified, never guessed. Worker readiness performs no provider requests.
+
+Actual PDL embedding, end-customer display, export, storage, termination/deletion
+and resale rights are **not established** by the readable API docs. Its legal
+portal did not expose the agreement text. Obtain the actual signed order form and
+agreement and review Exa’s applicable contract before activation. A key or an
+ordinary subscription alone does not prove commercial product-embedding rights.
+The flags below attest to separate approvals; they do not grant rights themselves.
+
+## Environment and approval gates
+
+Read [the exact worker contract and environment names](backend/DISCOVERY.md).
+Keep all approval values absent/false until the owner separately authorizes
+access, legal terms and an explicit total spend ceiling.
+
+On Convex, configure the already-approved worker HTTPS URL/token and normal
+Clerk/Stripe settings as before. Discovery additionally requires:
+
+- `SIGNALFOUNDRY_DISCOVERY_LAUNCH_APPROVED`
+- `SIGNALFOUNDRY_LICENSED_DATA_ACCESS_APPROVED`
+- `SIGNALFOUNDRY_EXA_DATA_ACCESS_APPROVED`
+- `SIGNALFOUNDRY_PDL_DATA_ACCESS_APPROVED`
+- `SIGNALFOUNDRY_LICENSED_DATA_EXPORT_APPROVED` for CSV export of provider data
+- `SIGNALFOUNDRY_DISCOVERY_JOB_BUDGET_MICROUSD`
+- `SIGNALFOUNDRY_DISCOVERY_WORKSPACE_MONTHLY_BUDGET_MICROUSD`
+- `SIGNALFOUNDRY_DISCOVERY_MONTHLY_BUDGET_MICROUSD`
+
+The worker separately requires approved Exa/PDL secrets, embedding/export/retention
+rights, contract reference/end date, approved retention days and per-call/per-record
+conservative cost ceilings. Budgets are integer microUSD (1 USD = 1,000,000).
+Job ≤ workspace monthly ≤ global monthly; job maximum is $20. No default paid
+budget exists. Set matching worker/Convex limits and vendor account hard caps.
+These local caps are conservative reservations, not a guarantee about vendor invoices.
+Unknown outcomes hold the full job reservation and require manual reconciliation;
+there is no automatic refund or re-dispatch of a paid step.
+
+Per-provider access flags allow disabling PDL contacts while preserving Exa company
+evidence, or disabling all licensed data immediately. Export is a separate grant.
+On contract termination, disable access first and complete provider-required
+physical deletion/backups/export-customer obligations. Scheduled live-record
+expiry cannot revoke CSVs already downloaded or erase external backups.
+
+## Data migration and staging
+
+New campaign/job fields are optional for existing Convex rows. New tables track
+spend, usage and provider pacing. Existing manual jobs/campaigns stay readable;
+new campaigns freeze their targeting snapshot. No populated schema was pushed.
+Before deploying, run official Convex codegen, review the additive schema and
+exercise a separately authorized staging migration and two-organization test.
+
+## Verification and launch acceptance
+
+Local tests and exact-head CI results are recorded in `docs/DISCOVERY_VERIFICATION.md`.
+Unit tests use synthetic identities and offline provider transports; they cannot
+certify real provider licensing, billing, deliverability or deployed integration.
+
+Before production activation:
+
+1. Review the draft diff and exact-head source/container/browser CI plus desktop,
+   mobile and tablet screenshots; rerun after any integration or fix
+2. Validate Clerk sessions/organization switches, existing Stripe behavior and
+   legacy/manual campaigns against the approved staging environment
+3. Obtain and record explicit commercial/data-use approvals and total spend limits;
+   configure keys only via approved secure setup, never browser variables or source
+4. With separate live-test authorization, verify the real Exa/PDL contracts,
+   target-quality/coverage, empty/429/timeout behavior, billed usage versus ledger,
+   cancellation before/between stages and worker restart/no-duplicate behavior
+5. Verify independent per-provider expiry/revocation, physical purge, backup
+   deletion, export permissions and human-review outreach/privacy obligations
+6. Add and approve an independent verification provider before claiming verified
+   email; consumers/communities and outreach sending remain out of scope
+
+## Rollback
+
+First disable discovery launch and licensed-data access/export gates. Cancel queued
+runs; uncertain in-flight spend must remain reserved for reconciliation. Preserve
+ledger records. An authorized rollback may redeploy the recorded prior frontend/
+worker image, but **do not narrow the Convex mode/schema while discovery rows still
+exist**. Keep the additive schema compatible or migrate/archive discovery rows via
+an independently approved procedure. Deletion obligations and provider contract
+retention still apply. Do not reset main, merge this PR, deploy, or delete customer
+data as part of this review task.
+
+---
+
+## Historical landing and release handoff (superseded where noted above)
+
 # SignalFoundry premium landing: reviewer and deployment handoff
 
 ## Scope and review boundary — 2026-10-02

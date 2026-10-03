@@ -16,9 +16,14 @@ const functionKinds: Record<FunctionName, "query" | "mutation" | "action"> = {
   "campaigns.create": "mutation",
   "campaigns.get": "query",
   "campaigns.accounts": "query",
+  "campaigns.exportAccounts": "query",
+  "campaigns.suggestBrief": "action",
+  "discovery.status": "action",
   "accounts.get": "query",
   "accounts.setStatus": "mutation",
   "accounts.draft": "query",
+  "accounts.suppressions": "query",
+  "accounts.restoreSuppression": "mutation",
   "jobs.start": "mutation",
   "jobs.get": "query",
   "jobs.cancel": "mutation",
@@ -94,7 +99,9 @@ async function handler(
           new Promise<never>((_, reject) => {
             timer = setTimeout(
               () => reject(new Error("Provider timeout")),
-              name === "workspaces.analyze" ? 150_000 : 25_000,
+              ["workspaces.analyze", "campaigns.suggestBrief"].includes(name)
+                ? 150_000
+                : 25_000,
             );
           }),
         ]);

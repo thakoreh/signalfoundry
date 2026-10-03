@@ -44,7 +44,7 @@ class ProductionSourceChecks(unittest.TestCase):
         self.assertNotIn('\n    volumes:', compose)
 
     def test_worker_imports_cannot_reach_demo_persistence(self):
-        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', '__init__'}
+        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', '__init__', 'discovery', 'discovery_config', 'discovery_models', 'discovery_providers'}
         for name in allowed:
             tree = ast.parse((ROOT / 'backend/app' / f'{name}.py').read_text())
             for node in ast.walk(tree):

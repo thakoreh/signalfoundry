@@ -47,6 +47,18 @@ class WorkerTest(unittest.TestCase):
         return self.client.post(path, json=self.body() if body is None else body,
                                 headers=self.auth if headers is None else headers)
 
+    def test_trusted_exclusions_block_page_fetch_and_decision_calls_before_work(self):
+        body = {**self.body(domains=['https://www.company.com/']), 'excluded_domains': ['company.com']}
+        with patch.object(self.app.state, 'fetch_page', side_effect=AssertionError('Suppressed page was fetched')) as fetch:
+            with patch.object(self.app.state.decision_provider, 'evaluate', side_effect=AssertionError('Suppressed company was evaluated')) as evaluate:
+                response = self.post(body)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'accounts': [], 'errors': []})
+        fetch.assert_not_called()
+        evaluate.assert_not_called()
+        for excluded in [['company.com'] * 101, ['https://company.com/'], ['bad..com']]:
+            self.assertEqual(self.post({**self.body(), 'excluded_domains': excluded}).status_code, 422)
+
     def test_reject_demo_research_without_creating_fictional_accounts(self):
         self.assertEqual(self.post(self.body('demo', [])).status_code, 422)
 

@@ -335,14 +335,174 @@ test("provider internals never leak; CSV neutralizes spreadsheet formulas", asyn
 });
 
 test("billing offer is a tenant-readable authenticated action without a client price", async () => {
-  const result = await call("billing/offer", "GET", undefined, { orgRole: "org:member" });
+  const result = await call("billing/offer", "GET", undefined, {
+    orgRole: "org:member",
+  });
   assert.equal(result.response.status, 200);
-  assert.deepEqual(result.calls.map(c => ({ name: c.name, args: c.args })), [{ name: "stripe.offer", args: {} }]);
+  assert.deepEqual(
+    result.calls.map((c) => ({ name: c.name, args: c.args })),
+    [{ name: "stripe.offer", args: {} }],
+  );
 });
 
 test("real CSV API preserves evidence, reasons, unknowns and engines", async () => {
- const {deps}=setup(); deps.invoke=async()=>[{name:"Public business",domain:"business.example",score:70,confidence:"medium",status:"new",description:"Public facts",why_fit:["Supported fit"],why_now:[],unknowns:["Budget unknown"],score_breakdown:[],evidence:[{id:"ev",url:"https://business.example",excerpt:"Quoted public fact",published_at:null,retrieved_at:"2026-10-01T00:00:00Z"}],researched_at:"2026-10-01T00:00:00Z",decision_engine:"jev",is_demo:false}];
- const response=await handleApi(request("campaigns/c1/export.csv"),["campaigns","c1","export.csv"],deps);
- assert.equal(response.status,200); const csv=await response.text();
- for(const value of ["evidence_urls","evidence_snippets","score_breakdown","decision_engine","Budget unknown","https://business.example","Quoted public fact"]) assert.ok(csv.includes(value),value);
+  const { deps } = setup();
+  deps.invoke = async () => [
+    {
+      name: "Public business",
+      domain: "business.example",
+      score: 70,
+      confidence: "medium",
+      status: "new",
+      description: "Public facts",
+      why_fit: ["Supported fit"],
+      why_now: [],
+      unknowns: ["Budget unknown"],
+      score_breakdown: [],
+      evidence: [
+        {
+          id: "ev",
+          url: "https://business.example",
+          excerpt: "Quoted public fact",
+          published_at: null,
+          retrieved_at: "2026-10-01T00:00:00Z",
+        },
+      ],
+      researched_at: "2026-10-01T00:00:00Z",
+      decision_engine: "jev",
+      is_demo: false,
+    },
+  ];
+  const response = await handleApi(
+    request("campaigns/c1/export.csv"),
+    ["campaigns", "c1", "export.csv"],
+    deps,
+  );
+  assert.equal(response.status, 200);
+  const csv = await response.text();
+  for (const value of [
+    "evidence_urls",
+    "evidence_snippets",
+    "score_breakdown",
+    "decision_engine",
+    "Budget unknown",
+    "https://business.example",
+    "Quoted public fact",
+  ])
+    assert.ok(csv.includes(value), value);
+});
+
+test("company-only campaign defaults stay omitted and enrichment needs a boolean choice", async () => {
+  const valid = await call("campaigns", "POST", {
+    name: "Mission",
+    mode: "discovery",
+    domains: [],
+    enrich_contacts: false,
+  });
+  assert.equal(valid.response.status, 201);
+  assert.equal(valid.calls[0].args.enrich_contacts, false);
+  for (const value of ["true", 1, null, {}]) {
+    const invalid = await call("campaigns", "POST", {
+      name: "Mission",
+      mode: "discovery",
+      domains: [],
+      enrich_contacts: value,
+    });
+    assert.equal(invalid.response.status, 400);
+    assert.equal(invalid.calls.length, 0);
+  }
+});
+
+test("feedback bridge preserves bounded reason and explicit suppression scope", async () => {
+  const feedback = {
+    status: "dismissed",
+    reason: "competitor",
+    suppress_workspace: true,
+  };
+  const result = await call("accounts/a1", "PATCH", feedback);
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.calls[0].args, { id: "a1", ...feedback });
+  for (const body of [
+    { status: "dismissed", reason: "delete everybody" },
+    { status: "dismissed", suppress_workspace: "true" },
+    { status: "dismissed", orgId: "org_b" },
+  ]) {
+    const invalid = await call("accounts/a1", "PATCH", body);
+    assert.equal(invalid.response.status, 400);
+    assert.equal(invalid.calls.length, 0);
+  }
+});
+
+test("suppression pagination is explicit, bounded, tenant-bound, and unavailable on other routes", async () => {
+  const state = setup();
+  state.deps.invoke = async (name, args, token) => {
+    state.calls.push({ name, args, token });
+    return {
+      page: [{ domain: "company.example", reason: "competitor" }],
+      isDone: false,
+      continueCursor: "next-page",
+    };
+  };
+  const response = await handleApi(
+    request("workspace/suppressions?limit=30&after=prior-page"),
+    ["workspace", "suppressions"],
+    state.deps,
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(state.calls[0].args, {
+    paginationOpts: { cursor: "prior-page", numItems: 30 },
+  });
+  assert.deepEqual(await response.json(), {
+    items: [{ domain: "company.example", reason: "competitor" }],
+    is_done: false,
+    continue_cursor: "next-page",
+  });
+  for (const query of [
+    "limit=0",
+    "limit=101",
+    "limit=1.5",
+    "limit=10&limit=20",
+    "orgId=org_b",
+    "after=",
+  ]) {
+    const invalid = setup();
+    const r = await handleApi(
+      request(`workspace/suppressions?${query}`),
+      ["workspace", "suppressions"],
+      invalid.deps,
+    );
+    assert.equal(r.status, 400, query);
+    assert.equal(invalid.calls.length, 0);
+  }
+  const other = setup();
+  assert.equal(
+    (await handleApi(request("campaigns?limit=30"), ["campaigns"], other.deps))
+      .status,
+    400,
+  );
+  const switched = setup({ orgId: "org_b" });
+  assert.equal(
+    (
+      await handleApi(
+        request("workspace/suppressions?limit=30"),
+        ["workspace", "suppressions"],
+        switched.deps,
+      )
+    ).status,
+    409,
+  );
+});
+
+test("restoring workspace suppression forwards only exact domain through an authenticated mutation", async () => {
+  const result = await call("workspace/suppressions/restore", "POST", {
+    domain: "company.example",
+  });
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(result.calls[0].args, { domain: "company.example" });
+  assert.deepEqual(await result.response.json(), { restored: true });
+  const invalid = await call("workspace/suppressions/restore", "POST", {
+    domain: "company.example",
+    orgId: "org_b",
+  });
+  assert.equal(invalid.response.status, 400);
 });

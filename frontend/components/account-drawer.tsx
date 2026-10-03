@@ -1,6 +1,14 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { Account, AccountStatus, Draft, Evidence } from "@/lib/types";
+import type {
+  Account,
+  AccountStatus,
+  Draft,
+  Evidence,
+  Profile,
+  ReviewFeedback,
+  ReviewReason,
+} from "@/lib/types";
 import { errorMessage } from "@/lib/api";
 import {
   drawerFocusBoundaryTarget,
@@ -9,6 +17,7 @@ import {
   safeUrl,
   scoreLabel,
 } from "@/lib/utils";
+import { CriterionReview } from "./criterion-review";
 import { Dialog } from "./dialog";
 import { Icon } from "./icons";
 import { useWorkspaceSession } from "./workspace-session";
@@ -67,14 +76,19 @@ function EvidenceCard({
 }
 export function AccountDrawer({
   account,
+  profile,
   onClose,
   onStatusChange,
   busy,
   statusError,
 }: {
   account: Account;
+  profile?: Profile | null;
   onClose: () => void;
-  onStatusChange: (status: AccountStatus) => Promise<void>;
+  onStatusChange: (
+    status: AccountStatus,
+    feedback?: ReviewFeedback,
+  ) => Promise<boolean>;
   busy: boolean;
   statusError: string;
 }) {
@@ -82,6 +96,15 @@ export function AccountDrawer({
   const [tab, setTab] = useState<"overview" | "evidence" | "outreach">(
     "overview",
   );
+  const [showPass, setShowPass] = useState(false);
+  const [passReason, setPassReason] = useState<ReviewReason | "">("");
+  const [suppressFuture, setSuppressFuture] = useState(
+    Boolean(account.suppress_workspace),
+  );
+  const [undo, setUndo] = useState<{
+    status: AccountStatus;
+    feedback: ReviewFeedback;
+  } | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftBusy, setDraftBusy] = useState(false);
   const [error, setError] = useState("");
@@ -98,8 +121,8 @@ export function AccountDrawer({
   const busyRef = useRef(busy);
   useEffect(() => {
     closeRef.current = onClose;
-    busyRef.current = busy;
-  }, [onClose, busy]);
+    busyRef.current = busy || draftBusy;
+  }, [onClose, busy, draftBusy]);
 
   useEffect(() => {
     const content = drawerContentRef.current;
@@ -115,12 +138,12 @@ export function AccountDrawer({
       "input:not([disabled])",
       "select:not([disabled])",
       "textarea:not([disabled])",
-      "[tabindex]:not([tabindex=\"-1\"])",
+      '[tabindex]:not([tabindex="-1"])',
     ].join(",");
     const focusable = () =>
-      Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter(
-        (element) => element.getAttribute("aria-hidden") !== "true",
-      );
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>(focusableSelector),
+      ).filter((element) => element.getAttribute("aria-hidden") !== "true");
     const focusFirst = () => {
       const first = focusable()[0];
       first?.focus();
@@ -163,11 +186,26 @@ export function AccountDrawer({
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       document.removeEventListener("focusin", onFocusIn, true);
-      if (opener && document.contains(opener)) opener.focus();
+      const returnTarget =
+        opener && document.contains(opener)
+          ? opener
+          : opener?.id
+            ? document.getElementById(opener.id)
+            : null;
+      // Native dialog.close() runs in the nested dialog cleanup. Restore only
+      // afterward, and never steal focus from a newer dialog/navigation.
+      queueMicrotask(() => {
+        if (
+          returnTarget?.isConnected &&
+          !document.querySelector("dialog[open]")
+        )
+          returnTarget.focus();
+      });
     };
   }, [drawerContentRef]);
 
   async function generate() {
+    if (account.suppress_workspace) return;
     setDraftBusy(true);
     setError("");
     try {
@@ -197,7 +235,12 @@ export function AccountDrawer({
     }
   }
   return (
-    <Dialog title={`${account.name} account details`} onClose={onClose} drawer>
+    <Dialog
+      title={`${account.name} account details`}
+      onClose={onClose}
+      drawer
+      busy={busy || draftBusy}
+    >
       <div className="account-head" ref={drawerContentRef}>
         <div className="company-logo large">{initials(account.name)}</div>
         <div className="account-title">
@@ -236,10 +279,18 @@ export function AccountDrawer({
           {statusError}
         </div>
       )}
+      {account.suppress_workspace && account.status !== "dismissed" && (
+        <div className="notice soft compact">
+          <Icon name="shield" size={16} />
+          This domain is suppressed in this workspace. Its earlier research
+          remains as history; it is excluded from actionable review and draft
+          suggestions until you deliberately restore it.
+        </div>
+      )}
       <div className="account-action-row">
         <button
           className={`btn ${account.status === "shortlisted" ? "shortlisted" : "primary"}`}
-          disabled={busy}
+          disabled={busy || account.suppress_workspace}
           onClick={() =>
             onStatusChange(
               account.status === "shortlisted" ? "new" : "shortlisted",
@@ -257,13 +308,156 @@ export function AccountDrawer({
         <button
           className="btn secondary"
           disabled={busy}
-          onClick={() =>
-            onStatusChange(account.status === "dismissed" ? "new" : "dismissed")
-          }
+          onClick={() => {
+            if (account.status === "dismissed")
+              void onStatusChange("new", {
+                reason: null,
+                suppress_workspace: false,
+              });
+            else {
+              setSuppressFuture(Boolean(account.suppress_workspace));
+              setPassReason(account.review_reason ?? "");
+              setShowPass((open) => !open);
+            }
+          }}
         >
-          {account.status === "dismissed" ? "Restore account" : "Dismiss"}
+          {account.status === "dismissed"
+            ? account.suppress_workspace
+              ? "Restore & allow future searches"
+              : "Restore account"
+            : "Pass on this company"}
         </button>
+        {account.status === "shortlisted" && (
+          <button
+            className="btn secondary"
+            disabled={busy || account.suppress_workspace}
+            onClick={() => void onStatusChange("new")}
+          >
+            Needs research
+          </button>
+        )}
+        {account.suppress_workspace && account.status !== "dismissed" && (
+          <button
+            className="btn secondary"
+            disabled={busy}
+            onClick={() =>
+              void onStatusChange(account.status, {
+                reason: null,
+                suppress_workspace: false,
+              })
+            }
+          >
+            Allow future searches
+          </button>
+        )}
       </div>
+      {showPass && account.status !== "dismissed" && (
+        <div className="pass-feedback">
+          <h3>What made this a pass?</h3>
+          <p>
+            Optional feedback helps you remember the decision. It never changes
+            your audience criteria automatically.
+          </p>
+          <label>
+            Reason (optional)
+            <select
+              value={passReason}
+              onChange={(event) =>
+                setPassReason(event.target.value as ReviewReason | "")
+              }
+            >
+              <option value="">Skip a reason</option>
+              <option value="wrong_industry">Wrong industry</option>
+              <option value="wrong_geography">Wrong geography</option>
+              <option value="wrong_size">Wrong company size</option>
+              <option value="existing_customer">Existing customer</option>
+              <option value="competitor">Competitor</option>
+              <option value="not_relevant">Not relevant</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <label className="review-confirmation">
+            <input
+              type="checkbox"
+              checked={suppressFuture}
+              onChange={(event) => setSuppressFuture(event.target.checked)}
+            />
+            <span>
+              Also suppress this domain in future searches in this workspace
+            </span>
+          </label>
+          <p className="input-hint">
+            A pass always stays dismissed in this campaign. The optional
+            workspace choice affects only this exact domain and can be undone.
+          </p>
+          <div className="pass-actions">
+            <button
+              className="btn secondary small"
+              disabled={busy}
+              onClick={() => setShowPass(false)}
+            >
+              Cancel
+            </button>
+            <button
+              className="btn primary small"
+              disabled={busy}
+              onClick={async () => {
+                setUndo({
+                  status: account.status,
+                  feedback: {
+                    reason: account.review_reason ?? null,
+                    suppress_workspace: account.suppress_workspace ?? false,
+                  },
+                });
+                const saved = await onStatusChange("dismissed", {
+                  reason: passReason || null,
+                  suppress_workspace: suppressFuture,
+                });
+                if (saved) setShowPass(false);
+              }}
+            >
+              Save pass
+            </button>
+          </div>
+        </div>
+      )}
+      {account.status === "dismissed" && (
+        <div className="review-decision-note" role="status">
+          <Icon name="check" size={16} />
+          <span>
+            Passed
+            {account.review_reason
+              ? ` · ${account.review_reason.replaceAll("_", " ")}`
+              : ""}
+            .{" "}
+            {account.suppress_workspace
+              ? "This domain is suppressed for future workspace searches."
+              : "This decision applies to this campaign."}
+          </span>
+          <button
+            className="text-btn"
+            disabled={busy}
+            onClick={async () => {
+              const previousStatus = undo?.status ?? "new";
+              const previousFeedback = undo?.feedback ?? {
+                reason: null,
+                suppress_workspace: false,
+              };
+              const saved = await onStatusChange(
+                previousStatus,
+                previousStatus !== "dismissed" &&
+                  previousFeedback.suppress_workspace
+                  ? { reason: null, preserve_workspace_suppression: true }
+                  : previousFeedback,
+              );
+              if (saved) setUndo(null);
+            }}
+          >
+            Undo pass
+          </button>
+        </div>
+      )}
+
       <div
         className="drawer-tabs"
         role="tablist"
@@ -318,7 +512,7 @@ export function AccountDrawer({
           <>
             <div className="score-panel">
               <div>
-                <span className="eyebrow">ACCOUNT FIT</span>
+                <span className="eyebrow">LANGUAGE MATCH SCORE</span>
                 <div className="big-score">
                   {account.score}
                   <span>/100</span>
@@ -333,12 +527,13 @@ export function AccountDrawer({
                 </span>
                 <span>
                   {account.decision_engine === "rules"
-                    ? "Transparent rules-based scoring"
+                    ? "Transparent language rules · not verified buying intent"
                     : "Decision engine scoring"}
                 </span>
                 <span>Researched {formatDate(account.researched_at)}</span>
               </div>
             </div>
+            <CriterionReview account={account} profile={profile} />
             <section className="detail-section">
               <h3>Company snapshot</h3>
               <p>
@@ -364,10 +559,38 @@ export function AccountDrawer({
                 </div>
               </div>
             </section>
+            {account.source_provider && (
+              <section className="detail-section">
+                <h3>Discovery source</h3>
+                <p>Provider: {account.source_provider}</p>
+                <p className="input-hint">
+                  Retrieved: {formatDate(account.retrieved_at)}
+                </p>
+                {account.source_url &&
+                  safeUrl(account.source_url) &&
+                  !account.is_demo && (
+                    <a
+                      className="source-link"
+                      href={safeUrl(account.source_url)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      Company discovery source
+                      <Icon name="external" size={12} />
+                    </a>
+                  )}
+                {!!account.license_restrictions?.length && (
+                  <p className="input-hint">
+                    Usage restrictions:{" "}
+                    {account.license_restrictions.join("; ")}
+                  </p>
+                )}
+              </section>
+            )}
             <section className="detail-section">
               <h3>
                 <Icon name="target" size={18} />
-                Why it fits
+                Possible relevance
               </h3>
               {account.why_fit.length ? (
                 <ul className="reason-list">
@@ -385,7 +608,7 @@ export function AccountDrawer({
             <section className="detail-section">
               <h3>
                 <Icon name="bolt" size={18} />
-                Why now
+                Timing clues to verify
               </h3>
               {account.why_now.length ? (
                 <ul className="reason-list signals">
@@ -455,8 +678,9 @@ export function AccountDrawer({
                 People & contact coverage
               </h3>
               <p className="section-note">
-                Contact enrichment is not connected. No email addresses are
-                inferred.
+                Contacts, where available, come from a named provider. An email
+                is unverified unless separately checked. Verification does not
+                imply permission to contact.
               </p>
               {account.contacts.length ? (
                 account.contacts.map((contact, i) => (
@@ -475,11 +699,44 @@ export function AccountDrawer({
                         : contact.verification_status}
                     </span>
                     <p>{contact.note}</p>
-                    {contact.email &&
-                    contact.verification_status === "verified" ? (
-                      <p>{contact.email}</p>
+                    {contact.email ? (
+                      <p className="contact-email">
+                        {contact.email}
+                        <span className="input-hint">
+                          {contact.verification_status === "verified"
+                            ? "Independently verified"
+                            : "Provider-returned · unverified"}
+                        </span>
+                      </p>
                     ) : (
-                      <p className="input-hint">Verified email not available</p>
+                      <p className="input-hint">Email not available</p>
+                    )}
+                    {contact.provider && (
+                      <p className="input-hint">
+                        Source: {contact.provider}
+                        {contact.retrieved_at
+                          ? ` · Retrieved ${formatDate(contact.retrieved_at)}`
+                          : ""}
+                        {contact.email_checked_at
+                          ? ` · Email checked ${formatDate(contact.email_checked_at)}`
+                          : " · Email not checked"}
+                      </p>
+                    )}
+                    {contact.email_status &&
+                      contact.email_status !== "not_checked" && (
+                        <p className="input-hint">
+                          Email check result:{" "}
+                          {contact.email_status.replaceAll("_", " ")}
+                          {contact.email_verification_provider
+                            ? ` · ${contact.email_verification_provider}`
+                            : ""}
+                        </p>
+                      )}
+                    {!!contact.license_restrictions?.length && (
+                      <p className="input-hint">
+                        Usage restrictions:{" "}
+                        {contact.license_restrictions.join("; ")}
+                      </p>
                     )}
                     {contact.source_url &&
                       safeUrl(contact.source_url) &&
@@ -544,7 +801,7 @@ export function AccountDrawer({
                 {error}
               </div>
             )}
-            {draft ? (
+            {draft && !account.suppress_workspace ? (
               <>
                 <article className="outreach-draft">
                   <span className="eyebrow">SUBJECT</span>
@@ -560,7 +817,7 @@ export function AccountDrawer({
                   <button
                     className="btn secondary"
                     onClick={generate}
-                    disabled={draftBusy}
+                    disabled={draftBusy || account.suppress_workspace}
                   >
                     <Icon name="refresh" size={16} />
                     {draftBusy ? "Generating…" : "Regenerate"}
@@ -587,15 +844,20 @@ export function AccountDrawer({
                 <span className="modal-icon">
                   <Icon name="mail" size={25} />
                 </span>
-                <h3>Less generic. More grounded.</h3>
+                <h3>
+                  {account.suppress_workspace
+                    ? "This company is suppressed."
+                    : "Less generic. More grounded."}
+                </h3>
                 <p>
-                  Use the account’s fit and public evidence to write a
-                  thoughtful first touch.
+                  {account.suppress_workspace
+                    ? "Restore this domain deliberately in Customer profile before preparing an outreach draft."
+                    : "Use the account’s fit and public evidence to write a thoughtful first touch."}
                 </p>
                 <button
                   className="btn primary"
                   onClick={generate}
-                  disabled={draftBusy}
+                  disabled={draftBusy || account.suppress_workspace}
                 >
                   {draftBusy ? (
                     <>

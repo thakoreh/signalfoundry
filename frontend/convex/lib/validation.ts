@@ -67,12 +67,12 @@ export function normalizeWebsite(input: string): string {
   return url.toString();
 }
 export function normalizeDomains(
-  mode: "demo" | "manual",
+  mode: "demo" | "manual" | "discovery",
   domains: string[],
 ): string[] {
   if (
     domains.length > 10 ||
-    (mode === "demo" && domains.length) ||
+    (mode !== "manual" && domains.length) ||
     (mode === "manual" && !domains.length)
   ) {
     throw appError(
@@ -101,9 +101,9 @@ export function validateResearchResult(
   accounts: WorkerAccount[],
   errors: string[],
   campaignId: string,
-  mode: "demo" | "manual",
+  mode: "demo" | "manual" | "discovery",
 ) {
-  if (accounts.length > 10 || errors.length > 20)
+  if (accounts.length > (mode === "discovery" ? 30 : 10) || errors.length > 20)
     throw appError("RESEARCH_FAILED", "Worker result exceeds allowed size");
   const domains = new Set<string>();
   for (const row of accounts) {
@@ -119,8 +119,49 @@ export function validateResearchResult(
         "Worker returned inconsistent account metadata",
       );
     }
+    if (
+      mode === "discovery" &&
+      (row.source_provider !== "exa" ||
+        !row.license_reference ||
+        !row.license_expires_at ||
+        !Number.isFinite(Date.parse(row.license_expires_at)) ||
+        Date.parse(row.license_expires_at) <= Date.now())
+    )
+      throw appError(
+        "RESEARCH_FAILED",
+        "Discovery data requires a current source license and retention deadline",
+      );
+    for (const contact of row.contacts) {
+      if (mode === "discovery" && contact.provider !== "peopledatalabs")
+        throw appError(
+          "RESEARCH_FAILED",
+          "Discovery contacts require named provider provenance",
+        );
+      if (
+        contact.provider &&
+        (!contact.license_reference ||
+          !contact.license_expires_at ||
+          !Number.isFinite(Date.parse(contact.license_expires_at)) ||
+          Date.parse(contact.license_expires_at) <= Date.now())
+      )
+        throw appError(
+          "RESEARCH_FAILED",
+          "Contact data requires a current license and retention deadline",
+        );
+      if (
+        contact.verification_status === "verified" &&
+        (!contact.email ||
+          contact.email_status !== "valid" ||
+          !contact.email_checked_at ||
+          !contact.email_verification_provider)
+      )
+        throw appError(
+          "RESEARCH_FAILED",
+          "Verified email requires independent verification evidence",
+        );
+    }
     text(row.domain, "Account domain", 253);
-    if (mode === "manual") normalizeWebsite(row.domain);
+    if (mode !== "demo") normalizeWebsite(row.domain);
     if (domains.has(row.domain.toLowerCase()))
       throw appError("RESEARCH_FAILED", "Worker returned duplicate domains");
     domains.add(row.domain.toLowerCase());
@@ -151,7 +192,7 @@ export function validateResearchResult(
       if (item.is_demo !== row.is_demo)
         throw appError("RESEARCH_FAILED", "Evidence fiction label mismatch");
       const url = new URL(item.url);
-      if (mode === "manual") normalizeWebsite(item.url);
+      if (mode !== "demo") normalizeWebsite(item.url);
       if (
         !["http:", "https:"].includes(url.protocol) ||
         url.username ||

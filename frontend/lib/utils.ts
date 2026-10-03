@@ -69,10 +69,10 @@ export function initials(name: string) {
 }
 export function scoreLabel(score: number) {
   return score >= 65
-    ? "Strong fit"
+    ? "More language matches"
     : score >= 50
-      ? "Potential fit"
-      : "Explore fit";
+      ? "Some language matches"
+      : "Needs research";
 }
 
 export function decisionEngineLabel(
@@ -81,9 +81,7 @@ export function decisionEngineLabel(
   const engines = new Set(accounts.map((account) => account.decision_engine));
   if (engines.size === 0) return "Decision engine";
   if (engines.size > 1) return "Mixed decision engines";
-  return engines.has("jev")
-    ? "Jev intelligence"
-    : "Rules-based intelligence";
+  return engines.has("jev") ? "Jev intelligence" : "Transparent rules";
 }
 
 export function websiteAnalysisMessage(
