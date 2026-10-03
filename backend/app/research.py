@@ -11,14 +11,28 @@ INDUSTRY_TERMS = {
     'B2B SaaS': ['saas', 'b2b', 'software as a service'],
     'Developer tools': ['developer', 'api', 'sdk'],
     'Financial technology': ['fintech', 'payments', 'financial technology'],
-    'Healthcare technology': ['healthcare', 'clinical', 'patient'],
+    'Veterinary clinics': ['veterinary', 'veterinarian', 'veterinarians', 'vet clinic'],
+    'Plumbing businesses': ['plumbing', 'plumber', 'plumbers'],
+    'Healthcare services': ['clinic', 'clinics', 'medical practice', 'dental', 'dentist', 'dentists'],
+    'Healthcare technology': ['healthcare technology', 'clinical software', 'patient software'],
+    'Hospitality': ['restaurant', 'restaurants', 'hotel', 'hotels', 'hospitality'],
+    'Legal services': ['law firm', 'law firms', 'legal services'],
     'E-commerce': ['ecommerce', 'e-commerce', 'online store'],
     'Manufacturing': ['manufacturing', 'industrial', 'factory'],
-    'Agency': ['agency', 'consultancy'],
+    'Agency': ['agency', 'agencies', 'consultancy', 'professional services'],
 }
 ROLE_TERMS = ['VP Sales', 'Head of Growth', 'Revenue Operations', 'Marketing', 'Engineering', 'Operations']
 KEYWORD_TERMS = ['sales', 'workflow', 'automation', 'pipeline', 'developer', 'analytics', 'data', 'platform', 'customer', 'security', 'integration', 'marketing']
 SIGNAL_TERMS = ['hiring', 'new product', 'launch', 'expanding', 'funding', 'partnership']
+
+
+def canonical_industry(value: str) -> str:
+    aliases = {'professional services': 'agency', 'retail & ecommerce': 'e-commerce',
+               'retail': 'e-commerce', 'ecommerce': 'e-commerce',
+               'plumbing': 'plumbing businesses', 'plumbers': 'plumbing businesses',
+               'veterinary': 'veterinary clinics', 'veterinary clinic': 'veterinary clinics'}
+    normalized = value.strip().casefold()
+    return aliases.get(normalized, normalized)
 
 
 def matches(term: str, text: str) -> bool:
@@ -31,16 +45,46 @@ def excerpt_for(term: str, text: str, size: int = 260) -> str:
     return ('…' if start else '') + text[start:start + size] + ('…' if start + size < len(text) else '')
 
 
+# Extract buyer clauses before mapping categories. A seller calling itself an
+# agency or software company says nothing about who should buy its offering.
+BUYER_CATEGORIES = [
+    (r'\bplumb(?:ers?|ing)\b', 'Plumbing businesses', ['Owner', 'Operations Manager']),
+    (r'\b(?:veterinary|veterinarians?|vets?)\b', 'Veterinary clinics', ['Practice Manager', 'Owner']),
+    (r'\b(?:restaurants?|hospitality|hotels?)\b', 'Hospitality', ['Owner', 'Operations Manager']),
+    (r'\b(?:retail(?:ers?)?|ecommerce|e-commerce|online stores?)\b', 'Retail & ecommerce', ['Head of Operations', 'Owner']),
+    (r'\b(?:healthcare|medical|dental|dentists?)\b', 'Healthcare services', ['Practice Manager', 'Operations Director']),
+    (r'\b(?:agenc(?:y|ies)|consultancies)\b', 'Professional services', ['Founder', 'Head of Operations']),
+    (r'\b(?:fintech|financial technology)\b', 'Financial technology', ['Head of Operations', 'CTO']),
+    (r'\b(?:saas|software companies|software teams)\b', 'B2B SaaS', ['Founder', 'Head of Operations']),
+    (r'\b(?:manufactur(?:ing|ers?)|factories)\b', 'Manufacturing', ['Operations Director', 'Plant Manager']),
+]
+
+
 def infer_profile(page: Page) -> Profile:
-    industries = [label for label, terms in INDUSTRY_TERMS.items() if any(matches(t, page.text) for t in terms)]
-    keywords = [term for term in KEYWORD_TERMS if matches(term, page.text)]
-    roles = [term for term in ROLE_TERMS if matches(term, page.text)]
-    # These are explicitly draft targeting suggestions, not inferred firmographics.
     description = page.description or page.text[:900]
+    # Restrict suggestions to the summary, not navigation/customer-logo lists.
+    positive = re.sub(r'\b(?:not(?!\s+(?:just|only)\b)|excluding|exclude|except)\s+[^.!?;,]{2,100}', ' ', description, flags=re.I)
+    buyer_text = '; '.join(re.split(r'\s+(?:serv(?:e|es|ing)|sell(?:s|ing)?|reach(?:es|ing)?|help(?:s|ing)?|build(?:s|ing)?|improv(?:e|es|ing)|automate(?:s)?|manage(?:s)?|with us)\b', clause, maxsplit=1, flags=re.I)[0].strip() for clause in re.findall(r'\b(?:for|to|helps?|serving|serves?|targeting)\s+([^.!?;]{2,180})', positive, flags=re.I))
+    candidates = [(label, roles) for pattern, label, roles in BUYER_CATEGORIES if re.search(pattern, buyer_text, re.I)]
+    industries = [candidates[0][0]] if candidates else []
+    roles = list(candidates[0][1]) if candidates else []
+    if re.search(r'\b(?:engineering|developer|devops)\b', buyer_text, re.I):
+        roles = ['Engineering Manager', 'CTO']
+    elif re.search(r'\b(?:sales|revenue)\b', buyer_text, re.I):
+        roles = ['Head of Sales', 'Revenue Operations']
+    keywords = [term for term in KEYWORD_TERMS if matches(term, description)]
+    exclusions = [value.strip() for value in re.findall(r'\b(?:not(?!\s+(?:just|only)\b)|excluding|exclude|except)\s+([^.!?;,]{2,100})', description, re.I)]
+    geographies = [label for pattern, label in [(r'\b(?:US|USA)\b|\b[Uu]nited [Ss]tates\b', 'United States'), (r'\bUK\b|\b[Uu]nited [Kk]ingdom\b', 'United Kingdom'), (r'\b[Cc]anada\b', 'Canada'), (r'\b[Aa]ustralia\b', 'Australia')] if re.search(pattern, buyer_text)]
     return Profile(company_name=re.split(r'\s[|–—]\s', page.title)[0][:240],
-                   description=description + '\n\nDraft ICP from website keyword rules; review target industries, roles, and keywords. Company sizes and geographies are unknown until you choose them.',
-                   industries=industries[:12], company_sizes=[], geographies=[],
-                   buyer_roles=roles, keywords=keywords[:20], exclusions=[])
+                   description=description + '\n\nDraft ICP from explicit buyer-language rules; review every suggestion. Unstated buyers and company sizes are unknown.',
+                   industries=industries, company_sizes=[], geographies=geographies,
+                   buyer_roles=roles, keywords=keywords[:20], exclusions=exclusions)
+
+
+def company_identity_text(value: str) -> str:
+    # A supplier's beneficiary/use-case language is not its own category.
+    # Keep direct identity before "software for clinics" / "helps clinics".
+    return re.split(r'\b(?:for|helps?|serves?|serving|targeting)\s+', value, maxsplit=1, flags=re.I)[0].strip()
 
 
 class RulesDecisionProvider:
@@ -57,10 +101,10 @@ class RulesDecisionProvider:
         inferred_industry = fixture['industry'] if fixture else next(
             (label for source in (page.title, page.description)
              for label, terms in INDUSTRY_TERMS.items()
-             if any(matches(t, source) for t in terms)), 'Unknown')
+             if any(matches(t, company_identity_text(source)) for t in terms)), 'Unknown')
         matched_industries = [x for x in profile.industries if
-                             x.casefold() == inferred_industry.casefold() or
-                             (inferred_industry == 'Unknown' and matches(x, page.title))]
+                             canonical_industry(x) == canonical_industry(inferred_industry) or
+                             (inferred_industry == 'Unknown' and matches(x, company_identity_text(page.title)))]
         matched_roles = [x for x in profile.buyer_roles if matches(x, text)]
         matched_signals = [x for x in SIGNAL_TERMS if matches(x, text)]
         # Category exclusions describe this company, not customers mentioned in
@@ -69,8 +113,8 @@ class RulesDecisionProvider:
         for term in profile.exclusions:
             categories = {label for label, terms in INDUSTRY_TERMS.items()
                           if matches(label, term) or any(matches(t, term) for t in terms)}
-            excluded = (inferred_industry in categories) if categories else any(
-                matches(term, source) for source in (page.title, page.description))
+            excluded = (canonical_industry(inferred_industry) in {canonical_industry(category) for category in categories}) if categories else any(
+                matches(term, company_identity_text(source)) for source in (page.title, page.description))
             if fixture is not None:
                 excluded = matches(term, text)
             if excluded:
@@ -85,15 +129,23 @@ class RulesDecisionProvider:
         breakdown = [part('Keyword fit', matched_keywords, profile.keywords, 40, 4),
                      part('Industry language', matched_industries, profile.industries, 25, 1),
                      part('Buyer-role language', matched_roles, profile.buyer_roles, 15, 2),
-                     part('Observable signals', matched_signals, SIGNAL_TERMS, 20, 2)]
+                     ScoreComponent(label='Observable signals', points=0, max_points=20,
+                                    reason='Undated website mentions do not establish a current buying signal')]
         if exclusions:
-            breakdown.append(ScoreComponent(label='Exclusion penalty', points=-50, max_points=0,
+            breakdown.append(ScoreComponent(label='Exclusion penalty', points=-100, max_points=0,
                                              reason='Excluded website language: ' + ', '.join(exclusions)))
         score = max(0, min(100, sum(x.points for x in breakdown)))
         if profile.industries and not matched_industries and score >= 65:
             breakdown.append(ScoreComponent(label='Unconfirmed industry fit',
                 points=64-score, max_points=0,
                 reason='Company identity does not establish the target industry; score capped below strong fit'))
+            score = 64
+        # A high keyword score cannot establish hard size/location constraints.
+        # The website extractor does not verify firmographics for real companies.
+        if not fixture and (profile.geographies or profile.company_sizes) and score >= 65:
+            breakdown.append(ScoreComponent(label='Unverified required criteria',
+                points=64-score, max_points=0,
+                reason='Required company size or geography is unknown; review before keeping this match'))
             score = 64
         evidence = [Evidence(id=new_id('ev'), title=('Fictional demo: ' if is_demo else '') + page.title,
                              url=page.url, excerpt=(('Fictional fixture. ' if is_demo else '') + (page.description or text[:400]))[:600],
@@ -117,7 +169,7 @@ class RulesDecisionProvider:
         unknowns = ['No contact-enrichment provider is configured; people and email addresses are unavailable',
                     'Budget, buying intent, and decision authority are unknown',
                     'Publication dates and the recency of website statements are unknown',
-                    'Company size and geography do not contribute to the score in this MVP']
+                    'Company size and geography require independent confirmation; unknown required criteria keep this match in research']
         if is_demo:
             unknowns.insert(0, 'All company details and evidence are fictional demo fixtures')
         else:
@@ -135,7 +187,7 @@ class RulesDecisionProvider:
                        industry=fixture['industry'] if fixture else inferred_industry,
                        employee_range=fixture['employee_range'] if fixture else 'Unknown',
                        location=fixture['location'] if fixture else 'Unknown', score=score,
-                       confidence='medium' if matched_keywords and matched_industries else 'low',
+                       confidence='medium' if matched_keywords and matched_industries and not (profile.geographies or profile.company_sizes) and not exclusions else 'low',
                        decision_engine='rules', status='new', why_fit=fit, why_now=signals,
                        unknowns=unknowns, evidence=evidence, contacts=contacts, is_demo=is_demo,
                        researched_at=timestamp, score_breakdown=breakdown)

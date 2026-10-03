@@ -36,9 +36,10 @@ class DiscoveryService:
         blockers = []
         if not self.settings.approved:
             blockers.append('Discovery launch, licensed-data access, and job/workspace/global budgets require operator approval')
-        for label, provider in (('Company discovery', discovery), ('Contact discovery', contacts)):
-            if not provider.configured or not provider.licensed:
-                blockers.append(f'{label} is not configured or commercially licensed')
+        # Named-contact enrichment is an independent, optional capability.
+        # Its credentials/license never block approved company discovery.
+        if not discovery.configured or not discovery.licensed:
+            blockers.append('Company discovery is not configured or commercially licensed')
         return DiscoveryStatus(enabled=not blockers, providers=DiscoveryProviders(discovery=discovery,
             contacts=contacts, verification=ProviderReadiness(configured=False, licensed=False,
             reason='Independent email verification is not configured; discovered emails remain unverified')),
@@ -46,6 +47,7 @@ class DiscoveryService:
             blockers=blockers)
 
     def discover(self, body: DiscoverRequest, *, fetch_page=fetch_public_page, parallel_domains=4) -> DiscoverResponse:
+        excluded = {canonical_domain(domain) for domain in body.excluded_domains}
         cost = self.settings.exa.unit_cost_microusd
         deadline = time.monotonic() + DISCOVERY_DEADLINE_SECONDS
         try:
@@ -54,6 +56,8 @@ class DiscoveryService:
             return DiscoverResponse(errors=[str(exc)])
         except ProviderFailure as exc:
             return DiscoverResponse(errors=[str(exc)], cost_microusd=cost, spend_uncertain=True)
+        # Trusted server-derived exclusions are applied before any company page fetch.
+        candidates = [candidate for candidate in candidates if canonical_domain(candidate.domain) not in excluded]
         # No Jev call here: only the approved Exa reservation can be spent.
         rules = RulesDecisionProvider()
         def evaluate(candidate):
@@ -73,7 +77,7 @@ class DiscoveryService:
                 account.license_restrictions = self.settings.exa.restrictions()
                 account.contacts = []
                 account.unknowns = [x for x in account.unknowns if 'No contact-enrichment provider' not in x]
-                account.unknowns.append('Contact discovery and independent email verification have not completed')
+                account.unknowns.append('Named contacts have not been enriched; independent email verification is not configured')
                 return account, None
             except FetchError as exc:
                 return None, f'{candidate.domain}: {exc}'
@@ -90,6 +94,13 @@ class DiscoveryService:
         return DiscoverResponse(accounts=accounts, errors=errors[:20], cost_microusd=cost)
 
     def contacts(self, body: ContactsRequest) -> ContactsResponse:
+        # Defense in depth: the tenant-aware caller also rechecks immediately before dispatch.
+        if canonical_domain(body.domain) in {canonical_domain(domain) for domain in body.excluded_domains}:
+            return ContactsResponse(account_id=body.account_id,
+                errors=['Company was passed or suppressed; no contact provider request was made'])
+        if not body.enrich_contacts:
+            return ContactsResponse(account_id=body.account_id,
+                errors=['Named-contact enrichment was not selected; no contact provider request was made'])
         cost = self.settings.pdl.unit_cost_microusd * body.max_contacts
         try:
             contacts = self.pdl.search(body.profile, body.domain, body.max_contacts, body.max_cost_microusd)

@@ -5,8 +5,6 @@ export function discoveryReady(status: DiscoveryStatus | null): boolean {
     status?.enabled &&
     status.providers?.discovery?.configured &&
     status.providers.discovery.licensed &&
-    status.providers?.contacts?.configured &&
-    status.providers.contacts.licensed &&
     status.blockers?.length === 0,
   );
 }

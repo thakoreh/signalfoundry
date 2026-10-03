@@ -7,6 +7,7 @@ import { tenantMutation, tenantQuery } from "./lib/auth";
 import {
   iso,
   jobResult,
+  contactsForCampaign,
   requireCampaign,
   requireJob,
   requireWorkspace,
@@ -20,11 +21,18 @@ import {
 import { workerConfiguration } from "./lib/worker";
 import {
   discoveryPolicy,
+  contactDataAccessible,
   dataVisible,
   filterAccessibleDiscoveryAccounts,
 } from "./lib/discoveryPolicy";
 import { reserveDiscovery, settleDiscovery } from "./lib/discoveryLedger";
 import * as validators from "./validators";
+import {
+  applyReviewFeedback,
+  feedbackDomain,
+  isResearchExcluded,
+  researchExclusions,
+} from "./lib/feedback";
 
 const MAX_ATTEMPTS = 5;
 const LEASE_MS = 150_000;
@@ -226,6 +234,15 @@ export const start = tenantMutation({
         "CONFIGURATION_ERROR",
         "Discovery requires approved provider licenses and spend limits",
       );
+    if (
+      campaign.mode === "discovery" &&
+      campaign.enrich_contacts === true &&
+      !contactDataAccessible()
+    )
+      throw appError(
+        "CONFIGURATION_ERROR",
+        "Named-contact enrichment requires separate PDL data-access approval; use company-only discovery or configure that capability",
+      );
     await ctx.db.patch(workspace._id, {
       activeJobs: workspace.activeJobs + 1,
       researchWindowCount: count + 1,
@@ -255,6 +272,7 @@ export const start = tenantMutation({
             stage: "discovery" as const,
             stageCursor: 0,
             targetCount: campaign.target_count ?? 20,
+            enrichContacts: campaign.enrich_contacts ?? false,
             offeringWebsite: campaign.offering_website ?? workspace.website,
           }
         : {}),
@@ -347,6 +365,7 @@ export const claim = internalMutation({
       campaignId: v.id("campaigns"),
       mode: validators.mode,
       domains: v.array(v.string()),
+      excludedDomains: v.array(v.string()),
       profile: validators.profile,
     }),
     v.null(),
@@ -377,6 +396,26 @@ export const claim = internalMutation({
         return null;
       }
     }
+    let excludedDomains: string[];
+    try {
+      excludedDomains = await researchExclusions(
+        ctx,
+        row.orgId,
+        row.campaignId,
+      );
+    } catch {
+      await failJob(
+        ctx,
+        row,
+        "Research paused because the exclusion set exceeds the safe 100-domain dispatch limit. Restore exclusions before retrying.",
+        false,
+      );
+      return null;
+    }
+    const excluded = new Set(excludedDomains);
+    const domains = row.domains.filter(
+      (domain) => !excluded.has(feedbackDomain(new URL(domain).hostname)),
+    );
     await ctx.db.patch(row._id, {
       status: "running",
       attempt: args.attempt,
@@ -391,7 +430,8 @@ export const claim = internalMutation({
       orgId: row.orgId,
       campaignId: row.campaignId,
       mode: row.mode,
-      domains: row.domains,
+      domains,
+      excludedDomains,
       profile: row.profile,
     };
   },
@@ -416,10 +456,19 @@ export const finish = internalMutation({
     if (campaign.activeJobId !== row._id) return null;
     const suppliedAccounts = args.accounts ?? row.intermediateAccounts ?? [];
     const suppliedErrors = args.errors ?? row.stageErrors ?? [];
+    const contactScope = {
+      mode: row.mode,
+      enrich_contacts:
+        row.enrichContacts === true && campaign.enrich_contacts === true,
+    };
+    const scopedAccounts = suppliedAccounts.map((account) => ({
+      ...account,
+      contacts: contactsForCampaign(account.contacts, contactScope),
+    }));
     let accounts =
       row.mode === "discovery"
-        ? filterAccessibleDiscoveryAccounts(suppliedAccounts)
-        : suppliedAccounts;
+        ? filterAccessibleDiscoveryAccounts(scopedAccounts)
+        : scopedAccounts;
     const pruned =
       accounts.length !== suppliedAccounts.length ||
       accounts.reduce(
@@ -433,11 +482,40 @@ export const finish = internalMutation({
     let errors = pruned
       ? [
           ...suppliedErrors.slice(0, 19),
-          "Expired or revoked licensed data was removed before saving results.",
+          "Expired, revoked, or unselected contact data was removed before saving results.",
         ]
       : suppliedErrors;
     validateResearchResult(accounts, errors, row.campaignId, row.mode);
-    if (!accounts.length && (row.mode !== "discovery" || errors.length > 0)) {
+    const stored = await ctx.db
+      .query("accounts")
+      .withIndex("by_orgId_and_campaignId_and_score", (q) =>
+        q.eq("orgId", row.orgId).eq("campaignId", row.campaignId),
+      )
+      .take(row.mode === "discovery" ? 31 : 11);
+    const allManualExcluded =
+      row.mode === "manual" &&
+      (
+        await Promise.all(
+          row.domains.map((domain) => {
+            const canonical = feedbackDomain(new URL(domain).hostname);
+            const prior = stored.find(
+              (account) => feedbackDomain(account.data.domain) === canonical,
+            );
+            return isResearchExcluded(
+              ctx,
+              row.orgId,
+              row.campaignId,
+              canonical,
+              prior?.data,
+            );
+          }),
+        )
+      ).every(Boolean);
+    if (
+      !accounts.length &&
+      !allManualExcluded &&
+      (row.mode !== "discovery" || errors.length > 0)
+    ) {
       await failJob(
         ctx,
         row,
@@ -446,17 +524,19 @@ export const finish = internalMutation({
       );
       return null;
     }
-    const stored = await ctx.db
-      .query("accounts")
-      .withIndex("by_orgId_and_campaignId_and_score", (q) =>
-        q.eq("orgId", row.orgId).eq("campaignId", row.campaignId),
-      )
-      .take(row.mode === "discovery" ? 31 : 11);
     const previous = [];
     for (const account of stored) {
       if (row.mode === "discovery" && !dataVisible(account.data))
         await ctx.db.delete(account._id);
-      else previous.push(account);
+      else {
+        const data = {
+          ...account.data,
+          contacts: contactsForCampaign(account.data.contacts, contactScope),
+        };
+        if (data.contacts.length !== account.data.contacts.length)
+          await ctx.db.patch(account._id, { data });
+        previous.push({ ...account, data });
+      }
     }
     const accountLimit =
       row.mode === "discovery" ? (row.targetCount ?? 30) : 10;
@@ -468,7 +548,41 @@ export const finish = internalMutation({
     const existing = new Map(
       previous.map((account) => [account.data.domain, account]),
     );
-    if (row.mode === "discovery" && errors.length) {
+    const suppressedPrevious = new Set<string>();
+    for (const account of previous) {
+      if (
+        await isResearchExcluded(
+          ctx,
+          row.orgId,
+          row.campaignId,
+          account.data.domain,
+          account.data,
+        )
+      )
+        suppressedPrevious.add(account.data.domain);
+    }
+    const eligible = [];
+    for (const account of accounts) {
+      if (
+        !(await isResearchExcluded(
+          ctx,
+          row.orgId,
+          row.campaignId,
+          account.domain,
+          previous.find(
+            (prior) =>
+              feedbackDomain(prior.data.domain) ===
+              feedbackDomain(account.domain),
+          )?.data,
+        ))
+      )
+        eligible.push(account);
+    }
+    accounts = eligible;
+    if (
+      (row.mode === "discovery" && errors.length) ||
+      suppressedPrevious.size > 0
+    ) {
       let room = Math.max(0, accountLimit - previous.length);
       const bounded = accounts.filter(
         (account) => existing.has(account.domain) || room-- > 0,
@@ -482,12 +596,11 @@ export const finish = internalMutation({
       }
     }
     // Partial research is not an instruction to delete earlier evidence or user decisions.
-    const retained = errors.length
-      ? previous.filter(
-          (account) =>
-            !accounts.some((item) => item.domain === account.data.domain),
-        )
-      : [];
+    const retained = previous.filter(
+      (account) =>
+        (errors.length > 0 || suppressedPrevious.has(account.data.domain)) &&
+        !accounts.some((item) => item.domain === account.data.domain),
+    );
     if (
       accounts.length + retained.length > accountLimit ||
       (row.mode === "manual" && accounts.length > row.domains.length)
@@ -502,9 +615,22 @@ export const finish = internalMutation({
       void workerId;
       void workerCampaignId;
       const old = existing.get(data.domain);
+      const reviewed = await applyReviewFeedback(
+        ctx,
+        row.orgId,
+        row.campaignId,
+        data,
+        old?.data ?? {
+          ...data,
+          status: "new",
+          review_reason: null,
+          reviewed_at: null,
+          suppress_workspace: false,
+        },
+      );
       if (old) {
         await ctx.db.patch(old._id, {
-          data: { ...data, status: old.data.status },
+          data: reviewed,
           score: data.score,
           jobId: row._id,
         });
@@ -515,11 +641,13 @@ export const finish = internalMutation({
           campaignId: row.campaignId,
           jobId: row._id,
           score: data.score,
-          data,
+          data: reviewed,
         });
     }
     if (!errors.length) {
-      for (const old of existing.values()) await ctx.db.delete(old._id);
+      for (const old of existing.values())
+        if (!suppressedPrevious.has(old.data.domain))
+          await ctx.db.delete(old._id);
     }
     const status = errors.length ? "partial" : "succeeded";
     await ctx.db.patch(row._id, {

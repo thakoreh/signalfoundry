@@ -48,7 +48,7 @@ def discover_body(**updates):
 
 def contacts_body(**updates):
     return ContactsRequest(**{**scope(), 'profile': DEMO_PROFILE, 'domain': 'company.com',
-        'account_id': 'acc_one', 'max_contacts': 3, **updates})
+        'account_id': 'acc_one', 'max_contacts': 3, 'enrich_contacts': True, **updates})
 
 
 def pdl_person(**updates):
@@ -76,6 +76,62 @@ class DiscoveryProviderTests(unittest.TestCase):
         self.assertEqual(result.accounts, [])
         self.assertEqual(result.cost_microusd, 0)
         self.assertEqual(contacts.cost_microusd, 0)
+        self.assertEqual(self.calls, [])
+
+    def test_exclusions_filter_candidates_before_website_and_contacts_before_pdl(self):
+        service = DiscoveryService(self.settings, transport=self.transport({'results': [{'url': 'https://www.company.com'}]}))
+        with patch('app.discovery.fetch_public_page', side_effect=AssertionError('Suppressed website fetched')):
+            result = service.discover(discover_body(excluded_domains=['company.com']),
+                fetch_page=lambda _: self.fail('Suppressed candidate must not fetch a page'))
+        self.assertEqual(result.accounts, [])
+        self.assertEqual(len(self.calls), 1)  # Only bounded generic Exa discovery; no company-page fetch.
+        self.calls.clear()
+        service = DiscoveryService(self.settings, transport=self.transport({}))
+        result = service.contacts(contacts_body(domain='www.company.com', excluded_domains=['company.com']))
+        self.assertEqual(result.contacts, [])
+        self.assertEqual(result.cost_microusd, 0)
+        self.assertEqual(self.calls, [])
+        for excluded in [['company.com'] * 101, ['https://company.com/'], ['bad..com']]:
+            with self.assertRaises(ValidationError):
+                discover_body(excluded_domains=excluded)
+            with self.assertRaises(ValidationError):
+                contacts_body(excluded_domains=excluded)
+
+    def test_exa_only_readiness_and_execution_do_not_require_or_call_pdl(self):
+        for pdl in (ProviderPolicy(name='peopledatalabs'), self.settings.pdl):
+            settings = replace(self.settings, pdl=pdl)
+            service = DiscoveryService(settings, transport=self.transport({'results': [{'url': 'https://company.com'}]}))
+            self.assertTrue(service.status().enabled)
+            self.assertEqual(service.status().blockers, [])
+            self.assertFalse(service.status().providers.verification.configured)
+            before = len(self.calls)
+            result = service.discover(discover_body(), fetch_page=lambda _: PAGE)
+            self.assertEqual(len(result.accounts), 1)
+            self.assertEqual(result.accounts[0].contacts, [])
+            self.assertEqual(result.cost_microusd, 27_000)
+            self.assertEqual(len(self.calls) - before, 1)
+            self.assertEqual(str(self.calls[-1].url), EXA_URL)
+
+    def test_contacts_require_explicit_selection_even_with_approved_credentials(self):
+        service = DiscoveryService(self.settings, transport=self.transport({'status': 200, 'data': [pdl_person()]}))
+        body = contacts_body().model_dump()
+        del body['enrich_contacts']
+        for request in (ContactsRequest(**body), contacts_body(enrich_contacts=False)):
+            result = service.contacts(request)
+            self.assertEqual(result.contacts, [])
+            self.assertEqual(result.cost_microusd, 0)
+            self.assertIn('not selected', result.errors[0])
+        self.assertEqual(self.calls, [])
+
+    def test_selected_contact_scope_keeps_independent_license_and_budget_gates(self):
+        for field in ('key_approved', 'embedding', 'export', 'retention'):
+            settings = replace(self.settings, pdl=replace(self.settings.pdl, **{field: False}))
+            service = DiscoveryService(settings, transport=self.transport({}))
+            self.assertTrue(service.status().enabled)
+            self.assertEqual(service.contacts(contacts_body()).cost_microusd, 0)
+        for allowance in (0, 299_999, 1_000_001):
+            service = DiscoveryService(self.settings, transport=self.transport({}))
+            self.assertEqual(service.contacts(contacts_body(max_cost_microusd=allowance)).cost_microusd, 0)
         self.assertEqual(self.calls, [])
 
     def test_every_commercial_gate_and_key_approval_is_required(self):
@@ -274,8 +330,9 @@ class DiscoveryProviderTests(unittest.TestCase):
                        {'operation_id': 'x'*161}):
             with self.assertRaises(ValidationError):
                 discover_body(**values)
-        with self.assertRaises(ValidationError):
-            contacts_body(max_contacts=4)
+        for updates in ({'max_contacts': 4}, {'enrich_contacts': 'true'}, {'enrich_contacts': 1}):
+            with self.assertRaises(ValidationError):
+                contacts_body(**updates)
 
 
 class DiscoveryRoutesTests(unittest.TestCase):
@@ -302,6 +359,25 @@ class DiscoveryRoutesTests(unittest.TestCase):
             self.assertEqual(bad.status_code, 422)
             self.assertNotIn(token, bad.text)
 
+    def test_local_campaign_contact_selection_is_explicit_and_legacy_compatible(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'SIGNALFOUNDRY_PREVIEW_ORIGIN': '', 'DECISION_ENGINE': 'rules'}):
+            app = create_app(directory+'/local.sqlite3', testing=True)
+            with TestClient(app) as client:
+                payload = {'mode': 'discovery', 'name': 'Company-only', 'domains': [], 'profile_snapshot': DEMO_PROFILE.model_dump()}
+                default = client.post('/api/campaigns', json=payload)
+                self.assertEqual(default.status_code, 201)
+                self.assertFalse(default.json()['enrich_contacts'])
+                selected = client.post('/api/campaigns', json={**payload, 'enrich_contacts': True})
+                self.assertEqual(selected.status_code, 201)
+                self.assertTrue(client.get('/api/campaigns/'+selected.json()['id']).json()['enrich_contacts'])
+                self.assertEqual(client.post('/api/campaigns', json={**payload, 'enrich_contacts': 'true'}).status_code, 422)
+                self.assertEqual(client.post('/api/campaigns', json={**payload, 'mode': 'manual', 'domains': ['company.com'], 'enrich_contacts': True}).status_code, 422)
+                # Old persisted rows omit the field and remain safely company-only.
+                from app.models import Campaign
+                legacy = default.json()
+                del legacy['enrich_contacts']
+                self.assertFalse(Campaign.model_validate(legacy).enrich_contacts)
+
     def test_local_discovery_draft_is_disabled_and_manual_snapshot_frozen(self):
         with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'SIGNALFOUNDRY_PREVIEW_ORIGIN': '', 'DECISION_ENGINE': 'rules'}):
             app = create_app(directory+'/local.sqlite3', testing=True)
@@ -312,6 +388,7 @@ class DiscoveryRoutesTests(unittest.TestCase):
                 result = client.post('/api/campaigns', json={'mode': 'discovery', 'name': 'Find companies',
                     'domains': [], 'profile_snapshot': profile, 'target_count': 10})
                 self.assertEqual(result.status_code, 201)
+                self.assertFalse(result.json()['enrich_contacts'])
                 with patch.object(app.state, 'fetch_page', side_effect=AssertionError('No discovery network')):
                     self.assertEqual(client.post('/api/campaigns/'+result.json()['id']+'/research', json={}).status_code, 503)
                 result = client.post('/api/campaigns', json={'mode': 'manual', 'name': 'Snapshot',

@@ -8,7 +8,7 @@ import threading
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
@@ -17,7 +17,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from .config import preview_origin
 from .discovery_models import DiscoveryStatus, local_discovery_status
 from .fixtures import DEMO_PROFILE
-from .models import Account, AccountStatus, AnalyzeRequest, Campaign, CampaignCreate, Draft, EmptyRequest, Profile, Workspace
+from .models import RestoreSuppression, Account, AccountStatus, AnalyzeRequest, Campaign, CampaignCreate, Draft, EmptyRequest, Profile, Workspace
 from .research import RulesDecisionProvider, demo_accounts, infer_profile, make_draft
 from .safety import FetchError, fetch_public_page, normalize_url
 from .store import Repository
@@ -178,6 +178,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         try:
             return repository().create_campaign(body.name, body.mode, domains,
                 profile_snapshot=body.profile_snapshot, target_count=body.target_count,
+                enrich_contacts=body.enrich_contacts,
                 offering_website=normalize_url(body.offering_website) if body.offering_website else None)
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
@@ -218,6 +219,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
                 accounts = demo_accounts(profile, campaign.id)
             else:
                 for domain in campaign.domains:
+                    if repository().is_research_excluded(campaign.id, urlsplit(domain).hostname):
+                        continue
                     try:
                         page = app.state.fetch_page(domain)
                         account = app.state.decision_provider.evaluate(profile, page, campaign_id=campaign.id)
@@ -245,14 +248,30 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.patch('/api/accounts/{account_id}', response_model=Account)
     def patch_account(account_id: str, body: AccountStatus):
-        result = repository().set_account_status(account_id, body.status)
+        result = repository().set_account_status(account_id, body.status, reason=body.reason,
+            suppress_workspace=body.suppress_workspace if 'suppress_workspace' in body.model_fields_set else None,
+            preserve_workspace_suppression=body.preserve_workspace_suppression)
         if result is None:
             raise HTTPException(404, 'Account not found')
         return result
 
+    @app.get('/api/workspace/suppressions')
+    def workspace_suppressions(after: str = Query('', max_length=253), limit: int = Query(50, ge=1, le=100)):
+        return repository().workspace_suppressions(after=after, limit=limit)
+
+    @app.post('/api/workspace/suppressions/restore')
+    def restore_suppression(body: RestoreSuppression):
+        try:
+            repository().restore_workspace_domain(body.domain)
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)) from exc
+        return {'restored': True}
+
     @app.post('/api/accounts/{account_id}/draft', response_model=Draft)
     def draft(account_id: str, body: EmptyRequest):
         account = get_account(account_id)
+        if repository().is_workspace_suppressed(account.domain):
+            raise HTTPException(409, 'This domain is workspace-suppressed. Restore it before generating outreach drafts.')
         profile = get_campaign(account.campaign_id).profile_snapshot or repository().workspace().profile
         if profile is None:
             raise HTTPException(422, 'Save a workspace profile before generating a draft')

@@ -18,6 +18,7 @@ export function campaignResult(row: Doc<"campaigns">) {
     id: row._id,
     name: row.name,
     mode: row.mode,
+    enrich_contacts: row.enrich_contacts ?? false,
     status: row.status,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -37,20 +38,50 @@ export function campaignResult(row: Doc<"campaigns">) {
       : {}),
   };
 }
-export function accountResult(row: Doc<"accounts">) {
-  if (!dataVisible(row.data))
-    throw appError(
-      "DATA_EXPIRED",
-      "Licensed prospect data is unavailable or expired",
-    );
-  const contacts = row.data.contacts.filter(
+// Campaign selection is an independent data-use boundary, including legacy rows.
+// Company search cannot supply named people; manual research retains only honest
+// role suggestions with no person, email, or provider-derived personal data.
+export function contactsForCampaign(
+  contacts: Doc<"accounts">["data"]["contacts"],
+  campaign: Pick<Doc<"campaigns">, "mode" | "enrich_contacts">,
+): Doc<"accounts">["data"]["contacts"] {
+  if (campaign.mode !== "discovery")
+    return contacts
+      .filter(
+        (contact) =>
+          !contact.provider && contact.name === null && contact.email === null,
+      )
+      .map((contact) => ({
+        name: null,
+        role: contact.role,
+        email: null,
+        verification_status: "not_available" as const,
+        source_url: null,
+        note: "Suggested role to research, not an identified person. No contact enrichment was requested.",
+      }));
+  if (campaign.enrich_contacts !== true) return [];
+  return contacts.filter(
     (contact) =>
-      !contact.provider ||
+      contact.provider === "peopledatalabs" &&
+      !!contact.license_reference &&
+      !!contact.retrieved_at &&
+      Number.isFinite(Date.parse(contact.retrieved_at)) &&
       dataVisible({
         source_provider: contact.provider,
         license_expires_at: contact.license_expires_at,
       }),
   );
+}
+export function accountResult(
+  row: Doc<"accounts">,
+  campaign: Pick<Doc<"campaigns">, "mode" | "enrich_contacts">,
+) {
+  if (!dataVisible(row.data))
+    throw appError(
+      "DATA_EXPIRED",
+      "Licensed prospect data is unavailable or expired",
+    );
+  const contacts = contactsForCampaign(row.data.contacts, campaign);
   return { id: row._id, campaign_id: row.campaignId, ...row.data, contacts };
 }
 export function jobResult(row: Doc<"jobs">) {

@@ -5,6 +5,15 @@ export const mode = v.union(
   v.literal("manual"),
   v.literal("discovery"),
 );
+export const reviewReason = v.union(
+  v.literal("wrong_industry"),
+  v.literal("wrong_geography"),
+  v.literal("wrong_size"),
+  v.literal("existing_customer"),
+  v.literal("competitor"),
+  v.literal("not_relevant"),
+  v.literal("other"),
+);
 export const accountStatus = v.union(
   v.literal("new"),
   v.literal("shortlisted"),
@@ -93,6 +102,9 @@ export const scoreComponent = v.object({
   reason: v.string(),
 });
 export const accountFields = {
+  review_reason: v.optional(v.union(reviewReason, v.null())),
+  reviewed_at: v.optional(v.union(v.string(), v.null())),
+  suppress_workspace: v.optional(v.boolean()),
   source_provider: v.optional(v.union(v.string(), v.null())),
   source_url: v.optional(v.union(v.string(), v.null())),
   retrieved_at: v.optional(v.union(v.string(), v.null())),
@@ -138,6 +150,7 @@ export const workspace = v.object({
   created_at: v.string(),
 });
 export const campaignFields = {
+  enrich_contacts: v.optional(v.boolean()),
   profile_snapshot: v.optional(profile),
   offering_website: v.optional(v.union(v.string(), v.null())),
   target_count: v.optional(v.number()),

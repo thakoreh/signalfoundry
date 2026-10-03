@@ -22,6 +22,8 @@ const functionKinds: Record<FunctionName, "query" | "mutation" | "action"> = {
   "accounts.get": "query",
   "accounts.setStatus": "mutation",
   "accounts.draft": "query",
+  "accounts.suppressions": "query",
+  "accounts.restoreSuppression": "mutation",
   "jobs.start": "mutation",
   "jobs.get": "query",
   "jobs.cancel": "mutation",

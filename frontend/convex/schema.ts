@@ -2,6 +2,8 @@ import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
 import {
   accountData,
+  accountStatus,
+  reviewReason,
   workerAccount,
   campaignFields,
   jobStatus,
@@ -57,6 +59,35 @@ export default defineSchema({
     ])
     .index("by_orgId", ["orgId"])
     .index("by_jobId", ["jobId"]),
+  accountFeedback: defineTable({
+    orgId: v.string(),
+    campaignId: v.id("campaigns"),
+    accountId: v.id("accounts"),
+    domain: v.string(),
+    status: accountStatus,
+    reason: v.union(reviewReason, v.null()),
+    reviewedAt: v.string(),
+  })
+    .index("by_orgId_and_campaignId_and_domain", [
+      "orgId",
+      "campaignId",
+      "domain",
+    ])
+    .index("by_orgId_and_campaignId_and_status", [
+      "orgId",
+      "campaignId",
+      "status",
+    ]),
+  workspaceSuppressions: defineTable({
+    orgId: v.string(),
+    domain: v.string(),
+    campaignId: v.id("campaigns"),
+    accountId: v.id("accounts"),
+    reason: v.union(reviewReason, v.null()),
+    updatedAt: v.string(),
+  })
+    .index("by_orgId_and_domain", ["orgId", "domain"])
+    .index("by_orgId", ["orgId"]),
   discoveryProviderWindow: defineTable({
     provider: v.string(),
     nextAvailableAt: v.number(),
@@ -90,6 +121,7 @@ export default defineSchema({
     stageCursor: v.optional(v.number()),
     stageInFlight: v.optional(v.boolean()),
     retentionSweepAt: v.optional(v.number()),
+    enrichContacts: v.optional(v.boolean()),
     verificationEnabled: v.optional(v.boolean()),
     stageErrors: v.optional(v.array(v.string())),
     orgId: v.string(),

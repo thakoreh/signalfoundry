@@ -26,11 +26,19 @@ These are code capabilities, not claims that cloud accounts are configured or th
 - [ ] Connect metrics/log alerts; verify worker-not-ready, job failure/backlog, billing webhook failure, high auth errors and resource usage alerts reach an owner
 - [ ] Rehearse backup/export and isolated restore; record recovery point/time objectives and authorized rollback plan
 - [ ] Approve privacy notice, product terms, data retention/deletion, business/site research policy, legal company identity and support contact
-- [ ] Decide whether licensed discovery/contact verification is needed. It remains unconfigured; no real contact verification is claimed
+- [ ] Approve company discovery independently from optional named-contact enrichment; verify server-side opt-in, provider rights, budgets, expiry and revocation. Independent email verification remains unconfigured.
 - [ ] Finish accessibility, responsive UI and target-browser acceptance with the real auth widgets
 
 ## Product honesty
 
-Demo accounts/evidence remain explicitly fictional. Public website observations are not verified buying events. Manual research accepts supplied public company domains only. Contact discovery, email verification, automatic sending and commercial lead-data licensing are not supplied. Drafts are human-reviewed suggestions and are never sent.
+Demo accounts/evidence remain explicitly fictional. Public website observations are not verified buying events. Manual research accepts supplied public company domains only. Exa company discovery and optional PDL contact adapters are implemented but disabled until separately approved credentials, commercial rights and budgets are configured. Independent email verification and automatic sending are not supplied. Drafts are human-reviewed suggestions and are never sent.
 
 See [setup](SAAS_SETUP.md), [operations](OPERATIONS.md), and [verification evidence](VERIFICATION.md).
+
+## Approval-led mission acceptance
+
+- [ ] Buyer inference handles direct buyers, seller/category ambiguity, exclusions and unknown firmographics honestly
+- [ ] Company-only campaigns cannot fetch, retain, return or export unsolicited contact data
+- [ ] Pass and workspace suppression stop subsequent research/enrichment, survive reruns, stay tenant-scoped and can be reversed after source expiry
+- [ ] Actual desktop/mobile/keyboard/reduced-motion screenshots of the final head are reviewed
+- [ ] Full-campaign CSV scope is explicit; suppressed historical rows do not become actionable suggestions

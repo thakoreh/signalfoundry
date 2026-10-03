@@ -91,7 +91,7 @@ const test = base.extend<{ browserHealth: void }>({
 
 type Options = {
   profile?: Profile | null;
-  providers?: "ready" | "disabled" | "error";
+  providers?: "ready" | "disabled" | "error" | "company-only";
   maxTargets?: number;
   campaigns?: Campaign[];
   accounts?: Account[];
@@ -100,6 +100,7 @@ type Options = {
   suggestionFailures?: number;
   refreshFailuresAfterResearch?: number;
   testData?: boolean;
+  statusFailures?: number;
 };
 
 async function mockWorkspace(page: Page, options: Options = {}) {
@@ -128,6 +129,12 @@ async function mockWorkspace(page: Page, options: Options = {}) {
     researched: false,
     drafts: [] as string[],
     statusChanges: [] as { id: string; status: string }[],
+    statusFailures: options.statusFailures ?? 0,
+    suppressions: [] as {
+      domain: string;
+      reason: string | null;
+      updated_at: string;
+    }[],
     exports: [] as string[],
   };
   await page.route("**/api/**", async (route) => {
@@ -151,6 +158,15 @@ async function mockWorkspace(page: Page, options: Options = {}) {
         ...(options.providers === "disabled" ? DISABLED : READY),
         max_target_count: options.maxTargets ?? 30,
       };
+      if (options.providers === "company-only")
+        status.providers = {
+          ...status.providers,
+          contacts: {
+            configured: false,
+            licensed: false,
+            reason: "Optional contacts unavailable",
+          },
+        };
       return send(
         options.testData && options.providers !== "disabled"
           ? {
@@ -278,13 +294,45 @@ async function mockWorkspace(page: Page, options: Options = {}) {
           "TEST DATA mock-backed draft. Review all claims and contact details. Nothing is sent.",
       });
     }
+    if (path === "/workspace/suppressions" && method === "GET")
+      return send({
+        items: state.suppressions,
+        is_done: true,
+        continue_cursor: null,
+      });
+    if (path === "/workspace/suppressions/restore" && method === "POST") {
+      state.suppressions = state.suppressions.filter(
+        (item) => item.domain !== request.postDataJSON().domain,
+      );
+      return send({ restored: true });
+    }
     const account = path.match(/^\/accounts\/([^/]+)$/);
     if (account && method === "GET")
       return send(state.accounts.find((item) => item.id === account[1]));
     if (account && method === "PATCH") {
       const target = state.accounts.find((item) => item.id === account[1]);
       if (!target) return send({ detail: "Account not found" }, 404);
-      target.status = request.postDataJSON().status;
+      if (state.statusFailures-- > 0)
+        return send(
+          { detail: "Review could not be saved. Please retry." },
+          503,
+        );
+      const feedback = request.postDataJSON();
+      target.status = feedback.status;
+      target.review_reason = feedback.reason ?? null;
+      target.reviewed_at = NOW;
+      target.suppress_workspace = feedback.preserve_workspace_suppression
+        ? target.suppress_workspace
+        : Boolean(feedback.suppress_workspace);
+      state.suppressions = state.suppressions.filter(
+        (item) => item.domain !== target.domain,
+      );
+      if (target.suppress_workspace)
+        state.suppressions.push({
+          domain: target.domain,
+          reason: target.review_reason ?? null,
+          updated_at: NOW,
+        });
       state.statusChanges.push({ id: target.id, status: target.status });
       return send(target);
     }
@@ -386,7 +434,9 @@ test("description-only discovery needs no profile, URL, or prospect list and sav
     })
     .fill(PROFILE.description);
   await dialog.getByRole("button", { name: "Suggest from offering" }).click();
-  await expect(dialog.getByText(/Draft targeting hypotheses/)).toBeVisible();
+  await expect(
+    dialog.getByText(/Starting suggestions from explicit buyer language/),
+  ).toBeVisible();
   await expect(
     dialog.getByRole("textbox", { name: /^Buyer roles\b/ }),
   ).toHaveValue("Head of Sales, Revenue Operations");
@@ -535,7 +585,7 @@ test("optional email verification does not block discovery and repeated clicks q
     dialog.getByRole("spinbutton", { name: /^Maximum companies to find\b/ }),
   ).toHaveValue("5");
   await expect(
-    dialog.getByText("Discovery providers ready", { exact: true }),
+    dialog.getByText("Company discovery ready", { exact: true }),
   ).toBeVisible();
   await expect(
     dialog.getByText(/Optional verifier not configured/),
@@ -624,7 +674,9 @@ test("a website-preview failure preserves edits and allows description-only hypo
   ).toHaveValue(PROFILE.description);
   await dialog.getByRole("button", { name: "Suggest from offering" }).click();
   await expect(dialog.getByRole("alert")).toHaveCount(0);
-  await expect(dialog.getByText(/Draft targeting hypotheses/)).toBeVisible();
+  await expect(
+    dialog.getByText(/Starting suggestions from explicit buyer language/),
+  ).toBeVisible();
   await review(dialog);
   expect(state.suggestions).toHaveLength(1);
   expect(state.creates).toHaveLength(0);
@@ -685,6 +737,7 @@ test("campaign snapshots and provider provenance remain visible with honest cont
     id: "campaign-1",
     name: "Saved October brief",
     mode: "discovery",
+    enrich_contacts: true,
     status: "complete",
     created_at: NOW,
     updated_at: NOW,
@@ -948,7 +1001,9 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
   });
   await test.step("2. Generate and edit target hypotheses", async () => {
     await dialog.getByRole("button", { name: "Suggest from offering" }).click();
-    await expect(dialog.getByText(/Draft targeting hypotheses/)).toBeVisible();
+    await expect(
+      dialog.getByText(/Starting suggestions from explicit buyer language/),
+    ).toBeVisible();
     await dialog
       .getByRole("textbox", { name: /^Buyer roles\b/ })
       .fill("Head of Sales, Revenue Operations");
@@ -964,6 +1019,12 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
     await dialog
       .getByRole("spinbutton", { name: /^Maximum companies to find\b/ })
       .fill("5");
+    await dialog
+      .getByText("Optional contact coverage", { exact: true })
+      .click();
+    await dialog
+      .getByRole("checkbox", { name: /Also request named contacts/ })
+      .check();
     await dialog
       .getByText("EDITABLE TARGET BRIEF", { exact: true })
       .scrollIntoViewIfNeeded();
@@ -1000,6 +1061,7 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
     expect(state.creates[0]).toMatchObject({
       name: "TEST DATA October customer discovery",
       domains: [],
+      enrich_contacts: true,
       mode: "discovery",
       target_count: 5,
       profile_snapshot: {
@@ -1084,7 +1146,9 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
       .click();
     await expect(drawer).toHaveCount(0);
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export CSV", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Export full campaign CSV", exact: true })
+      .click();
     const download = await downloadPromise;
     expect(download.suggestedFilename()).toBe(
       "signalfoundry-test-data-october-customer-discovery.csv",
@@ -1173,4 +1237,370 @@ test("TEST DATA one complete customer discovery campaign with ordered screenshot
     ),
     contentType: "application/json",
   });
+});
+
+test("buyer planning separates the seller from the direct customer and leaves ambiguous criteria unknown", async ({
+  page,
+}, testInfo) => {
+  const state = await mockWorkspace(page, { profile: null });
+  const dialog = await openCampaign(page, false);
+  const description = dialog.getByRole("textbox", {
+    name: "What does your offering help customers do?",
+    exact: true,
+  });
+  for (const [offering, industry, buyer] of [
+    [
+      "We are an agency building conversion websites for US plumbers.",
+      "Plumbing businesses",
+      "Owner, Operations Manager",
+    ],
+    [
+      "We sell scheduling software to veterinary clinics.",
+      "Veterinary clinics",
+      "Practice Manager, Owner",
+    ],
+    [
+      "Agency management software for web agencies.",
+      "Professional services",
+      "Founder, Head of Operations",
+    ],
+    [
+      "Developer observability for fintech engineering teams.",
+      "Financial technology",
+      "Engineering Manager, CTO",
+    ],
+  ]) {
+    await description.fill(offering);
+    await dialog.getByRole("button", { name: "Suggest from offering" }).click();
+    await expect(
+      dialog.getByRole("textbox", { name: /^Industries\b/ }),
+    ).toHaveValue(industry);
+    await expect(
+      dialog.getByRole("textbox", { name: /^Buyer roles\b/ }),
+    ).toHaveValue(buyer);
+  }
+  await description.fill(
+    "We are a marketing agency that makes beautiful things.",
+  );
+  await dialog.getByRole("button", { name: "Suggest from offering" }).click();
+  await expect(
+    dialog.getByRole("textbox", { name: /^Industries\b/ }),
+  ).toHaveValue("");
+  await expect(
+    dialog.getByText(/Which type of business gets the most value/),
+  ).toBeVisible();
+  await dialog
+    .getByRole("textbox", { name: "Who is this offering for?", exact: true })
+    .fill("plumbers in Canada");
+  await dialog.getByRole("button", { name: /Plumbing businesses/ }).click();
+  await expect(
+    dialog.getByRole("textbox", { name: /^Industries\b/ }),
+  ).toHaveValue("Plumbing businesses");
+  await expect(
+    dialog.getByRole("textbox", { name: /^Geographies\b/ }),
+  ).toHaveValue("Canada");
+  await dialog.locator(".audience-planner").scrollIntoViewIfNeeded();
+  await capture(page, testInfo, "explicit-buyer-audience");
+  expect(state.creates).toHaveLength(0);
+  expect(state.unknown).toEqual([]);
+});
+
+test("company-only readiness does not require contacts and never opts in silently", async ({
+  page,
+}, testInfo) => {
+  const state = await mockWorkspace(page, { providers: "company-only" });
+  const dialog = await openCampaign(page);
+  await expect(
+    dialog.getByText("Company discovery ready", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByText("Optional contact coverage", { exact: true }).click();
+  await expect(
+    dialog.getByRole("checkbox", { name: /Also request named contacts/ }),
+  ).not.toBeChecked();
+  await expect(
+    dialog.getByRole("checkbox", { name: /Also request named contacts/ }),
+  ).toBeDisabled();
+  await review(dialog);
+  await expect(
+    dialog.getByText("Company research only; no contact enrichment", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await dialog.getByRole("checkbox").check();
+  await capture(page, testInfo, "company-only-approval");
+  await dialog
+    .getByRole("button", { name: "Find customers", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  expect(state.creates[0].enrich_contacts).toBe(false);
+  expect(state.research).toEqual(["campaign-1"]);
+  expect(state.unknown).toEqual([]);
+});
+
+function missionFixture(): { campaign: Campaign; account: Account } {
+  const campaign: Campaign = {
+    id: "campaign-1",
+    name: "TEST DATA evidence review",
+    mode: "discovery",
+    status: "complete",
+    created_at: NOW,
+    updated_at: NOW,
+    account_count: 1,
+    qualified_count: 0,
+    domains: [],
+    errors: [],
+    profile_snapshot: PROFILE,
+    enrich_contacts: false,
+  };
+  const account: Account = {
+    id: "account-1",
+    campaign_id: campaign.id,
+    name: "TEST DATA Research Co",
+    domain: "research.example.com",
+    description: "TEST DATA public-source review fixture",
+    industry: "B2B SaaS",
+    employee_range: "Unknown",
+    location: "Unknown",
+    score: 64,
+    confidence: "low",
+    decision_engine: "rules",
+    status: "new",
+    why_fit: ["Source language mentions sales operations"],
+    why_now: ["Hiring language is undated and unverified"],
+    unknowns: ["Location and size are unknown"],
+    contacts: [],
+    is_demo: false,
+    researched_at: NOW,
+    score_breakdown: [],
+    evidence: [
+      {
+        id: "e1",
+        title: "TEST DATA saved company source",
+        url: "https://research.example.com",
+        excerpt: "TEST DATA B2B SaaS software for sales operations",
+        kind: "company",
+        published_at: null,
+        retrieved_at: NOW,
+        is_demo: false,
+      },
+    ],
+  };
+  return { campaign, account };
+}
+
+test("mission review shows unknown hard criteria, saves pass scope, retries a failure and supports undo", async ({
+  page,
+}, testInfo) => {
+  const { campaign, account } = missionFixture();
+  const state = await mockWorkspace(page, {
+    campaigns: [campaign],
+    accounts: [account],
+    statusFailures: 1,
+  });
+  await page.goto("/workspace");
+  await expect(
+    page.getByRole("region", { name: "Customer mission overview" }),
+  ).toContainText("1");
+  await capture(page, testInfo, "mission-approval-queue");
+  await page.getByRole("button", { name: "Review next company" }).click();
+  const drawer = page.getByRole("dialog", {
+    name: "TEST DATA Research Co account details",
+  });
+  const criteria = drawer.getByRole("region", {
+    name: "Saved criteria assessment",
+  });
+  await expect(
+    criteria.locator(".criterion-row").filter({ hasText: "Geography" }),
+  ).toContainText("Unknown");
+  await expect(
+    criteria.locator(".criterion-row").filter({ hasText: "Company size" }),
+  ).toContainText("Unknown");
+  await expect(
+    criteria
+      .getByRole("link", { name: "TEST DATA saved company source" })
+      .first(),
+  ).toHaveAttribute("href", "https://research.example.com/");
+  await criteria.scrollIntoViewIfNeeded();
+  await capture(page, testInfo, "criterion-evidence-unknowns");
+  await drawer.getByRole("button", { name: "Pass on this company" }).click();
+  await drawer
+    .getByRole("combobox", { name: "Reason (optional)" })
+    .selectOption("competitor");
+  await drawer
+    .getByRole("checkbox", { name: /Also suppress this domain/ })
+    .check();
+  await drawer.getByRole("button", { name: "Save pass", exact: true }).click();
+  await expect(drawer.getByRole("alert")).toContainText(
+    "Review could not be saved",
+  );
+  await expect(
+    drawer.getByRole("combobox", { name: "Reason (optional)" }),
+  ).toHaveValue("competitor");
+  await drawer.getByRole("button", { name: "Save pass", exact: true }).click();
+  await expect(
+    drawer.getByText(/This domain is suppressed for future workspace searches/),
+  ).toBeVisible();
+  expect(state.accounts[0].review_reason).toBe("competitor");
+  expect(state.accounts[0].suppress_workspace).toBe(true);
+  await capture(page, testInfo, "saved-pass-and-undo");
+  await drawer.getByRole("button", { name: "Undo pass", exact: true }).click();
+  await expect(
+    drawer.getByRole("button", { name: "Pass on this company" }),
+  ).toBeVisible();
+  expect(state.accounts[0].status).toBe("new");
+  expect(state.accounts[0].suppress_workspace).toBe(false);
+  expect(state.suppressions).toEqual([]);
+  await page.keyboard.press("Escape");
+  await expect(drawer).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Review next company" }),
+  ).toBeFocused();
+  expect(state.unknown).toEqual([]);
+});
+
+test("suppression management can restore future scope after source rows have expired", async ({
+  page,
+}, testInfo) => {
+  const state = await mockWorkspace(page);
+  state.suppressions.push({
+    domain: "expired.example.com",
+    reason: "existing_customer",
+    updated_at: NOW,
+  });
+  await page.goto("/workspace");
+  const menu = page.getByRole("button", { name: "Open navigation" });
+  if (await menu.isVisible()) await menu.click();
+  await page
+    .locator(".main-nav")
+    .getByRole("button", { name: "Customer profile" })
+    .click();
+  await page.getByRole("button", { name: "Manage suppressions" }).click();
+  await expect(page.locator(".suppression-panel")).toContainText(
+    "expired.example.com",
+  );
+  await page.locator(".suppression-panel").scrollIntoViewIfNeeded();
+  await capture(page, testInfo, "suppression-management");
+  await page.getByRole("button", { name: "Allow in future searches" }).click();
+  await expect(
+    page.getByText("No domains are suppressed in this workspace."),
+  ).toBeVisible();
+  expect(state.suppressions).toEqual([]);
+  expect(state.unknown).toEqual([]);
+});
+
+test("an existing workspace exclusion stays selected when another campaign records a pass", async ({
+  page,
+}, testInfo) => {
+  const { campaign, account } = missionFixture();
+  account.suppress_workspace = true;
+  const state = await mockWorkspace(page, {
+    campaigns: [campaign],
+    accounts: [account],
+  });
+  state.suppressions.push({
+    domain: account.domain,
+    reason: "competitor",
+    updated_at: NOW,
+  });
+  await page.goto("/workspace");
+  await expect(
+    page.getByRole("button", { name: "Review next company" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("region", { name: "Customer mission overview" }),
+  ).toContainText("Your exclusions are respected");
+  await page
+    .getByRole("button", { name: "View TEST DATA Research Co details" })
+    .click();
+  const drawer = page.getByRole("dialog", {
+    name: "TEST DATA Research Co account details",
+  });
+  await drawer.getByRole("button", { name: "Pass on this company" }).click();
+  await expect(
+    drawer.getByRole("checkbox", { name: /Also suppress this domain/ }),
+  ).toBeChecked();
+  await drawer.getByRole("button", { name: "Save pass", exact: true }).click();
+  await expect(
+    drawer.getByText(/This domain is suppressed for future workspace searches/),
+  ).toBeVisible();
+  expect(state.suppressions).toHaveLength(1);
+  expect(state.accounts[0].suppress_workspace).toBe(true);
+  await drawer.getByRole("button", { name: "Undo pass", exact: true }).click();
+  await expect(
+    drawer.getByRole("button", { name: "Pass on this company" }),
+  ).toBeVisible();
+  expect(state.accounts[0].status).toBe("new");
+  expect(state.accounts[0].suppress_workspace).toBe(true);
+  expect(state.suppressions).toHaveLength(1);
+  await drawer.getByRole("tab", { name: "Outreach draft" }).click();
+  await expect(
+    drawer.getByRole("button", { name: "Generate outreach draft" }),
+  ).toBeDisabled();
+  await capture(page, testInfo, "suppressed-history-not-actionable");
+  expect(state.unknown).toEqual([]);
+});
+
+test("failed Undo retains its original shortlisted decision for a safe retry", async ({
+  page,
+}) => {
+  const { campaign, account } = missionFixture();
+  account.status = "shortlisted";
+  const state = await mockWorkspace(page, {
+    campaigns: [campaign],
+    accounts: [account],
+  });
+  await page.goto("/workspace");
+  await page
+    .getByRole("button", { name: "View TEST DATA Research Co details" })
+    .click();
+  const drawer = page.getByRole("dialog", {
+    name: "TEST DATA Research Co account details",
+  });
+  await drawer.getByRole("button", { name: "Pass on this company" }).click();
+  await drawer.getByRole("button", { name: "Save pass", exact: true }).click();
+  await expect(drawer.getByRole("button", { name: "Undo pass" })).toBeVisible();
+  state.statusFailures = 1;
+  await drawer.getByRole("button", { name: "Undo pass" }).click();
+  await expect(drawer.getByRole("alert")).toContainText(
+    "Review could not be saved",
+  );
+  await drawer.getByRole("button", { name: "Undo pass" }).click();
+  await expect(
+    drawer.getByRole("button", { name: "Shortlisted", exact: true }),
+  ).toBeVisible();
+  expect(state.accounts[0].status).toBe("shortlisted");
+  expect(state.unknown).toEqual([]);
+});
+
+test("audience cards are keyboard operable and respect reduced motion", async ({
+  page,
+}, testInfo) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const state = await mockWorkspace(page, { profile: null });
+  const dialog = await openCampaign(page, false);
+  await dialog
+    .getByRole("textbox", {
+      name: "What does your offering help customers do?",
+      exact: true,
+    })
+    .fill("We build conversion websites for US plumbers.");
+  const audience = dialog.getByRole("button", { name: /Plumbing businesses/ });
+  await audience.focus();
+  await page.keyboard.press("Enter");
+  await expect(audience).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    dialog.getByRole("textbox", { name: /^Industries\b/ }),
+  ).toHaveValue("Plumbing businesses");
+  const motion = await audience.evaluate((element) => ({
+    transition: getComputedStyle(element).transitionDuration,
+    transform: getComputedStyle(element).transform,
+  }));
+  expect(motion.transition).toBe("0s");
+  expect(motion.transform).toBe("none");
+  await audience.scrollIntoViewIfNeeded();
+  await capture(page, testInfo, "audience-keyboard-reduced-motion");
+  await page.keyboard.press("Escape");
+  await expect(dialog).toHaveCount(0);
+  expect(state.creates).toHaveLength(0);
+  expect(state.unknown).toEqual([]);
 });

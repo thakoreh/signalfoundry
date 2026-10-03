@@ -19,6 +19,7 @@ import {
 } from "./lib/validation";
 import { dataVisible, MAX_DISCOVERY_TARGETS } from "./lib/discoveryPolicy";
 import * as validators from "./validators";
+import { applyReviewFeedback } from "./lib/feedback";
 
 export const list = tenantQuery({
   args: { limit: v.optional(v.number()) },
@@ -40,11 +41,17 @@ export const create = tenantMutation({
     profile_snapshot: v.optional(validators.profile),
     offering_website: v.optional(v.union(v.string(), v.null())),
     target_count: v.optional(v.number()),
+    enrich_contacts: v.optional(v.boolean()),
   },
   returns: validators.campaign,
   handler: async (ctx, args) => {
     if (args.mode === "demo")
       throw appError("VALIDATION_ERROR", "Demo campaigns are not available");
+    if (args.enrich_contacts && args.mode !== "discovery")
+      throw appError(
+        "VALIDATION_ERROR",
+        "Named-contact enrichment is only available for discovery campaigns",
+      );
     const workspace = await requireWorkspace(ctx, ctx.principal.orgId);
     if (!workspace.profile && !args.profile_snapshot)
       throw appError(
@@ -80,6 +87,7 @@ export const create = tenantMutation({
       profile_snapshot: snapshot,
       offering_website: website,
       target_count: targetCount,
+      enrich_contacts: args.enrich_contacts ?? false,
       domains: normalizeDomains(args.mode, args.domains),
       status: "draft",
       created_at: timestamp,
@@ -101,7 +109,7 @@ export const accounts = tenantQuery({
   args: { id: v.id("campaigns") },
   returns: v.array(validators.account),
   handler: async (ctx, args) => {
-    await requireCampaign(ctx, ctx.principal.orgId, args.id);
+    const campaign = await requireCampaign(ctx, ctx.principal.orgId, args.id);
     const rows = await ctx.db
       .query("accounts")
       .withIndex("by_orgId_and_campaignId_and_score", (q) =>
@@ -109,7 +117,24 @@ export const accounts = tenantQuery({
       )
       .order("desc")
       .take(MAX_DISCOVERY_TARGETS);
-    return rows.filter((row) => dataVisible(row.data)).map(accountResult);
+    return Promise.all(
+      rows
+        .filter((row) => dataVisible(row.data))
+        .map(async (row) =>
+          accountResult(
+            {
+              ...row,
+              data: await applyReviewFeedback(
+                ctx,
+                row.orgId,
+                row.campaignId,
+                row.data,
+              ),
+            },
+            campaign,
+          ),
+        ),
+    );
   },
 });
 
@@ -117,7 +142,7 @@ export const exportAccounts = tenantQuery({
   args: { id: v.id("campaigns") },
   returns: v.array(validators.account),
   handler: async (ctx, args) => {
-    await requireCampaign(ctx, ctx.principal.orgId, args.id);
+    const campaign = await requireCampaign(ctx, ctx.principal.orgId, args.id);
     const rows = await ctx.db
       .query("accounts")
       .withIndex("by_orgId_and_campaignId_and_score", (q) =>
@@ -138,7 +163,22 @@ export const exportAccounts = tenantQuery({
         "EXPORT_BLOCKED",
         "Licensed-data export approval is required",
       );
-    return visible.map(accountResult);
+    return Promise.all(
+      visible.map(async (row) =>
+        accountResult(
+          {
+            ...row,
+            data: await applyReviewFeedback(
+              ctx,
+              row.orgId,
+              row.campaignId,
+              row.data,
+            ),
+          },
+          campaign,
+        ),
+      ),
+    );
   },
 });
 

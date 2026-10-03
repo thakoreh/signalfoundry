@@ -17,6 +17,8 @@ export type FunctionName =
   | "accounts.get"
   | "accounts.setStatus"
   | "accounts.draft"
+  | "accounts.suppressions"
+  | "accounts.restoreSuppression"
   | "jobs.start"
   | "jobs.get"
   | "jobs.cancel"
@@ -226,8 +228,20 @@ export async function handleApi(
       path.some((part) => !/^[A-Za-z0-9._-]{1,128}$/.test(part))
     )
       fail(404, "Route not found.");
-    if (new URL(request.url).search)
+    const searchParams = new URL(request.url).searchParams;
+    const suppressionList =
+      method === "GET" && path.join("/") === "workspace/suppressions";
+    if (new URL(request.url).search && !suppressionList)
       fail(400, "Query parameters are not supported.");
+    if (
+      suppressionList &&
+      [...searchParams.keys()].some(
+        (key) =>
+          !["limit", "after"].includes(key) ||
+          searchParams.getAll(key).length > 1,
+      )
+    )
+      fail(400, "Unsupported suppression pagination.");
     const mutation = method !== "GET";
     if (
       request.headers.get("sec-fetch-site") === "cross-site" ||
@@ -260,6 +274,35 @@ export async function handleApi(
       if (session.orgRole !== "org:admin")
         fail(403, "An organization administrator must perform this action.");
     };
+    if (route === "GET /workspace/suppressions") {
+      const limitText = searchParams.get("limit") ?? "30";
+      const limit = Number(limitText);
+      if (
+        !/^\d+$/.test(limitText) ||
+        !Number.isSafeInteger(limit) ||
+        limit < 1 ||
+        limit > 100
+      )
+        fail(400, "Choose 1–100 domains per page.");
+      const cursor = searchParams.get("after");
+      if (cursor !== null && (!cursor || cursor.length > 4000))
+        fail(400, "Invalid page cursor.");
+      const result = (await invoke("accounts.suppressions", {
+        paginationOpts: { cursor, numItems: limit },
+      })) as { page: unknown[]; isDone: boolean; continueCursor: string };
+      return json({
+        items: result.page,
+        is_done: result.isDone,
+        continue_cursor: result.isDone ? null : result.continueCursor,
+      });
+    }
+    if (route === "POST /workspace/suppressions/restore") {
+      keys(body, ["domain"]);
+      await invoke("accounts.restoreSuppression", {
+        domain: string(body.domain, 253),
+      });
+      return json({ restored: true });
+    }
     if (route === "GET /workspace") return json(await invoke("workspaces.get"));
     if (route === "POST /workspace") {
       admin();
@@ -310,7 +353,13 @@ export async function handleApi(
         "profile_snapshot",
         "offering_website",
         "target_count",
+        "enrich_contacts",
       ]);
+      if (
+        body.enrich_contacts !== undefined &&
+        typeof body.enrich_contacts !== "boolean"
+      )
+        fail(400, "Choose whether to include contact enrichment.");
       if (body.mode !== "manual" && body.mode !== "discovery")
         fail(400, "Choose a valid research mode.");
       if (
@@ -324,6 +373,9 @@ export async function handleApi(
         await invoke("campaigns.create", {
           name: string(body.name),
           mode: body.mode,
+          ...(body.enrich_contacts !== undefined
+            ? { enrich_contacts: body.enrich_contacts }
+            : {}),
           domains: list(body.domains, 10),
           ...(body.profile_snapshot !== undefined
             ? { profile_snapshot: profile(body.profile_snapshot) }
@@ -381,11 +433,53 @@ export async function handleApi(
       if (method === "GET" && path.length === 2)
         return json(await invoke("accounts.get", { id }));
       if (method === "PATCH" && path.length === 2) {
-        keys(body, ["status"]);
+        keys(body, [
+          "status",
+          "reason",
+          "suppress_workspace",
+          "preserve_workspace_suppression",
+        ]);
         if (!["new", "shortlisted", "dismissed"].includes(String(body.status)))
           fail(400, "Invalid account status.");
+        if (
+          body.reason !== undefined &&
+          body.reason !== null &&
+          ![
+            "wrong_industry",
+            "wrong_geography",
+            "wrong_size",
+            "existing_customer",
+            "competitor",
+            "not_relevant",
+            "other",
+          ].includes(String(body.reason))
+        )
+          fail(400, "Choose a valid review reason.");
+        if (
+          body.suppress_workspace !== undefined &&
+          typeof body.suppress_workspace !== "boolean"
+        )
+          fail(400, "Choose a valid suppression scope.");
+        if (
+          body.preserve_workspace_suppression !== undefined &&
+          typeof body.preserve_workspace_suppression !== "boolean"
+        )
+          fail(400, "Choose a valid suppression restore intent.");
         return json(
-          await invoke("accounts.setStatus", { id, status: body.status }),
+          await invoke("accounts.setStatus", {
+            id,
+            status: body.status,
+            ...(body.preserve_workspace_suppression !== undefined
+              ? {
+                  preserve_workspace_suppression:
+                    body.preserve_workspace_suppression,
+                }
+              : {}),
+            ...(body.reason !== undefined ? { reason: body.reason } : {}),
+            ...(body.suppress_workspace !== undefined
+              ? { suppress_workspace: body.suppress_workspace }
+              : {}),
+          }),
         );
       }
       if (method === "POST" && path[2] === "draft") {

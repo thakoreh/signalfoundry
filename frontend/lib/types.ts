@@ -29,6 +29,7 @@ export type Campaign = {
   profile_snapshot?: Profile | null;
   target_count?: number;
   offering_website?: string | null;
+  enrich_contacts?: boolean;
 };
 export type CampaignInput = {
   name: string;
@@ -37,6 +38,7 @@ export type CampaignInput = {
   profile_snapshot: Profile;
   target_count: number;
   offering_website: string | null;
+  enrich_contacts?: boolean;
 };
 export type ProviderReadiness = {
   configured: boolean;
@@ -82,6 +84,19 @@ export type Contact = {
   license_restrictions?: string[];
   license_expires_at?: string | null;
 };
+export type ReviewReason =
+  | "wrong_industry"
+  | "wrong_geography"
+  | "wrong_size"
+  | "existing_customer"
+  | "competitor"
+  | "not_relevant"
+  | "other";
+export type ReviewFeedback = {
+  reason?: ReviewReason | null;
+  suppress_workspace?: boolean;
+  preserve_workspace_suppression?: boolean;
+};
 export type AccountStatus = "new" | "shortlisted" | "dismissed";
 export type Account = {
   id: string;
@@ -96,6 +111,9 @@ export type Account = {
   confidence: "low" | "medium" | "high";
   decision_engine: "rules" | "jev";
   status: AccountStatus;
+  review_reason?: ReviewReason | null;
+  reviewed_at?: string | null;
+  suppress_workspace?: boolean;
   why_fit: string[];
   why_now: string[];
   unknowns: string[];

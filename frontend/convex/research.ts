@@ -14,9 +14,19 @@ export const execute = internalAction({
       campaignId: Id<"campaigns">;
       mode: "demo" | "manual";
       domains: string[];
+      excludedDomains: string[];
       profile: Profile;
     } | null = await ctx.runMutation(internal.jobs.claim, args);
     if (!work) return null;
+    // Every domain was reviewed or workspace-suppressed before dispatch.
+    if (!work.domains.length) {
+      await ctx.runMutation(internal.jobs.finish, {
+        ...args,
+        accounts: [],
+        errors: [],
+      });
+      return null;
+    }
     try {
       let result: { accounts: WorkerAccount[]; errors: string[] };
       {
@@ -25,6 +35,7 @@ export const execute = internalAction({
           campaign_id: work.campaignId,
           mode: work.mode,
           domains: work.domains,
+          excluded_domains: work.excludedDomains,
         });
         if (
           !response ||

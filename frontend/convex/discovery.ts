@@ -10,6 +10,7 @@ import { tenantAction } from "./lib/auth";
 import { callWorker, WorkerFailure } from "./lib/worker";
 import {
   discoveryPolicy,
+  contactDataAccessible,
   filterAccessibleDiscoveryAccounts,
   MAX_DISCOVERY_TARGETS,
 } from "./lib/discoveryPolicy";
@@ -17,6 +18,7 @@ import { validateResearchResult, text } from "./lib/validation";
 import { appError } from "./lib/errors";
 import { entitled, failJob, release } from "./jobs";
 import * as validators from "./validators";
+import { feedbackDomain, researchExclusions } from "./lib/feedback";
 
 const LEASE_MS = 150_000;
 const provider = v.object({
@@ -86,6 +88,17 @@ export const status = tenantAction({
       const policy = discoveryPolicy();
       return {
         ...value,
+        providers: {
+          ...value.providers,
+          contacts: contactDataAccessible()
+            ? value.providers.contacts
+            : {
+                ...value.providers.contacts,
+                licensed: false,
+                reason:
+                  "Named-contact enrichment requires separate PDL data-access approval",
+              },
+        },
         enabled: value.enabled && !!policy,
         max_target_count: MAX_DISCOVERY_TARGETS,
         max_cost_microusd: policy?.jobBudget ?? 0,
@@ -117,9 +130,37 @@ const work = v.object({
   accounts: v.array(validators.workerAccount),
   errors: v.array(v.string()),
   remaining: v.number(),
+  enrichContacts: v.boolean(),
+  excludedDomains: v.array(v.string()),
   verificationEnabled: v.boolean(),
 });
 type Work = Infer<typeof work>;
+async function finishWithoutDispatch(
+  ctx: MutationCtx,
+  row: Doc<"jobs">,
+  attempt: number,
+  message: string,
+  accounts = row.intermediateAccounts ?? [],
+) {
+  await ctx.db.patch(row._id, {
+    status: "running",
+    attempt,
+    stageInFlight: false,
+    intermediateAccounts: accounts,
+    stageErrors: [...(row.stageErrors ?? []), message].slice(0, 20),
+    leaseUntil: Date.now() + LEASE_MS,
+    updatedAt: Date.now(),
+  });
+  await ctx.scheduler.runAfter(0, internal.jobs.finish, {
+    id: row._id,
+    attempt,
+  });
+  await ctx.scheduler.runAfter(LEASE_MS, internal.jobs.recover, {
+    id: row._id,
+    expectedAttempt: attempt,
+  });
+}
+
 export const claim = internalMutation({
   args: { id: v.id("jobs"), attempt: v.number() },
   returns: v.union(work, v.null()),
@@ -151,8 +192,46 @@ export const claim = internalMutation({
       );
       return null;
     }
+    let excludedDomains: string[];
+    try {
+      excludedDomains = await researchExclusions(
+        ctx,
+        row.orgId,
+        row.campaignId,
+      );
+    } catch {
+      if (row.intermediateAccounts?.length)
+        await finishWithoutDispatch(
+          ctx,
+          row,
+          args.attempt,
+          "Research exclusions exceed the safe request limit; no further provider request was made.",
+        );
+      else
+        await failJob(
+          ctx,
+          row,
+          "Research exclusions exceed the safe request limit; no provider request was made.",
+          false,
+        );
+      return null;
+    }
     if (row.stage !== "discovery") {
       const saved = row.intermediateAccounts ?? [];
+      const candidate = saved[row.stageCursor ?? 0];
+      const excluded = new Set(excludedDomains);
+      if (candidate && excluded.has(feedbackDomain(candidate.domain))) {
+        await finishWithoutDispatch(
+          ctx,
+          row,
+          args.attempt,
+          "Enrichment stopped because a company was excluded by your review preferences.",
+          filterAccessibleDiscoveryAccounts(saved).filter(
+            (account) => !excluded.has(feedbackDomain(account.domain)),
+          ),
+        );
+        return null;
+      }
       const accounts = filterAccessibleDiscoveryAccounts(saved);
       if (
         !accounts.length ||
@@ -187,7 +266,11 @@ export const claim = internalMutation({
         return null;
       }
     }
-    if (row.stage === "contacts") {
+    if (
+      row.stage === "contacts" &&
+      row.enrichContacts === true &&
+      contactDataAccessible()
+    ) {
       // PDL's documented default is 10 requests/minute across the API account.
       // Reserve a global slot transactionally across all customer workspaces.
       const window = await ctx.db
@@ -244,10 +327,68 @@ export const claim = internalMutation({
         0,
         (row.reservedMicrousd ?? 0) - (row.spentMicrousd ?? 0),
       ),
+      enrichContacts: row.enrichContacts ?? false,
+      excludedDomains,
       verificationEnabled: row.verificationEnabled ?? false,
     };
   },
 });
+// Re-read job state and tenant-scoped review choices after readiness awaits.
+// Mutations serialize with review/cancellation changes; no exclusions come from
+// browser arguments, and only this fresh bounded snapshot reaches the worker.
+export const dispatchExclusions = internalMutation({
+  args: { id: v.id("jobs"), attempt: v.number() },
+  returns: v.union(v.array(v.string()), v.null()),
+  handler: async (ctx, args): Promise<string[] | null> => {
+    const row = await ctx.db.get(args.id);
+    if (
+      !row ||
+      row.mode !== "discovery" ||
+      row.status !== "running" ||
+      row.attempt !== args.attempt ||
+      row.stageInFlight !== true ||
+      row.leaseUntil < Date.now()
+    )
+      return null;
+    let excludedDomains: string[];
+    try {
+      excludedDomains = await researchExclusions(
+        ctx,
+        row.orgId,
+        row.campaignId,
+      );
+    } catch {
+      await finishWithoutDispatch(
+        ctx,
+        row,
+        args.attempt,
+        "Research exclusions exceed the safe request limit; no provider request was made.",
+      );
+      return null;
+    }
+    if (row.stage !== "discovery") {
+      const candidate = row.intermediateAccounts?.[row.stageCursor ?? 0];
+      if (
+        !candidate ||
+        excludedDomains.includes(feedbackDomain(candidate.domain))
+      ) {
+        const excluded = new Set(excludedDomains);
+        await finishWithoutDispatch(
+          ctx,
+          row,
+          args.attempt,
+          "Enrichment stopped because a company was excluded by your review preferences.",
+          filterAccessibleDiscoveryAccounts(
+            row.intermediateAccounts ?? [],
+          ).filter((account) => !excluded.has(feedbackDomain(account.domain))),
+        );
+        return null;
+      }
+    }
+    return excludedDomains;
+  },
+});
+
 async function schedule(ctx: MutationCtx, row: Doc<"jobs">) {
   const scheduledId = await ctx.scheduler.runAfter(
     0,
@@ -319,18 +460,33 @@ export const advance = internalMutation({
           "Contact results changed company identity",
         );
     }
-    const errors = [...(row.stageErrors ?? []), ...args.errors].slice(0, 19);
+    const excluded = new Set(
+      await researchExclusions(ctx, row.orgId, row.campaignId),
+    );
+    const eligibleAccounts = args.accounts.filter(
+      (account) => !excluded.has(feedbackDomain(account.domain)),
+    );
+    const removedExcluded = eligibleAccounts.length !== args.accounts.length;
+    const errors = [
+      ...(row.stageErrors ?? []),
+      ...args.errors,
+      ...(removedExcluded
+        ? [
+            "Excluded company matches were omitted according to your review preferences.",
+          ]
+        : []),
+    ].slice(0, 19);
     const spentMicrousd = (row.spentMicrousd ?? 0) + args.cost;
     await ctx.db.patch(row._id, {
       stageInFlight: false,
-      intermediateAccounts: args.accounts,
+      intermediateAccounts: eligibleAccounts,
       stageErrors: errors,
       spentMicrousd,
       spendStatus: args.uncertain ? "uncertain" : row.spendStatus,
       verificationEnabled: args.verificationEnabled,
       updatedAt: Date.now(),
     });
-    const deadlines = args.accounts
+    const deadlines = eligibleAccounts
       .flatMap((account) => [
         account.license_expires_at,
         ...account.contacts.map((contact) => contact.license_expires_at),
@@ -354,7 +510,7 @@ export const advance = internalMutation({
       nextStage = "contacts";
       cursor = 0;
     } else if (
-      cursor >= args.accounts.length &&
+      cursor >= eligibleAccounts.length &&
       row.stage === "contacts" &&
       args.verificationEnabled
     ) {
@@ -363,9 +519,11 @@ export const advance = internalMutation({
     }
     const complete =
       args.uncertain ||
+      (removedExcluded && row.stage !== "discovery") ||
+      (row.stage === "discovery" && row.enrichContacts !== true) ||
       (args.cost === 0 && args.errors.length > 0) ||
-      !args.accounts.length ||
-      (row.stage !== "discovery" && cursor >= args.accounts.length) ||
+      !eligibleAccounts.length ||
+      (row.stage !== "discovery" && cursor >= eligibleAccounts.length) ||
       spentMicrousd >= (row.reservedMicrousd ?? 0);
     if (complete) {
       if (args.uncertain)
@@ -373,8 +531,9 @@ export const advance = internalMutation({
           "Provider billing outcome is uncertain. Remaining budget is held and no paid retry was made.",
         );
       else if (
+        row.enrichContacts === true &&
         spentMicrousd >= (row.reservedMicrousd ?? 0) &&
-        cursor < args.accounts.length
+        cursor < eligibleAccounts.length
       )
         errors.push(
           "Campaign stopped at its approved provider budget; contact coverage may be incomplete.",
@@ -485,27 +644,76 @@ export const execute = internalAction({
         if (
           !available.enabled ||
           !available.providers.discovery.configured ||
-          !available.providers.discovery.licensed ||
-          !available.providers.contacts.configured ||
-          !available.providers.contacts.licensed
+          !available.providers.discovery.licensed
         )
           throw new WorkerFailure(
             "Discovery providers are not configured and commercially approved",
             false,
           );
-        verify =
-          available.providers.verification.configured &&
-          available.providers.verification.licensed;
+        if (
+          current.enrichContacts &&
+          (!contactDataAccessible() ||
+            !available.providers.contacts.configured ||
+            !available.providers.contacts.licensed)
+        )
+          throw new WorkerFailure(
+            "Selected named-contact enrichment is not configured or commercially approved; use company-only discovery or configure that capability",
+            false,
+          );
+        // There is no independent verification adapter or user-selected
+        // verification capability yet. Provider readiness cannot opt a job in.
+        verify = false;
+        const excludedDomains = await ctx.runMutation(
+          internal.discovery.dispatchExclusions,
+          args,
+        );
+        if (excludedDomains === null) return null;
         called = true;
         response = await callWorker("/worker/discover", {
           ...common,
           target_count: current.targetCount,
           offering_website: current.offeringWebsite,
+          excluded_domains: excludedDomains,
         });
       } else {
         const account = current.accounts[current.cursor];
         if (!account)
           throw new WorkerFailure("Discovery checkpoint is invalid", false);
+        if (!current.enrichContacts)
+          throw new WorkerFailure(
+            "Named-contact enrichment was not selected; company results were preserved",
+            false,
+          );
+        if (current.stage === "contacts") {
+          if (!contactDataAccessible())
+            throw new WorkerFailure(
+              "Named-contact access is no longer approved; company results were preserved",
+              false,
+            );
+          const available = parseReadiness(
+            await callWorker("/worker/discovery-status", {}),
+          );
+          const contacts = available.providers.contacts;
+          if (!contacts.configured || !contacts.licensed)
+            throw new WorkerFailure(
+              "Named-contact enrichment is unavailable; company results were preserved",
+              false,
+            );
+          if (
+            !Number.isSafeInteger(contacts.max_cost_microusd) ||
+            (contacts.max_cost_microusd ?? 0) <= 0 ||
+            contacts.max_cost_microusd! > current.remaining
+          )
+            throw new WorkerFailure(
+              "The remaining approved budget cannot cover named-contact enrichment; company results were preserved",
+              false,
+            );
+        }
+        const excludedDomains = await ctx.runMutation(
+          internal.discovery.dispatchExclusions,
+          args,
+        );
+        if (excludedDomains === null) return null;
         called = true;
         response = await callWorker(
           current.stage === "contacts" ? "/worker/contacts" : "/worker/verify",
@@ -515,6 +723,8 @@ export const execute = internalAction({
                 account_id: account.id,
                 domain: account.domain,
                 max_contacts: 3,
+                enrich_contacts: true,
+                excluded_domains: excludedDomains,
               }
             : {
                 org_id: current.orgId,
@@ -552,8 +762,13 @@ export const execute = internalAction({
             "Discovery returned no account collection",
             false,
           );
-        accounts = result.accounts;
-        if (!verify)
+        // Exa discovery is company-only even when a later contact stage was
+        // selected. Ignore injected personal data before checkpoint persistence.
+        accounts = result.accounts.map((account) => ({
+          ...account,
+          contacts: [],
+        }));
+        if (current.enrichContacts && !verify)
           result.errors.push(
             "Email verification is not configured. Returned emails remain unverified; discovery does not imply consent to contact.",
           );

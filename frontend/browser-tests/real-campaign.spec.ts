@@ -137,7 +137,7 @@ test("one real manually curated Ontario plumbing campaign", async ({
       .getByRole("textbox", { name: /^Geographies\b/ })
       .fill("Brantford Ontario, Paris Ontario");
     await dialog
-      .getByRole("textbox", { name: /^Keywords & buying signals\b/ })
+      .getByRole("textbox", { name: /^Observable match criteria\b/ })
       .fill("plumbing, emergency, repair, residential, appointment");
     await dialog.getByRole("textbox", { name: /^Exclusions\b/ }).fill("");
     await dialog
@@ -316,7 +316,9 @@ test("one real manually curated Ontario plumbing campaign", async ({
       })
       .click();
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export CSV", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Export full campaign CSV", exact: true })
+      .click();
     const download = await downloadPromise;
     const csvPath = info.outputPath("07-real-ontario-plumbing-campaign.csv");
     await download.saveAs(csvPath);

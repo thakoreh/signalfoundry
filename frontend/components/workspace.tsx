@@ -9,6 +9,7 @@ import type {
   WorkspaceData,
   ResearchJob,
   DiscoveryStatus,
+  ReviewFeedback,
 } from "@/lib/types";
 import { discoveryReady, errorMessage, jsonBody } from "@/lib/api";
 import {
@@ -29,6 +30,8 @@ import { ProfileEditor } from "./profile-editor";
 import { DiscoveryReadiness, TargetBrief } from "./discovery-readiness";
 import { CampaignDialog } from "./campaign-dialog";
 import { AccountDrawer } from "./account-drawer";
+import { SuppressionPanel } from "./suppression-panel";
+import { MissionBoard } from "./mission-board";
 import { BillingPanel } from "./billing-panel";
 import { activeJob } from "@/lib/jobs";
 
@@ -77,6 +80,7 @@ export default function Workspace({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [statusBusy, setStatusBusy] = useState(false);
+  const statusLock = useRef(false);
   const [statusError, setStatusError] = useState("");
   const detailRequest = useRef(0);
   const activeCampaignRef = useRef(selectedId);
@@ -259,7 +263,9 @@ export default function Workspace({
       ),
     [accounts, query, status, fit, sort, view],
   );
-  const shortlisted = accounts.filter((a) => a.status === "shortlisted").length;
+  const shortlisted = accounts.filter(
+    (a) => a.status === "shortlisted" && !a.suppress_workspace,
+  ).length;
   const sources = accounts.reduce((total, a) => total + a.evidence.length, 0);
   function navigate(next: View) {
     setView(next);
@@ -370,15 +376,25 @@ export default function Workspace({
       if (request === detailRequest.current) setStatusError(errorMessage(e));
     }
   }
-  async function changeStatus(next: AccountStatus) {
-    if (!selectedAccount) return;
+  async function changeStatus(
+    next: AccountStatus,
+    feedback: ReviewFeedback = {},
+  ) {
+    if (!selectedAccount || statusLock.current) return false;
+    statusLock.current = true;
     const request = ++detailRequest.current;
     setStatusBusy(true);
     setStatusError("");
     try {
       const a = await api<Account>(`/accounts/${selectedAccount.id}`, {
         method: "PATCH",
-        body: jsonBody({ status: next }),
+        body: jsonBody({
+          status: next,
+          ...feedback,
+          ...(next !== "dismissed" && !feedback.preserve_workspace_suppression
+            ? { reason: null, suppress_workspace: false }
+            : {}),
+        }),
       });
       if (request === detailRequest.current)
         setSelectedAccount((current) => replaceSelectedAccount(current, a));
@@ -387,16 +403,21 @@ export default function Workspace({
         next === "shortlisted"
           ? "Account added to your shortlist"
           : next === "dismissed"
-            ? "Account dismissed"
+            ? "Passed. This domain stays dismissed on the next campaign run."
             : "Account restored",
       );
+      return true;
     } catch (e) {
       if (request === detailRequest.current) setStatusError(errorMessage(e));
+      return false;
     } finally {
+      statusLock.current = false;
       setStatusBusy(false);
     }
   }
   async function toggleShortlist(account: Account) {
+    if (statusLock.current) return;
+    statusLock.current = true;
     setStatusBusy(true);
     setError("");
     try {
@@ -415,6 +436,7 @@ export default function Workspace({
     } catch (e) {
       setError(errorMessage(e));
     } finally {
+      statusLock.current = false;
       setStatusBusy(false);
     }
   }
@@ -769,6 +791,7 @@ export default function Workspace({
                       setToast("Customer profile saved");
                     }}
                   />
+                  <SuppressionPanel />
                 </>
               ) : view === "campaigns" ? (
                 <>
@@ -820,7 +843,7 @@ export default function Workspace({
                               <strong>{c.account_count}</strong> accounts
                             </span>
                             <span>
-                              <strong>{c.qualified_count}</strong> qualified
+                              <strong>{c.qualified_count}</strong> higher-ranked
                             </span>
                           </div>
                           <div className="campaign-card-footer">
@@ -853,8 +876,8 @@ export default function Workspace({
                       </h1>
                       <p>
                         {view === "shortlist"
-                          ? "The accounts you’ve saved for a more thoughtful next step."
-                          : "Cut through the noise. Focus on the companies that fit, with the evidence to prove it."}
+                          ? "The accounts you’ve kept for a more thoughtful next step."
+                          : "Start with a focused audience. Review what the evidence supports, and keep the companies worth a closer look."}
                       </p>
                     </div>
                     <button
@@ -865,6 +888,13 @@ export default function Workspace({
                       New campaign
                     </button>
                   </div>
+                  <MissionBoard
+                    campaign={campaign}
+                    accounts={accounts}
+                    profile={campaign.profile_snapshot ?? workspace.profile}
+                    job={job}
+                    onReview={openAccount}
+                  />
                   {campaign.profile_snapshot && (
                     <details className="campaign-snapshot">
                       <summary>Saved campaign target brief</summary>
@@ -891,9 +921,12 @@ export default function Workspace({
                     />
                     <Stat
                       icon="target"
-                      label="Qualified accounts"
-                      value={campaign.qualified_count}
-                      detail="Fit score of 65 or higher"
+                      label="Matches to review"
+                      value={
+                        accounts.filter((account) => account.status === "new")
+                          .length
+                      }
+                      detail="Human review still required"
                       green
                     />
                     <Stat
@@ -954,9 +987,12 @@ export default function Workspace({
                           disabled={
                             !accounts.length || exportBusy || accountLoading
                           }
+                          title="Includes every campaign status, including passed companies. Contact data is filtered by access and export permissions."
                         >
                           <Icon name="download" size={15} />
-                          {exportBusy ? "Exporting…" : "Export CSV"}
+                          {exportBusy
+                            ? "Exporting…"
+                            : "Export full campaign CSV"}
                         </button>
                       </div>
                     </div>
@@ -1067,7 +1103,7 @@ export default function Workspace({
                             onChange={(e) => setFit(e.target.value)}
                           >
                             <option value="all">All fit scores</option>
-                            <option value="high">Strong fit · 65+</option>
+                            <option value="high">More matches · 65+</option>
                             <option value="other">Below 65</option>
                           </select>
                           <Icon name="down" size={13} />
@@ -1078,7 +1114,7 @@ export default function Workspace({
                             value={sort}
                             onChange={(e) => setSort(e.target.value)}
                           >
-                            <option value="score">Best fit first</option>
+                            <option value="score">Highest match score</option>
                             <option value="score-low">Lowest fit first</option>
                             <option value="name">Company A–Z</option>
                           </select>
@@ -1099,7 +1135,7 @@ export default function Workspace({
                               <th scope="col">Company</th>
                               <th scope="col">Profile</th>
                               <th scope="col">
-                                Fit score <Icon name="down" size={11} />
+                                Match score <Icon name="down" size={11} />
                               </th>
                               <th scope="col">Evidence</th>
                               <th scope="col">Status</th>
@@ -1202,11 +1238,13 @@ export default function Workspace({
                                 <td>
                                   <span className={`status-tag ${a.status}`}>
                                     <span />
-                                    {a.status === "new"
-                                      ? "To review"
-                                      : a.status === "shortlisted"
-                                        ? "Shortlisted"
-                                        : "Dismissed"}
+                                    {a.suppress_workspace
+                                      ? "Suppressed"
+                                      : a.status === "new"
+                                        ? "To review"
+                                        : a.status === "shortlisted"
+                                          ? "Shortlisted"
+                                          : "Dismissed"}
                                   </span>
                                 </td>
                                 <td>
@@ -1290,8 +1328,8 @@ export default function Workspace({
                     </span>
                     <div>
                       <strong>
-                        A good score starts a conversation. Evidence makes it
-                        relevant.
+                        A score helps you prioritize. Your judgment decides the
+                        next step.
                       </strong>
                       <p>
                         Open any account to explore its fit, timing signals, and
@@ -1343,6 +1381,7 @@ export default function Workspace({
         <AccountDrawer
           key={selectedAccount.id}
           account={selectedAccount}
+          profile={campaign?.profile_snapshot ?? workspace?.profile}
           onClose={() => {
             ++detailRequest.current;
             setSelectedAccount(null);

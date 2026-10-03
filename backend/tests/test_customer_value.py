@@ -55,3 +55,96 @@ class CustomerValueTests(unittest.TestCase):
         page=Page('https://vendor.example/','Example SaaS vendor','We sell a SaaS platform.','Workflow automation SaaS platform.')
         result=RulesDecisionProvider().evaluate(profile,page,campaign_id='test')
         self.assertTrue(any(p.label=='Exclusion penalty' for p in result.score_breakdown))
+
+    def test_seller_industry_is_not_inferred_as_buyer(self):
+        from app.research import infer_profile
+        for description, industry, role in [
+            ('We are an agency building conversion websites for US plumbers.', 'Plumbing businesses', 'Owner'),
+            ('We sell scheduling software to veterinary clinics.', 'Veterinary clinics', 'Practice Manager'),
+            ('Agency management software for web agencies.', 'Professional services', 'Founder'),
+            ('Developer observability for fintech engineering teams.', 'Financial technology', 'Engineering Manager'),
+        ]:
+            profile = infer_profile(Page('https://seller.example/', 'Our Company', description, description))
+            self.assertEqual(profile.industries, [industry])
+            self.assertEqual(profile.buyer_roles[0], role)
+
+    def test_ambiguous_seller_and_negative_buyer_are_not_targets(self):
+        from app.research import infer_profile
+        description = 'We are a marketing agency with developers. Not agencies.'
+        profile = infer_profile(Page('https://seller.example/', 'Our Company', description, description))
+        self.assertEqual(profile.industries, [])
+        self.assertEqual(profile.buyer_roles, [])
+        self.assertEqual(profile.exclusions, ['agencies'])
+
+    def test_undated_signal_words_do_not_add_urgency_points(self):
+        page = Page('https://agency.example/', 'Example Agency', 'Agency workflow automation.', 'Agency workflow automation integrations AI. Founder Operations. Hiring launch funding expanding partnership.')
+        result = RulesDecisionProvider().evaluate(self.profile(), page, campaign_id='test')
+        self.assertEqual(next(p.points for p in result.score_breakdown if p.label == 'Observable signals'), 0)
+        self.assertTrue(all('unverified' in text for text in result.why_now))
+
+    def test_unknown_required_geography_and_size_prevent_high_rank(self):
+        page = Page('https://agency.example/', 'Example Agency', 'Agency workflow automation.', 'Agency workflow automation integrations AI. Founder Operations. Hiring launch funding.')
+        for constraints in [{'geographies': ['United States']}, {'company_sizes': ['11-50']}]:
+            profile = self.profile().model_copy(update=constraints)
+            result = RulesDecisionProvider().evaluate(profile, page, campaign_id='test')
+            self.assertLess(result.score, 65)
+            self.assertEqual(result.confidence, 'low')
+            self.assertTrue(any(p.label == 'Unverified required criteria' for p in result.score_breakdown))
+
+    def test_hard_exclusion_cannot_be_overcome_by_keyword_score(self):
+        profile = self.profile().model_copy(update={'exclusions': ['Agency']})
+        page = Page('https://agency.example/', 'Example Agency', 'Agency workflow automation.', 'Agency workflow automation integrations AI. Founder Operations. Hiring launch funding.')
+        result = RulesDecisionProvider().evaluate(profile, page, campaign_id='test')
+        self.assertEqual(result.score, 0)
+        self.assertEqual(result.confidence, 'low')
+
+    def test_suggested_audiences_match_actual_evaluation_taxonomy(self):
+        from app.research import infer_profile
+        for offering, title, description in [
+            ('Agency management software for web agencies.', 'Acme Agency', 'Agency client services and projects.'),
+            ('We sell scheduling software to veterinary clinics.', 'Acme Veterinary Clinic', 'Veterinary appointment scheduling software.'),
+            ('We build websites for plumbing businesses.', 'Acme Plumbing', 'Local plumbing services and appointments.'),
+        ]:
+            profile = infer_profile(Page('https://seller.example/', 'Seller', offering, offering))
+            account = RulesDecisionProvider().evaluate(profile, Page('https://buyer.example/', title, description, description), campaign_id='test')
+            industry = next(part for part in account.score_breakdown if part.label == 'Industry language')
+            self.assertEqual(industry.points, 25, (profile.industries, account.industry))
+
+    def test_pronoun_us_is_not_country_and_direct_buyer_is_not_its_customer(self):
+        from app.research import infer_profile
+        text = 'Our tools help teams collaborate with us.'
+        self.assertEqual(infer_profile(Page('https://seller.example/', 'Seller', text, text)).geographies, [])
+        text = 'We help agencies serve plumbers more effectively.'
+        self.assertEqual(infer_profile(Page('https://seller.example/', 'Seller', text, text)).industries, ['Professional services'])
+
+    def test_generated_plural_exclusion_blocks_canonical_company_category(self):
+        from app.research import infer_profile
+        offer = 'We build websites for plumbers, not agencies.'
+        profile = infer_profile(Page('https://seller.example/', 'Seller', offer, offer))
+        profile.keywords = ['workflow', 'automation', 'integrations', 'AI']
+        profile.buyer_roles = ['Founder', 'Operations']
+        text = 'Agency workflow automation integrations AI. Founder Operations. Hiring launch funding.'
+        result = RulesDecisionProvider().evaluate(profile, Page('https://agency.example/', 'Acme Agency', text, text), campaign_id='test')
+        self.assertEqual(result.score, 0)
+        self.assertTrue(any(part.label == 'Exclusion penalty' for part in result.score_breakdown))
+
+    def test_veterinary_software_vendor_is_not_its_customer_category(self):
+        profile = self.profile().model_copy(update={'industries': ['Veterinary clinics'], 'keywords': ['veterinary', 'appointments'], 'buyer_roles': ['Practice Manager', 'Owner']})
+        description = 'Our software helps veterinary clinics manage appointments. Practice Manager and Owner tools.'
+        for title in ['Acme | Scheduling Software for Veterinary Clinics', 'Acme']:
+            account = RulesDecisionProvider().evaluate(profile, Page('https://software.example/', title, description, description), campaign_id='test')
+            self.assertNotEqual(account.industry, 'Veterinary clinics')
+            self.assertLess(account.score, 65)
+            self.assertEqual(next(part.points for part in account.score_breakdown if part.label == 'Industry language'), 0)
+        clinic = RulesDecisionProvider().evaluate(profile, Page('https://clinic.example/', 'Acme Veterinary Clinic', 'Veterinary care and appointments.', 'Practice Manager and Owner. Veterinary care and appointments.'), campaign_id='test')
+        self.assertEqual(clinic.industry, 'Veterinary clinics')
+        self.assertEqual(next(part.points for part in clinic.score_breakdown if part.label == 'Industry language'), 25)
+
+    def test_no_code_and_not_only_are_not_hard_exclusions(self):
+        from app.research import infer_profile
+        text = 'We build no code workflows for agencies.'
+        brief = infer_profile(Page('https://seller.example/', 'Seller', text, text))
+        self.assertEqual(brief.industries, ['Professional services'])
+        self.assertEqual(brief.exclusions, [])
+        text = 'We make websites for plumbers, not just agencies.'
+        self.assertEqual(infer_profile(Page('https://seller.example/', 'Seller', text, text)).exclusions, [])

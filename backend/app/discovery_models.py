@@ -1,7 +1,7 @@
 """Strict, stateless server-to-server discovery stage contracts."""
 from typing import Annotated
 from pydantic import Field, StringConstraints
-from .models import Account, Contact, Profile, StrictModel, URLText
+from .models import Account, Contact, Profile, StrictModel, URLText, ExclusionDomain, MAX_RESEARCH_EXCLUSIONS
 from .discovery_config import MAX_JOB_COST, MAX_TARGETS
 
 Identifier = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_:-]{1,160}$')]
@@ -15,12 +15,15 @@ class ScopedStage(StrictModel):
 
 
 class DiscoverRequest(ScopedStage):
+    excluded_domains: list[ExclusionDomain] = Field(default_factory=list, max_length=MAX_RESEARCH_EXCLUSIONS)
     profile: Profile
     target_count: int = Field(ge=1, le=MAX_TARGETS)
     offering_website: URLText | None = None
 
 
 class ContactsRequest(ScopedStage):
+    excluded_domains: list[ExclusionDomain] = Field(default_factory=list, max_length=MAX_RESEARCH_EXCLUSIONS)
+    enrich_contacts: bool = False
     profile: Profile
     account_id: Identifier
     domain: URLText

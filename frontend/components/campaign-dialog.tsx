@@ -13,7 +13,7 @@ import {
   jsonBody,
   errorMessage,
 } from "@/lib/api";
-import { suggestTargetBrief } from "@/lib/target-brief";
+import { audienceHypotheses, suggestTargetBrief } from "@/lib/target-brief";
 import { parseProspectImport } from "@/lib/prospect-import";
 import { tokens } from "@/lib/utils";
 import { Dialog } from "./dialog";
@@ -46,6 +46,9 @@ export function CampaignDialog({
   const [companyName, setCompanyName] = useState(
     workspace.profile?.company_name || workspace.name,
   );
+  const [buyerAnswer, setBuyerAnswer] = useState("");
+  const [selectedAudience, setSelectedAudience] = useState("");
+  const [enrichContacts, setEnrichContacts] = useState(false);
   const [description, setDescription] = useState(
     workspace.profile?.description || "",
   );
@@ -101,7 +104,32 @@ export function CampaignDialog({
     mode === "manual"
       ? 10
       : Math.max(1, Math.min(30, capabilities?.max_target_count || 30));
-  const canResearch = mode === "manual" || discoveryReady(capabilities);
+  const hypotheses = audienceHypotheses(description, buyerAnswer);
+  const audienceReady = Boolean(
+    tokens(values.industries).length || tokens(values.buyer_roles).length,
+  );
+  const contactsReady = Boolean(
+    capabilities?.providers.contacts.configured &&
+    capabilities.providers.contacts.licensed,
+  );
+  const canResearch =
+    mode === "manual" ||
+    (audienceReady &&
+      discoveryReady(capabilities) &&
+      (!enrichContacts || contactsReady));
+
+  function chooseAudience(id: string) {
+    setSelectedAudience(id);
+    const brief = suggestTargetBrief(companyName, description, buyerAnswer, id);
+    setValues(
+      Object.fromEntries(
+        targetFields.map(([key]) => [key, brief[key].join(", ")]),
+      ),
+    );
+    setBriefNote(
+      "Editable starting suggestion from your buyer language. Check the roles and observable criteria before approving this audience.",
+    );
+  }
 
   async function importFile(file?: File) {
     if (!file) return;
@@ -134,9 +162,17 @@ export function CampaignDialog({
             "/campaigns/suggest-brief",
             { method: "POST", body: jsonBody({ website: website.trim() }) },
           )
-        : { profile: suggestTargetBrief(companyName, description), website };
+        : {
+            profile: suggestTargetBrief(
+              companyName,
+              description,
+              buyerAnswer,
+              selectedAudience,
+            ),
+            website,
+          };
       setCompanyName(result.profile.company_name);
-      setDescription(result.profile.description);
+      setDescription(result.profile.description.split("\n\nDraft ICP")[0]);
       if (fromWebsite) setWebsite(result.website);
       setValues(
         Object.fromEntries(
@@ -145,8 +181,8 @@ export function CampaignDialog({
       );
       setBriefNote(
         fromWebsite
-          ? "Draft suggestions from public website language. Confirm that these are your buyers, then choose company sizes, geographies and exclusions."
-          : "Draft targeting hypotheses from your offering description. These are suggestions to edit, not verified facts about your customers.",
+          ? "Starting suggestions from explicit buyer language on your website. These are rules-based hypotheses; confirm who should buy, then refine the criteria."
+          : "Starting suggestions from explicit buyer language in your offering. These are rules-based hypotheses, not verified customer facts. If the buyer is unclear, answer the question below.",
       );
     } catch (e) {
       setError(errorMessage(e));
@@ -197,6 +233,7 @@ export function CampaignDialog({
         mode,
         domains: parsed.domains,
         target_count: count,
+        enrich_contacts: mode === "discovery" && enrichContacts,
         offering_website: offeringWebsite,
         profile_snapshot: profile,
       });
@@ -266,9 +303,7 @@ export function CampaignDialog({
           <Icon name="spark" size={24} />
         </span>
         <span className="eyebrow">
-          {review
-            ? "02 / REVIEW YOUR TARGETING"
-            : "01 / DEFINE YOUR NEXT CUSTOMERS"}
+          {review ? "02 / REVIEW YOUR TARGETING" : "01 / YOUR CUSTOMER MISSION"}
         </span>
         <h2 ref={reviewHeading} tabIndex={-1}>
           {review
@@ -278,7 +313,7 @@ export function CampaignDialog({
         <p>
           {review
             ? "These criteria are saved with this campaign. Future workspace profile changes won’t change this brief."
-            : "Start with your website and an editable target brief. No prospect list required."}
+            : "Describe what you sell. Choose who should benefit. Approve a bounded search with the evidence always in view."}
         </p>
       </div>
       <form
@@ -319,7 +354,32 @@ export function CampaignDialog({
               </div>
             )}
             {mode === "discovery" && (
-              <DiscoveryReadiness status={capabilities} loading={checking} />
+              <>
+                <div className="mission-boundaries">
+                  <span>
+                    <Icon name="check" size={15} /> Company discovery and public
+                    evidence
+                  </span>
+                  <span>
+                    <Icon name="shield" size={15} />{" "}
+                    {review.enrich_contacts
+                      ? "Named contacts requested within the approved budget"
+                      : "Company research only; no contact enrichment"}
+                  </span>
+                  <span>
+                    <Icon name="edit" size={15} /> Every opportunity waits for
+                    your review
+                  </span>
+                </div>
+                {!audienceReady && (
+                  <p className="notice soft">
+                    Your buyer is still unknown. Save this draft, or go back and
+                    choose a target industry or buyer role before starting a
+                    search.
+                  </p>
+                )}
+                <DiscoveryReadiness status={capabilities} loading={checking} />
+              </>
             )}
             <label className="review-confirmation">
               <input
@@ -445,12 +505,79 @@ export function CampaignDialog({
                 {briefNote}
               </p>
             )}
+            <section
+              className="audience-planner"
+              aria-label="Choose your buyer audience"
+            >
+              <div className="target-brief-heading">
+                <span className="eyebrow">WHO SHOULD BENEFIT?</span>
+                <p>
+                  Your industry and your buyer’s industry can be different.
+                  Start with one audience you can assess.
+                </p>
+              </div>
+              <label>
+                Who is this offering for?
+                <input
+                  value={buyerAnswer}
+                  maxLength={300}
+                  onChange={(event) => {
+                    setBuyerAnswer(event.target.value);
+                    setSelectedAudience("");
+                  }}
+                  placeholder="e.g. plumbing business owners in the United States"
+                />
+                <span className="input-hint">
+                  Optional when your description already names the buyer. This
+                  answer takes priority over wording about your own company.
+                </span>
+              </label>
+              {hypotheses.length > 0 ? (
+                <div className="audience-options">
+                  {hypotheses.map((hypothesis) => (
+                    <button
+                      type="button"
+                      key={hypothesis.id}
+                      className={`audience-option ${selectedAudience === hypothesis.id ? "selected" : ""}`}
+                      aria-pressed={selectedAudience === hypothesis.id}
+                      onClick={() => chooseAudience(hypothesis.id)}
+                    >
+                      <span className="audience-icon">
+                        <Icon name="target" size={19} />
+                      </span>
+                      <strong>{hypothesis.label}</strong>
+                      <span>{hypothesis.buyerRoles.join(" · ")}</span>
+                      <small>Suggested from your buyer language</small>
+                      <span className="audience-choice">
+                        {selectedAudience === hypothesis.id
+                          ? "Chosen audience"
+                          : "Use this audience"}{" "}
+                        <Icon
+                          name={
+                            selectedAudience === hypothesis.id
+                              ? "check"
+                              : "arrow"
+                          }
+                          size={15}
+                        />
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="audience-question">
+                  <Icon name="info" size={17} /> Which type of business gets the
+                  most value from your offering? Add it above, or define your
+                  buyer below. We won’t guess from your company’s category.
+                </p>
+              )}
+            </section>
             <div className="target-brief-heading">
               <span className="eyebrow">EDITABLE TARGET BRIEF</span>
               <p>
                 {workspace.profile
                   ? "Drafted from your workspace profile. Review every field before research."
-                  : "Define who could benefit from your offering. These details guide the search."}
+                  : "These are editable search hypotheses. Unspecified criteria stay unknown; a match is never a guarantee of buying intent."}
               </p>
             </div>
             <div className="form-grid campaign-brief-fields">
@@ -493,6 +620,30 @@ export function CampaignDialog({
                     a promise of matches.
                   </span>
                 </label>
+                <details className="optional-enrichment">
+                  <summary>Optional contact coverage</summary>
+                  <label className="review-confirmation">
+                    <input
+                      type="checkbox"
+                      checked={enrichContacts}
+                      disabled={!contactsReady}
+                      onChange={(event) =>
+                        setEnrichContacts(event.target.checked)
+                      }
+                    />
+                    <span>
+                      Also request named contacts for the discovered companies
+                    </span>
+                  </label>
+                  <p className="input-hint">
+                    Company research works without contacts. This optional
+                    provider step uses the approved campaign budget. Emails
+                    remain unverified, and nothing is sent.{" "}
+                    {contactsReady
+                      ? ""
+                      : "Contact enrichment is not configured or licensed."}
+                  </p>
+                </details>
                 <DiscoveryReadiness status={capabilities} loading={checking} />
               </>
             ) : (

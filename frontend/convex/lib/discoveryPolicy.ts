@@ -22,6 +22,14 @@ export function licensedDataAccessible(
 ) {
   return env.SIGNALFOUNDRY_LICENSED_DATA_ACCESS_APPROVED === "true";
 }
+export function contactDataAccessible(
+  env: Record<string, string | undefined> = process.env,
+) {
+  return (
+    licensedDataAccessible(env) &&
+    env.SIGNALFOUNDRY_PDL_DATA_ACCESS_APPROVED === "true"
+  );
+}
 export function discoveryPolicy(
   env: Record<string, string | undefined> = process.env,
 ): DiscoveryPolicy | null {
@@ -40,7 +48,6 @@ export function discoveryPolicy(
   if (
     env.SIGNALFOUNDRY_DISCOVERY_LAUNCH_APPROVED !== "true" ||
     env.SIGNALFOUNDRY_EXA_DATA_ACCESS_APPROVED !== "true" ||
-    env.SIGNALFOUNDRY_PDL_DATA_ACCESS_APPROVED !== "true" ||
     !licensedDataAccessible(env) ||
     !jobBudget ||
     !monthlyBudget ||

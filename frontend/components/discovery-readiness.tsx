@@ -8,7 +8,7 @@ export const targetFields = [
   ["company_sizes", "Company size", "11–50, 51–200"],
   ["buyer_roles", "Buyer roles", "VP of Sales, Head of Operations"],
   ["geographies", "Geographies", "United States, United Kingdom"],
-  ["keywords", "Keywords & buying signals", "scaling sales, new funding"],
+  ["keywords", "Observable match criteria", "scaling sales, new funding"],
   ["exclusions", "Exclusions", "agencies, consumer apps"],
 ] as const;
 
@@ -31,7 +31,7 @@ export function DiscoveryReadiness({
           {loading
             ? "Checking discovery availability…"
             : ready
-              ? "Discovery providers ready"
+              ? "Company discovery ready"
               : "Discovery unavailable"}
         </strong>
       </div>
@@ -40,7 +40,7 @@ export function DiscoveryReadiness({
           ? "Your brief can be reviewed while we check the service."
           : ready
             ? "Research uses the saved criteria and a bounded provider budget. Results still need your review. Email verification is a separate step."
-            : "You can save a campaign draft now. Research needs configured, licensed company and contact providers."}
+            : "You can save a campaign draft now. Company research needs an approved discovery provider and budget. Contact enrichment is optional."}
       </p>
       {!loading &&
         (status ? (
@@ -58,7 +58,7 @@ export function DiscoveryReadiness({
                       <span>
                         <strong>
                           {key === "contacts"
-                            ? "Contacts"
+                            ? "Contacts (optional)"
                             : key === "verification"
                               ? "Email verification (optional)"
                               : "Company discovery"}

@@ -22,7 +22,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field, StringConstraints, model_validator
 
-from .models import Account, AnalyzeRequest, EmptyRequest, Profile, StrictModel, URLText
+from .models import Account, AnalyzeRequest, EmptyRequest, Profile, StrictModel, URLText, ExclusionDomain, MAX_RESEARCH_EXCLUSIONS
 from .discovery import DiscoveryService
 from .discovery_config import DiscoverySettings
 from .discovery_models import (ContactsRequest, ContactsResponse, DiscoverRequest,
@@ -49,6 +49,7 @@ class ResearchRequest(StrictModel):
     campaign_id: Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{1,128}$')]
     mode: Literal['manual']
     domains: list[URLText] = Field(max_length=10)
+    excluded_domains: list[ExclusionDomain] = Field(default_factory=list, max_length=MAX_RESEARCH_EXCLUSIONS)
 
     @model_validator(mode='after')
     def valid_domains(self):
@@ -234,12 +235,15 @@ def create_worker() -> FastAPI:
         # Admission caps total work at two requests / eight domain lanes.
         deadline = time.monotonic() + RESEARCH_DEADLINE_SECONDS
         domains = list(dict.fromkeys(body.domains))
+        excluded = {domain.removeprefix('www.').rstrip('.') for domain in body.excluded_domains}
         def evaluate(raw):
             try:
                 url = normalize_url(raw)
             except FetchError:
                 return None, 'Invalid domain: use a public HTTP(S) business URL'
             label = urlsplit(url).hostname
+            if label.removeprefix('www.').rstrip('.') in excluded:
+                return None, None
             if time.monotonic() >= deadline - 16:
                 return None, f'{label}: Research deadline reached; try again later'
             try:

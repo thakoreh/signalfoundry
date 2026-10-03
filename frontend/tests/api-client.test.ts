@@ -46,3 +46,30 @@ test("API client keeps explicit content type and preserves cancellation", async 
   });
   await assert.rejects(api("/workspace"), { name: "AbortError" });
 });
+
+test("company discovery readiness is independent of optional contact enrichment", async () => {
+  const { discoveryReady } = await import("../lib/api.ts");
+  const status = {
+    enabled: true,
+    max_target_count: 10,
+    max_cost_microusd: 1_000_000,
+    blockers: [],
+    providers: {
+      discovery: { configured: true, licensed: true, reason: "Ready" },
+      contacts: { configured: false, licensed: false, reason: "Optional" },
+      verification: { configured: false, licensed: false, reason: "Optional" },
+    },
+  };
+  assert.equal(discoveryReady(status), true);
+  assert.equal(discoveryReady({ ...status, blockers: ["No budget"] }), false);
+  assert.equal(
+    discoveryReady({
+      ...status,
+      providers: {
+        ...status.providers,
+        discovery: { ...status.providers.discovery, licensed: false },
+      },
+    }),
+    false,
+  );
+});

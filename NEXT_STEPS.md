@@ -1,3 +1,77 @@
+# Approval-led customer missions: release candidate — 2026-10-03
+
+This section supersedes the older review-ownership and implementation status below.
+The release remains on `feat/discovery-first-campaigns` / PR #3. Main and the legacy
+local-demo tree are preserved. Merge and production changes require the release
+owner's coordinated go/no-go after exact-head CI and environment acceptance.
+
+## Release scope
+
+- Website or offering text → explicit buyer-language starting suggestions → one
+  editable audience → immutable approved campaign brief → bounded research
+- Seller category and buyer category are separated. Unknown buyers stay unknown;
+  explicit buyer answers take priority. These suggestions are transparent rules,
+  not semantic AI market research or a verified ideal customer profile
+- Company discovery needs approved Exa access, rights and budget. Contacts are a
+  separate explicit opt-in, default false even for legacy campaigns. Company-only
+  data boundaries reject unsolicited contacts at checkpoint, storage and read
+- A mission summary shows the actual next decision, current research stage and
+  review queue. No unattended agent, background monitoring or outreach is claimed
+- Account criteria show Matched / Not matched / Unknown with saved source links.
+  Undated signal words earn no urgency points; unknown required geography or size
+  prevents a high-ranked heuristic result; hard exclusions cannot be outscored
+- Pass reasons persist per campaign/domain. Workspace domain suppression is an
+  explicit choice, reversible in the account or Customer profile. Suppressed and
+  passed domains are excluded before further research/enrichment, with save-time
+  race checks. The generic Exa company-search query still has its approved cost: its
+  API does not support exclusion domains in company mode, so candidate filtering
+  occurs before follow-on website reads and paid contact requests. Historical rows
+  remain history and full-campaign CSV includes all
+  statuses; a CSV is not a kept-only export
+- Source/rights/expiry gates stay independent. Unknown or unverified email remains
+  labelled. No paid call, new key, subscription or outreach has been created
+
+## Release evidence and remaining gates
+
+The final exact commit, CI URL, screenshot artifacts and final check counts must
+be recorded after all review fixes. Historical counts below are not proof for a
+new head. Local Chromium cannot start in this runtime (`socket EPERM`); rendered
+browser evidence must come from the actual exact-head CI artifact, then be visually
+inspected at desktop/mobile widths. Synthetic UI flows stay labelled TEST DATA.
+
+A separate real public-business flow can use the existing opt-in CI job with its
+isolated database and real HTTP research. That proves the manual public-web path,
+not Exa/PDL access, buying intent, live billing, or an autonomous customer source.
+
+Still required before calling production shipped:
+1. Verify the final PR commit and all required CI/container/browser jobs
+2. Establish authorized deployment access and inspect the actual Coolify resource,
+   selected branch/commit, Dockerfile, domains, build/runtime settings and deployment
+   trigger. Do not infer that merging deploys this app
+3. Keep the SaaS frontend (`deploy/saas.Dockerfile`), stateless worker
+   (`deploy/worker.Dockerfile`) and Convex system of record separate. The root
+   Dockerfile is the unrelated single-workspace local-demo/preview architecture
+4. Deploy the compatible worker contract first, then additive Convex schema/indexes
+   and functions using official codegen, then the frontend. Keep new contact
+   selection optional/default false and new feedback fields/tables additive. No
+   schema narrowing, destructive reset or implicit customer data migration
+5. Exercise real Clerk session/organization switching, role boundaries, cancellation,
+   suppression/restore, expired/revoked data, legacy campaigns, export and the
+   existing Stripe test-mode flow in an approved staging environment
+6. Keep commercial discovery disabled until existing secure credentials, separate
+   data rights and explicit budgets are verified. A key is not a licensing grant
+
+## Rollback
+
+Disable discovery launch and paid enrichment before rollback. Cancel queued runs
+without releasing unknown-spend reservations. Preserve spend ledgers and user
+feedback/suppression records. Roll back frontend/worker images to the recorded
+prior release while retaining the compatible additive Convex schema and access
+filters. Never restore an old database snapshot over new user/billing activity,
+reactivate provider rights, or delete customer data as a deployment shortcut.
+
+---
+
 # Discovery-first campaigns: reviewer handoff
 
 ## Current scope — 2026-10-02

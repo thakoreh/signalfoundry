@@ -5,6 +5,36 @@ permission to spend. No keys, agreements, deployments, or paid requests were
 created by this change. Tests are offline. Live commercial acceptance remains a
 launch gate, including the actual provider contract and account-specific pricing.
 
+## Capability selection (updated 2026-10-03)
+
+Campaign creation accepts `enrich_contacts: boolean`, default **false**. Company
+search is the complete default workflow: approved/licensed Exa plus the existing
+launch, tenant subscription, and job/workspace/global budget gates are sufficient.
+A missing PDL key, license, or access approval does not block company-only jobs.
+The campaign snapshot freezes this selection in its job; omitted legacy campaign
+and job fields also mean false. Manual campaigns cannot select contact enrichment.
+All new fields on existing Convex tables are optional; no backfill is required.
+
+`enabled` and `blockers` in discovery readiness describe company discovery.
+`providers.contacts` independently describes optional named-contact readiness.
+Selected contacts require separate PDL data-access approval on Convex and approved
+worker credentials, commercial rights, retention, and a sufficient remaining
+reservation. Known missing Convex approval rejects job start; missing worker
+readiness rejects selected enrichment before the first paid request. After Exa
+succeeds, PDL revocation, budget exhaustion, or provider failure preserves eligible
+company results. Ambiguous dispatch still holds the full reservation; no paid retry
+is introduced. Unselected jobs never dispatch contacts, even with valid PDL keys.
+The company-search stage also discards any returned contact payload before
+checkpointing. Finalization independently enforces the frozen job and campaign
+selection, and account get/list/export/status/draft paths enforce campaign opt-in
+for legacy rows. Selected discovery contacts require current PDL provenance and
+rights; missing-provider records cannot bypass these gates. Manual research keeps
+only clearly labelled role suggestions without a person name or email address.
+
+Verification remains a separate unconfigured capability. Readiness cannot silently
+enable it; neither company discovery nor named-contact enrichment attests identity,
+employment, deliverability, or permission to contact anyone.
+
 ## Endpoints
 
 All four endpoints use POST JSON and the existing server-only bearer boundary:
@@ -16,11 +46,18 @@ the local SQLite service and does not persist or cache provider data.
   (`discovery`, `contacts`, `verification`), `max_target_count`,
   `max_cost_microusd`, `blockers`. Each provider has `configured`, `licensed`,
   `reason`, and `max_cost_microusd`. Readiness performs no network request.
+  Optional contact/verification failures are not company-discovery blockers.
 - `/worker/discover`: common fields below plus `profile`, `target_count` (1–30),
-  `offering_website` (nullable). Returns `accounts`, `errors` (at most 20),
+  `offering_website` (nullable), and server-derived `excluded_domains` (at most
+  100 exact domains; defaults to `[]`). Excluded candidates are removed before
+  public website research. Returns `accounts`, `errors` (at most 20),
   `cost_microusd`, `spend_uncertain`.
 - `/worker/contacts`: common fields plus `profile`, `account_id`, `domain`,
-  `max_contacts` (1–3; defaults to 3). Returns `account_id`, `contacts`, `errors`,
+  `max_contacts` (1–3; defaults to 3), and `enrich_contacts` (boolean, defaults
+  to false), plus server-derived `excluded_domains` (same bounded contract).
+  An excluded company returns zero cost before PDL dispatch. Omitted/false
+  selection returns no contacts, zero cost, and a warning
+  before any provider request. Returns `account_id`, `contacts`, `errors`,
   `cost_microusd`, `spend_uncertain`.
 - `/worker/verify`: common fields plus `account_id`, `contacts` (at most 3).
   Returns the contact response shape. No live verifier is implemented. It returns
@@ -36,6 +73,16 @@ claim each operation at most once, and reserve/enforce durable global and tenant
 budgets before dispatch. IDs are not an in-memory idempotency cache. Never retry
 an ambiguous paid call simply because the worker is stateless.
 
+Exclusions come from tenant-scoped workspace suppressions and explicit campaign
+Pass decisions, including legacy dismissed rows. They are exact company domains,
+not inferred industry/geography rules. Convex resolves the bounded set before
+claiming provider work and rechecks after readiness awaits immediately before
+paid dispatch; cancelled/stale jobs cannot proceed. Oversized exclusion sets fail
+closed instead of truncating. Returned candidates are checked again before later
+enrichment and saving. A Pass/suppression while PDL is already in flight prevents
+refreshing that company's evidence/contacts; the known dispatched cost is still
+settled conservatively and further enrichment stops without shifting a cursor.
+
 ## Provider behavior and evidence
 
 Exa receives target criteria only, one `auto`/`company` request, up to 30 results,
@@ -48,7 +95,7 @@ this path makes no Jev request and cannot introduce an unbudgeted decision charg
 Company size/location and buying intent remain unknown unless existing explicit
 evidence supports them. Empty/failed discovery never substitutes fixtures.
 
-PDL receives one Person Search query per account with an exact normalized
+Only when explicitly selected, PDL receives one Person Search query per account with an exact normalized
 `job_company_website` term and buyer-role phrases on `job_title.text`. The adapter
 also rejects mismatched employer domains in returned data. It retains only names,
 roles, work email, a source profile URL and provenance; no private email fallback,
@@ -83,7 +130,13 @@ The same approved global limits must be set on the worker and caller:
 Require job ≤ workspace monthly ≤ global monthly. Worker validation checks the
 configuration/each request, while Convex owns the durable cumulative ledger.
 
-For each `PREFIX` of `EXA` and `PDL`, separately approve and set:
+On Convex, `SIGNALFOUNDRY_EXA_DATA_ACCESS_APPROVED=true` is also required for
+company discovery and licensed company reads. `SIGNALFOUNDRY_PDL_DATA_ACCESS_APPROVED`
+is independently required only for selected contacts and licensed contact reads.
+`SIGNALFOUNDRY_LICENSED_DATA_EXPORT_APPROVED=true` still separately gates export.
+
+For `PREFIX=EXA`, and separately for `PREFIX=PDL` only when enabling optional
+named-contact enrichment, approve and set:
 
 - `PREFIX_API_KEY`: server secret; never a browser variable
 - `SIGNALFOUNDRY_PREFIX_API_KEY_APPROVED=true`
@@ -106,7 +159,11 @@ Each result expires at the earlier of provider-contract end and retrieval plus
 approved retention. The caller must independently enforce each account/contact
 expiry at display/export and actually delete data and backups according to its
 contract. An Exa account's expiry does not extend PDL contact rights. License
-revocation must immediately disable licensed-data access. No cross-customer cache,
+revocation must immediately disable the affected provider's data-access flag
+(or the global licensed-data flag when all rights are revoked). Turning off new
+discovery launch/spending does not alone revoke read rights for unexpired licensed
+results; revoking Exa rights hides companies, while revoking PDL rights removes
+contacts without hiding otherwise eligible companies. No cross-customer cache,
 reuse, redistribution or shared contact pool is implemented or permitted by this
 application. Flags are operator attestations, not a legal conclusion or license.
 
@@ -114,7 +171,8 @@ application. Flags are operator attestations, not a legal conclusion or license.
 
 The local/preview app always reports disabled discovery at
 `GET /api/discovery/status` (legacy alias `/api/discovery-status`). It can save a
-`mode=discovery` draft with profile snapshot and target count, but research rejects
+`mode=discovery` draft with profile snapshot, target count, and optional
+`enrich_contacts` selection, but research rejects
 it before any network/provider activity. Manual mode remains available where
 previously allowed and now freezes a supplied/current profile snapshot.
 `POST /api/campaigns/suggest-brief {website}` previews website inference without
