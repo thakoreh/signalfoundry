@@ -408,7 +408,11 @@ async function capture(page: Page, testInfo: TestInfo, name: string) {
   );
   await noOverflow(page);
   const path = testInfo.outputPath(`${testInfo.project.name}-${name}.png`);
-  await page.screenshot({ path, fullPage: true, animations: "disabled" });
+  await page.screenshot({
+    path,
+    fullPage: (await page.locator("dialog[open]").count()) === 0,
+    animations: "disabled",
+  });
   await testInfo.attach(name, { path, contentType: "image/png" });
 }
 
@@ -479,7 +483,9 @@ test("description-only discovery needs no profile, URL, or prospect list and sav
     page.getByText("Campaign draft saved. No research has started."),
   ).toBeVisible();
   await page.getByText("Saved campaign target brief", { exact: true }).click();
-  await expect(page.locator(".campaign-snapshot")).toContainText("VP of Sales");
+  await expect(
+    page.locator(".campaign-snapshot:not(.capability-details)"),
+  ).toContainText("VP of Sales");
   await capture(page, testInfo, "saved-campaign-snapshot");
   expect(state.unknown).toEqual([]);
 });
@@ -819,12 +825,12 @@ test("campaign snapshots and provider provenance remain visible with honest cont
   });
   await page.goto("/workspace");
   await page.getByText("Saved campaign target brief", { exact: true }).click();
-  await expect(page.locator(".campaign-snapshot")).toContainText(
-    "Chief Operations Officer",
-  );
-  await expect(page.locator(".campaign-snapshot")).not.toContainText(
-    "Different workspace buyer",
-  );
+  await expect(
+    page.locator(".campaign-snapshot:not(.capability-details)"),
+  ).toContainText("Chief Operations Officer");
+  await expect(
+    page.locator(".campaign-snapshot:not(.capability-details)"),
+  ).not.toContainText("Different workspace buyer");
   await page
     .getByRole("button", { name: "View Acme details", exact: true })
     .click();
