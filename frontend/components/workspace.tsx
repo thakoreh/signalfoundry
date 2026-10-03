@@ -266,7 +266,6 @@ export default function Workspace({
   const shortlisted = accounts.filter(
     (a) => a.status === "shortlisted" && !a.suppress_workspace,
   ).length;
-  const sources = accounts.reduce((total, a) => total + a.evidence.length, 0);
   function navigate(next: View) {
     setView(next);
     setMobileOpen(false);
@@ -906,42 +905,26 @@ export default function Workspace({
                       />
                     </details>
                   )}
-                  {campaign.mode === "discovery" && !activeJob(job) && (
-                    <DiscoveryReadiness
-                      status={discoveryStatus}
-                      loading={discoveryChecking}
-                    />
-                  )}
-                  <div className="stats-grid">
-                    <Stat
-                      icon="accounts"
-                      label="Accounts researched"
-                      value={campaign.account_count}
-                      detail="In this campaign"
-                    />
-                    <Stat
-                      icon="target"
-                      label="Matches to review"
-                      value={
-                        accounts.filter((account) => account.status === "new")
-                          .length
-                      }
-                      detail="Human review still required"
-                      green
-                    />
-                    <Stat
-                      icon="bookmark"
-                      label="Your shortlist"
-                      value={shortlisted}
-                      detail="Selected for the next step"
-                    />
-                    <Stat
-                      icon="file"
-                      label="Evidence collected"
-                      value={sources}
-                      detail="Public evidence records"
-                    />
-                  </div>
+                  {campaign.mode === "discovery" &&
+                    !activeJob(job) &&
+                    (accounts.length ? (
+                      <details className="campaign-snapshot capability-details">
+                        <summary>
+                          {discoveryReady(discoveryStatus)
+                            ? "Research capabilities and optional contact coverage"
+                            : "New discovery unavailable · review provider status"}
+                        </summary>
+                        <DiscoveryReadiness
+                          status={discoveryStatus}
+                          loading={discoveryChecking}
+                        />
+                      </details>
+                    ) : (
+                      <DiscoveryReadiness
+                        status={discoveryStatus}
+                        loading={discoveryChecking}
+                      />
+                    ))}
                   <section className="accounts-panel">
                     <div className="table-heading">
                       <div>
@@ -1122,6 +1105,13 @@ export default function Workspace({
                         </label>
                       </div>
                     </div>
+                    {!accountLoading && filtered.length > 0 && (
+                      <p className="mobile-table-cue">
+                        <Icon name="arrow" size={13} />
+                        Swipe for match score, evidence and status. Tap a
+                        company to review.
+                      </p>
+                    )}
                     {accountLoading ? (
                       <div className="table-loading" role="status">
                         <span className="spinner" />
@@ -1167,6 +1157,10 @@ export default function Workspace({
                                     <span>
                                       <strong>{a.name}</strong>
                                       <span>{a.domain}</span>
+                                      <span className="mobile-review-link">
+                                        Review company{" "}
+                                        <Icon name="arrow" size={11} />
+                                      </span>
                                     </span>
                                   </button>
                                 </td>
@@ -1212,7 +1206,10 @@ export default function Workspace({
                                   >
                                     <span>
                                       <Icon name="file" size={13} />
-                                      {sourceCount(a.evidence)} sources
+                                      {sourceCount(a.evidence)}{" "}
+                                      {sourceCount(a.evidence) === 1
+                                        ? "source"
+                                        : "sources"}
                                     </span>
                                     <span
                                       className={
@@ -1454,36 +1451,6 @@ export default function Workspace({
         </Dialog>
       )}
     </div>
-  );
-}
-function Stat({
-  icon,
-  label,
-  value,
-  detail,
-  green = false,
-}: {
-  icon: string;
-  label: string;
-  value: number;
-  detail: string;
-  green?: boolean;
-}) {
-  return (
-    <article className={`stat-card ${green ? "highlight-stat" : ""}`}>
-      <div className="stat-label">
-        <span>{label}</span>
-        <Icon name={icon} size={18} />
-      </div>
-      <div className="stat-value">
-        {value}
-        <span>{green && <Icon name="spark" size={22} />}</span>
-      </div>
-      <div className="stat-detail">
-        {green && <span className="small-dot mint" />}
-        {detail}
-      </div>
-    </article>
   );
 }
 function EmptyCampaign({ onCreate }: { onCreate: () => void }) {

@@ -2149,6 +2149,7 @@ legend {
 }
 .account-action-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
   margin: 19px 0 22px;
 }
@@ -4767,7 +4768,7 @@ legend {
 }
 @media (prefers-reduced-motion: reduce) {
   .audience-option {
-    transition: none;
+    transition: none !important;
   }
   .audience-option:hover {
     transform: none;
@@ -4835,4 +4836,74 @@ legend {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+@media (max-width: 520px) {
+  .account-action-row .btn {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .score-confidence > span:not(.tag),
+  .score-confidence > .tag {
+    font-size: 11px;
+    line-height: 1.5;
+  }
+}
+
+/* Keep secondary review destinations readable, including inactive tabs. */
+.drawer-tabs button:not(.active),
+.contact-card > div > span,
+.contact-card > p {
+  color: #65735e;
+}
+.contact-card > div > strong {
+  color: #344c37;
+}
+.accounts-table th {
+  color: #65735e;
+}
+.mobile-table-cue,
+.company-button .mobile-review-link {
+  display: none;
+}
+@media (max-width: 700px) {
+  .mobile-table-cue {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    border-top: 1px solid #d7dfd2;
+    background: #f4f7f0;
+    color: #50644c;
+    font-size: 11px;
+    line-height: 1.5;
+  }
+  .company-button .mobile-review-link {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    color: #275f3d;
+  }
+}
+
+.provider-budget {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  margin-top: 12px;
+  background: #f7fbf7;
+  border: 1px solid #b7cbb9;
+  border-radius: 8px;
+  color: #36583d;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.provider-budget svg {
+  flex-shrink: 0;
+  margin-top: 2px;
 }

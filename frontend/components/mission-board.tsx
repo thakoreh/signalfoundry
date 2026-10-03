@@ -27,6 +27,10 @@ export function MissionBoard({
   const passed = accounts.filter((account) => account.status === "dismissed");
   const unknown = waiting.filter((account) => needsResearch(account, profile));
   const next = waiting[0];
+  const evidenceCount = accounts.reduce(
+    (total, account) => total + account.evidence.length,
+    0,
+  );
   const running = activeJob(job) || campaign.status === "researching";
   const stages = [
     {
@@ -47,7 +51,7 @@ export function MissionBoard({
       detail: running
         ? "Working within your limits"
         : accounts.length
-          ? `${accounts.length} companies researched`
+          ? `${accounts.length} ${accounts.length === 1 ? "company" : "companies"} researched`
           : "Awaiting your start",
       done: Boolean(accounts.length),
     },
@@ -133,6 +137,7 @@ export function MissionBoard({
           {next && (
             <button
               className="btn primary small"
+              id="review-next-company"
               onClick={() => onReview(next)}
             >
               Review next company
@@ -142,9 +147,14 @@ export function MissionBoard({
         </div>
       )}
       <p className="mission-footnote">
-        <Icon name="info" size={13} /> Runs start when you approve them. This
-        workspace does not run an unattended agent, send messages, or verify
-        buying intent.
+        <Icon name="info" size={13} />
+        <span>
+          {evidenceCount > 0
+            ? `${evidenceCount} saved evidence ${evidenceCount === 1 ? "record" : "records"}. `
+            : ""}
+          Runs start when you approve them. This workspace does not run an
+          unattended agent, send messages, or verify buying intent.
+        </span>
       </p>
     </section>
   );

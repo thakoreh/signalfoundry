@@ -171,6 +171,13 @@ export function CampaignDialog({
             ),
             website,
           };
+      const inferredAudience = audienceHypotheses(
+        result.profile.description,
+        buyerAnswer,
+      ).find((candidate) =>
+        result.profile.industries.includes(candidate.label),
+      );
+      setSelectedAudience(inferredAudience?.id ?? "");
       setCompanyName(result.profile.company_name);
       setDescription(result.profile.description.split("\n\nDraft ICP")[0]);
       if (fromWebsite) setWebsite(result.website);

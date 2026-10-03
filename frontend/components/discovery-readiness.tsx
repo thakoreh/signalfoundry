@@ -45,6 +45,25 @@ export function DiscoveryReadiness({
       {!loading &&
         (status ? (
           <>
+            {ready &&
+              Number.isSafeInteger(status.max_cost_microusd) &&
+              status.max_cost_microusd > 0 && (
+                <p className="provider-budget">
+                  <Icon name="shield" size={14} />
+                  <span>
+                    Configured provider budget: up to{" "}
+                    {new Intl.NumberFormat("en-US", {
+                      style: "currency",
+                      currency: "USD",
+                      currencyDisplay: "code",
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 6,
+                    }).format(status.max_cost_microusd / 1_000_000)}{" "}
+                    per run. This is a conservative reservation, not a final
+                    provider invoice.
+                  </span>
+                </p>
+              )}
             <ul className="provider-readiness">
               {(["discovery", "contacts", "verification"] as const).map(
                 (key) => {

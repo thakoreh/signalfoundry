@@ -42,3 +42,16 @@ See [setup](SAAS_SETUP.md), [operations](OPERATIONS.md), and [verification evide
 - [ ] Pass and workspace suppression stop subsequent research/enrichment, survive reruns, stay tenant-scoped and can be reversed after source expiry
 - [ ] Actual desktop/mobile/keyboard/reduced-motion screenshots of the final head are reviewed
 - [ ] Full-campaign CSV scope is explicit; suppressed historical rows do not become actionable suggestions
+
+## Dependency audit note — 2026-10-03
+
+`npm audit --omit=dev --audit-level=moderate` reports zero production vulnerabilities.
+The all-dependency audit reports five linked high-severity entries from the single
+unpatched development-only `braces <=3.0.3` advisory
+[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm), through
+Next's ESLint tooling. The advisory lists no patched release. These dependencies
+are not in the production dependency graph; lint/build configuration must remain
+trusted. Do not use `npm audit fix --force`: the suggested downgrade to
+`eslint-config-next@14.2.35` would mismatch this Next 16 application. Review a safe
+upstream fix when one is available; this is an acknowledged tooling risk, not a
+claim that every development dependency is vulnerability-free.

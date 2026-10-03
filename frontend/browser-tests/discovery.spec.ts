@@ -54,7 +54,7 @@ const DISABLED: DiscoveryStatus = {
   ...READY,
   enabled: false,
   blockers: [
-    "Configure licensed company and contact providers before research.",
+    "Configure an approved company discovery provider and budget before research.",
   ],
   providers: {
     ...READY.providers,
@@ -402,6 +402,10 @@ async function noOverflow(page: Page) {
 }
 
 async function capture(page: Page, testInfo: TestInfo, name: string) {
+  // Reset only the document scroll; preserve the dialog's own evidence/form position.
+  await page.evaluate(() =>
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" }),
+  );
   await noOverflow(page);
   const path = testInfo.outputPath(`${testInfo.project.name}-${name}.png`);
   await page.screenshot({ path, fullPage: true, animations: "disabled" });
@@ -1290,7 +1294,7 @@ test("buyer planning separates the seller from the direct customer and leaves am
     dialog.getByText(/Which type of business gets the most value/),
   ).toBeVisible();
   await dialog
-    .getByRole("textbox", { name: "Who is this offering for?", exact: true })
+    .getByRole("textbox", { name: /^Who is this offering for\?/ })
     .fill("plumbers in Canada");
   await dialog.getByRole("button", { name: /Plumbing businesses/ }).click();
   await expect(

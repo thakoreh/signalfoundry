@@ -186,7 +186,21 @@ export function AccountDrawer({
     return () => {
       document.removeEventListener("keydown", onKeyDown, true);
       document.removeEventListener("focusin", onFocusIn, true);
-      if (opener && document.contains(opener)) opener.focus();
+      const returnTarget =
+        opener && document.contains(opener)
+          ? opener
+          : opener?.id
+            ? document.getElementById(opener.id)
+            : null;
+      // Native dialog.close() runs in the nested dialog cleanup. Restore only
+      // afterward, and never steal focus from a newer dialog/navigation.
+      queueMicrotask(() => {
+        if (
+          returnTarget?.isConnected &&
+          !document.querySelector("dialog[open]")
+        )
+          returnTarget.focus();
+      });
     };
   }, [drawerContentRef]);
 
