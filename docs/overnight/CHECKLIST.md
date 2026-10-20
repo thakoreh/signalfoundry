@@ -1,5 +1,7 @@
 # Source-backed release acceptance map
 
+S2 continuation: composer footer insertion/additive recovery and stale-copy revalidation are locally component-tested; backend contact syntax and cold booking fields/common calendar URLs guarded. Backend150/component11/typecheck/lint PASS. Persistent Selling-as, isolated Chrome actual changed flow, custom booking-URL guard limitations, exact-final-head CI and independent review remain open. No S2/full-RC acceptance. See PROGRESS for bounded remainder.
+
 S2 partial overlay: saved local sender fields/editor and backend exact-footer denial + identity-change invalidation are built/unit-tested; NOT a complete sender/footer journey. Composer recovery, Selling-as context, stale-client copy/mailto validation, cold-booking restriction and fresh Chrome evidence remain incomplete. Backend148/component10/typecheck/lint passed in initial run; no S2 CI/browser/review acceptance yet. NEXT REQUIRED P0: contact source/CASL publication/no-solicitation/role/region gate, not satisfied by footer. See S2_SETUP.md and PROGRESS. All baseline rows below retain historical gap mapping.
 
 S1 baseline at cfd22af. **Incomplete**, no hosted/staging/production verification. This is a staged backlog, not waived acceptance. Source paths relative to repo; UI under frontend/components, server under backend/app. Existing unit coverage is evidence of logic only. Fresh S1 evidence recorded in PROGRESS; no inherited screenshots count as verification.

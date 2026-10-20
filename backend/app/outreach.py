@@ -175,6 +175,17 @@ def blocked(thread: OutreachThread) -> bool:
 def sender_footer(profile) -> str:
     if not profile or not all((profile.sender_name, profile.company_name, profile.mailing_address, profile.sender_contact)):
         return ''
+    contact = profile.sender_contact
+    email = re.fullmatch(r'[^\s@]+@[^\s@]+\.[A-Za-z]{2,63}', contact)
+    phone = re.fullmatch(r'\+?[0-9 ()-]{7,30}', contact) and len(re.sub(r'\D', '', contact)) >= 7
+    web = False
+    if contact.startswith('https://'):
+        try:
+            web = normalize_url(contact).startswith('https://')
+        except FetchError:
+            pass
+    if not (email or phone or web):
+        return ''
     return (f'\n\n--\n{profile.sender_name} | {profile.company_name}\n{profile.mailing_address}\n'
             f'Contact: {profile.sender_contact}\nTo opt out, reply "unsubscribe".')
 
@@ -339,9 +350,10 @@ class OutreachStore:
                 if changed:
                     thread.approval = None
             elif operation == 'approve':
-                profile = Workspace.model_validate_json(db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant,)).fetchone()['data']).profile
-                if not profile or not all((profile.sender_name, profile.company_name, profile.mailing_address, profile.sender_contact)):
+                if not thread.sender_footer:
                     raise OutreachError('Save your sender name, company, mailing address and reachable contact in Edit business before approval.')
+                if not any(m.direction == 'inbound' and m.reply_state in ('interested', 'question') for m in thread.messages) and (thread.booking_link or re.search(r'https?://(?:www\.)?(?:calendly\.com|cal\.com|calendar\.[^/\s]+)/', thread.body, re.I)):
+                    raise OutreachError('Remove the booking link from the cold message. Offer it only after interest is shown.')
                 if not thread.body.endswith(thread.sender_footer):
                     raise OutreachError('Restore the current saved sender footer in your message, then save and approve again.')
                 if blocked(thread):

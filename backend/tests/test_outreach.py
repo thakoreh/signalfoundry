@@ -89,6 +89,25 @@ class OutreachTest(unittest.TestCase):
         with self.assertRaises(OutreachError):
             self.repo.mutate_outreach(current.id, 'sent', RevisionRequest(**self.fields(current)))
 
+    def test_missing_address_and_unreachable_contact_block_approval(self):
+        for change in ({'mailing_address': ''}, {'sender_contact': 'not reachable'}):
+            profile = self.sender().model_copy(update=change)
+            self.repo.save_profile(profile)
+            thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+            thread = self.edit(thread, body=thread.body + thread.sender_footer)
+            with self.assertRaisesRegex(OutreachError, 'sender|contact'):
+                self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_cold_booking_link_is_denied_but_interested_reply_can_include_it(self):
+        thread = self.ready()
+        thread = self.edit(thread, booking_link='https://calendar.business.com/book')
+        with self.assertRaisesRegex(OutreachError, 'booking'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Interested', reply_state='interested'))
+        thread = self.edit(thread, body='Here is the requested link.' + thread.sender_footer)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        self.assertTrue(thread.ready_for_manual_action)
+
     def test_missing_sender_blocks_approval_without_hiding_old_thread(self):
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
         self.assertEqual(self.repo.outreach_thread(thread.id).body, 'Can we talk?')
@@ -277,14 +296,17 @@ class OutreachTest(unittest.TestCase):
 
     def test_sent_snapshot_preserves_exact_approved_link_after_later_edits(self):
         self.sender()
+        # Booking invitations require an explicitly reported interested reply.
+        thread = self.start()
+        self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Interested, can we meet?', reply_state='interested'))
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Meeting', body='Would a meeting help?', booking_link='https://cal.business.com/intro')
         thread = self.edit(thread, body=thread.body + thread.sender_footer)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
         changed = self.edit(sent, booking_link='https://cal.business.com/different')
-        self.assertEqual(changed.messages[0].booking_link, 'https://cal.business.com/intro')
-        self.assertEqual(changed.messages[0].body, 'Would a meeting help?' + thread.sender_footer + '\n\nBooking link: https://cal.business.com/intro')
-        self.assertIsNotNone(changed.messages[0].approved_content_hash)
+        self.assertEqual(changed.messages[-1].booking_link, 'https://cal.business.com/intro')
+        self.assertEqual(changed.messages[-1].body, 'Would a meeting help?' + thread.sender_footer + '\n\nBooking link: https://cal.business.com/intro')
+        self.assertIsNotNone(changed.messages[-1].approved_content_hash)
 
     def test_opt_out_classification_suppresses_original_inbound_recipient_after_edit(self):
         thread = self.ready()

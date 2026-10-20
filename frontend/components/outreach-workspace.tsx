@@ -57,7 +57,21 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
             ? current
             : data.threads[0]?.id || "",
         );
-        setDrafts({});
+        setDrafts(
+          Object.fromEntries(
+            data.threads
+              .filter(
+                (item) =>
+                  item.body &&
+                  item.sender_footer &&
+                  !item.body.endsWith(item.sender_footer),
+              )
+              .map((item) => [
+                item.id,
+                { ...threadDraft(item), body: item.body + item.sender_footer },
+              ]),
+          ),
+        );
       })
       .catch((cause) => {
         if (!controller.signal.aborted) setError(errorMessage(cause));
@@ -178,7 +192,7 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
         [thread.id]: {
           ...(current[thread.id] || threadDraft(thread)),
           subject: result.subject,
-          body: result.body,
+          body: result.body + (thread.sender_footer || ""),
         },
       }));
       setNotice(
@@ -208,8 +222,27 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   async function copy() {
     if (!draft || !canAct) return;
     try {
+      const current = await api<OutreachThread>(
+        `/outreach/${encodeURIComponent(thread!.id)}`,
+        { signal: scope.current!.signal },
+      );
+      if (scope.current!.signal.aborted) return;
+      setThreads((items) =>
+        items.map((item) => (item.id === current.id ? current : item)),
+      );
+      if (
+        !current.ready_for_manual_action ||
+        !current.approval ||
+        current.approval.content_hash !== thread!.approval?.content_hash ||
+        !sameOutreachDraft(draft, threadDraft(current))
+      ) {
+        setError(
+          "Approval changed. Restore the saved sender footer, save and approve again. Your edits are still here.",
+        );
+        return;
+      }
       await navigator.clipboard.writeText(
-        `To: ${draft.recipient}\nSubject: ${draft.subject}\n\n${outreachMessageBody(draft)}`,
+        `To: ${current.recipient}\nSubject: ${current.subject}\n\n${outreachMessageBody(current)}`,
       );
       setNotice("Approved message copied. Nothing was sent.");
     } catch {
@@ -579,6 +612,33 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
                       />
                     </label>
                   </div>
+                  {step === "Review" && !thread.messages.length && (
+                    <p className="outreach-review-note">
+                      The first cold message must not include a booking link.
+                    </p>
+                  )}
+                  {thread.sender_footer ? (
+                    <button
+                      type="button"
+                      disabled={!!busy}
+                      onClick={() => {
+                        if (!draft.body.endsWith(thread.sender_footer!))
+                          edit(
+                            "body",
+                            draft.body.trimEnd() + thread.sender_footer,
+                          );
+                      }}
+                    >
+                      Restore saved sender footer
+                    </button>
+                  ) : (
+                    <p>
+                      Before approval,{" "}
+                      <Link href="/workspace/setup">Edit business</Link> to save
+                      your sender name, company, mailing address and reachable
+                      contact. Outreach must include these details.
+                    </p>
+                  )}
                   {step === "Review" && !thread.messages.length && (
                     <p className="outreach-review-note">
                       AI generation uses the configured provider when no cached

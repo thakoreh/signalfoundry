@@ -1,5 +1,7 @@
 # S2 sender safety — partial checkpoint
 
+Continuation: loaded nonempty drafts and explicitly generated drafts include the saved footer as unsaved reviewable text. Restore saved sender footer appends missing current details without deleting user text; review/remove any outdated footer manually, save, approve exact text. Copy re-fetches the thread and denies stale approval. Opening/copying never records sent; no mailto launch was added. Invalid/missing reachable-contact syntax blocks approval but syntax is not a provider reachability check. Booking field/common calendar URLs are blocked before interest; arbitrary custom booking URLs in prose need further review. Persistent Selling-as and real isolated Chrome flow proof remain required before S2 acceptance. Existing off-switch/rollback rules below still apply.
+
 Status: incomplete, backend/profile subseam only. No release acceptance, deployment or permission to send.
 
 Setup: existing local loopback stack only; no new dependencies/env/secrets. Edit business → sender name, company, mailing address, monitored contact. Missing values remain empty; old profiles stay readable. Hosted editor/payload unchanged, outreach disabled. Existing fixture businesses are fictional, not owner identity.

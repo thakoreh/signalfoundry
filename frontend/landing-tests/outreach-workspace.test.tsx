@@ -93,6 +93,35 @@ it("records actual text separately when manually sent with changes", async () =>
     actual_body: "My actual message",
   });
 });
+it("restores the saved footer without losing edits and copies only revalidated approved bytes", async () => {
+  const footer =
+    '\n\n--\nAlex | Fixture Co\n100 Example Street\nContact: alex@example.com\nTo opt out, reply "unsubscribe".';
+  Object.assign(thread, { sender_footer: footer });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path === "/outreach/thread_a") return structuredClone(thread);
+    return original(path, options);
+  });
+  await mount();
+  expect(field("Message").value).toBe("A reviewed factual message." + footer);
+  await change("Message", "Keep my unsaved words.");
+  await click("Restore saved sender footer");
+  expect(field("Message").value).toBe("Keep my unsaved words." + footer);
+  await click("Save changes");
+  await click("Approve exact message");
+  await click("Copy approved message");
+  expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+    "To: hello@example.org\nSubject: A specific introduction\n\nKeep my unsaved words." +
+      footer,
+  );
+  expect(thread.messages).toHaveLength(0);
+  vi.mocked(navigator.clipboard.writeText).mockClear();
+  thread.approval = null;
+  thread.ready_for_manual_action = false;
+  await click("Copy approved message");
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Approval changed");
+});
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }
@@ -111,6 +140,8 @@ beforeEach(() => {
   api.mockImplementation(async (path: string, options: RequestInit = {}) => {
     if (path.startsWith("/outreach?"))
       return { threads: [structuredClone(thread)] };
+    if (path === "/outreach/thread_a" && !options.method)
+      return structuredClone(thread);
     const body = JSON.parse((options.body as string) || "{}");
     const action = path.split("/").at(-1);
     expect(body.expected_revision).toBe(thread.revision);
