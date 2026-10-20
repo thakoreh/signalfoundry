@@ -84,6 +84,41 @@ Budget permission is not permission to buy services, connect a mailbox/calendar,
 
 At handoff, mark each as **implemented and tested**, **implemented but unverified**, or **blocked with named input**. If live transport is blocked, deliver the useful hosted/manual-assisted boundary and an exact next action; do not claim the whole vision is production-ready by morning.
 
+## Owner release-candidate acceptance additions (authoritative)
+
+The owner is the only maintainer, reviewer and merger. Keep each PR reviewable in about an hour; organize commits by seam and stack PRs when larger. No new services/accounts/queues/infrastructure beyond Next.js, local FastAPI/SQLite, Clerk/Convex and DeepSeek unless a P0 demonstrably requires it. Prefer fewer layers. One local command, one test command; collect every new env/manual step, off switch and rollback in one setup doc. Rare alerts go only to the owner. Every capability needs an off switch and rollback.
+
+The canonical numbered journey supersedes the older nine-step grouping above:
+
+1. Landing: clearly target launched B2B SaaS founders; visibly fictional whole-journey example; manual today versus planned; one website CTA and quiet manual fallback; no fake proof.
+2. Signup preserves the entered website; spends nothing; never overwrites a saved profile.
+3. Confirm once: offering, buyer and sender name/company/mailing address. Ask once for a missing mailing address and explain legal footer use. Saved identity is the Selling as context on working screens.
+4. Search prefills editable buyer/location, default/max five, visible cost/allowance before explicit click; real persisted progress; refresh never repeats paid work.
+5. Dense leads: company/named contacts first; shared inbox labeled and lower ranked; address verification, source URL and retrieval date; already-contacted company marker; selection/CSV; honest shortfalls, no padding.
+6. Draft: saved-evidence claims marked, unsupported claims flagged, footer included, recipient local time when known. Edit → save → exact approval → Copy/Open in email app → Sent as approved / Sent with changes / Not yet.
+7. End with a plain next-action summary, e.g. follow-ups due Thursday, not fabricated activity.
+8. Return to Next up: replies to log/answer, follow-ups due, snoozes due, approvals pending and meetings to report; one action per item; opening incurs no paid calls.
+9. Paste reply and manually choose type; show consequence. Interested; question/objection; referral (new same-company contact, fresh suppression/approval, credit referrer); not now (dated snooze); not interested (stop); opt-out or source challenge (suppress/stop); OOO (pause until dated return, exclude reply metric); bounce (invalid address/stop, exclude reply metric).
+10. Human answer uses saved offer facts beside thread; optional grounded AI only after cost gate. Exact approve → manually send → log.
+11. Follow-ups stay in thread, due in Next up, at most two, each manually approved; any reply stops them.
+12. After interest offer existing booking link; report booking AND time; offer approval-required confirmation; after time ask attended/no-show/cancelled, later customer outcome. All labeled reported by you.
+13. Honest personal funnel: contacted → replied → interested → meetings held → customers; separate manual reports/provider confirmation; no opens/vanity metrics.
+14. Next search reuses profile and flags/excludes already-contacted/suppressed companies without re-entry.
+
+Unknown stays Unknown without a report. Logging prompts at natural moments take two taps or fewer. Copy/open is not sending. Sent with changes stores actual recipient/subject/body separately from immutable approved text. Published email is unverified absent verifier evidence. Provider acceptance is not delivery; link is not booking; meeting is not sale; auto-reply is not reply. One active cold thread per company by default; reply/opt-out/meeting pauses pending outreach to other contacts until manual decision. Edits, replies, pauses and suppression invalidate approvals; opt-out survives later searches, address edits and corrections.
+
+Draft defaults: plain 50–125 words, one specific verifiable recipient observation, one factual seller line, one low-pressure interest question. No flattery, fake familiarity/Re:/Fwd:, urgency or connections. Initial email has no booking link, attachments/images and at most one link; founder may override style defaults. Suggest weekday working hours in known recipient timezone, never optimal-time claims.
+
+Compliance (US/Canada; verify current primary rules, not legal advice): each copied/mailto/outreach message includes saved name/company/mailing address and plain opt-out line; block approval without identity/address. Store each recipient's published address source URL and role relevance/contact basis; block when publication rejects unsolicited messages. Opt-outs immediate and durable (legal maximum ten business days). Default US/Canada only; EU/UK excluded unless explicitly enabled after GDPR/PECR review. No tracking pixels/link rewriting. Gated connected mailbox needs gradual daily caps, owner SPF/DKIM/DMARC steps, stop-on-bounce/complaint thresholds.
+
+Required unhappy paths: failed/empty/partial search; no contact; draft failure/allowance exhaustion; tab closes mid-edit (retain or explicit discard); edits drop approval; opt-out blocks already approved follow-up; company repeats across searches; keyboard covers editor; 320px and 200% zoom. Test all transitions, suppression/company pause, quota/allowance, return, concurrent failures and tenant/role boundaries using isolated fixtures/mocks only.
+
+Priority: source checklist/docs → coherent local steps 1–14 → durable local/global/tenant cost admission (reserve/settle/reconcile prior usage, idempotency, bounded tokens/retries/concurrency, uncertainty stop, kill switch) → hosted Convex parity while disabled until verified → grounded reply/offline mailbox after cost/contract → quality/auth/billing/privacy/operations/restore. Local journey wins conflicts with hosted work. US$25/month includes prior DeepSeek; reconciliation unknown, Ads unallocated. No purchases, spend, real messages, account connection, public deployment or live billing authorized. Do useful safe work while externally gated; defer broad CRM/fleets/multichannel/hundreds of results.
+
+Evidence: progress after every milestone with exact commands/results/decisions/blockers/next; fetch/preserve owner work/data/preview and use isolated worktrees/ports/DBs/Chrome profiles. Small checkpoint pushes; merge moving main, never force push/rebase pushed history. Stop a path after two failed approaches/about 45 minutes and continue safely; immediately halt secrets/data/paid-exposure/real-send risk. Never weaken tests/lint/types. Built needs exact-commit output; verified needs running-app walk, mocks are not integration. Fresh independent security/tenant/cost and busy-founder 390px UX review of integrated diff and steps 1–7 then 8–14; fix/retest/re-review critical changes. Final checks include source/container checks on up-to-date final head and resolved threads; zero GitHub approvals, only owner merge.
+
+Morning report: verdict then owner decisions; 1–14 works/partly/broken/gated with reason; EVERY P0/P1 built/locally tested/staging verified/production verified/blocked/deferred with reason; branch/PR/base/head/checks, review links/screenshots/defects, known/unknown spend, manual/connected distinction, setup/rollback. Truthful incomplete/candidate/production-ready/live distinction; deadline/build/mocks never imply readiness.
+
 ## Minimum human blockers to surface once, concretely
 
 1. **Budget/ads allocation and remaining usage:** confirm whether ads share US$25 and what has already been spent; propose no ads by default until resolved.
