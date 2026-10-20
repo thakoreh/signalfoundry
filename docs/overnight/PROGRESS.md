@@ -1,3 +1,7 @@
+## S2B continuation — tested checkpoint, acceptance still pending
+
+Shared seller/profile-return checkpoint now passes styled isolated Chrome1440/390/320 (actual components + global styles; fictional in-browser API, NOT Next/backend integration). Earlier390 overflow was missing global box-sizing/reset in harness; no product CSS/assertions weakened. New RED→GREEN guard tests cover nested-editor single discard prompt, cancelled navigation, Chrome Navigation API traversal, clean-save/unmount cleanup; no sensitive storage. Session switch without parent key reproduced old-request leak; internally keyed session fixes abort/closure isolation. Cancelled save/profile suspension reproduced permanently busy editor; new scope resets flight and successful GET releases busy while obsolete completion stays inert. Source60/component75/typecheck/lint pass (s2b-final-frontend.log); browser s2b-browser.log passes. Full S2 integration remains original S2 responsibility. Dedicated user/logout, slow-load and actual Chrome back/discard matrix still incomplete; do not accept full S2B contract yet. No new services/dependencies/Convex/owner-data/provider changes.
+
 # Release candidate progress — S1 / S2
 
 ## S2B bounded seller-return candidate — not S2 acceptance

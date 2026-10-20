@@ -17,17 +17,27 @@ type SessionClient = {
   request: (path: string, options?: RequestInit) => Promise<Response>;
 };
 const Context = createContext<SessionClient | null>(null);
-export function WorkspaceSession({
-  mode,
-  role,
-  organizationId,
-  children,
-}: {
+type SessionProps = {
   mode: AppMode;
   role: string;
   organizationId?: string;
   children: React.ReactNode;
-}) {
+};
+export function WorkspaceSession(props: SessionProps) {
+  // Context changes must destroy memory-only drafts and old request closures.
+  return (
+    <ScopedWorkspaceSession
+      key={JSON.stringify([props.mode, props.role, props.organizationId])}
+      {...props}
+    />
+  );
+}
+function ScopedWorkspaceSession({
+  mode,
+  role,
+  organizationId,
+  children,
+}: SessionProps) {
   const controller = useRef<AbortController | null>(null);
   const value = useMemo<SessionClient>(() => {
     const optionsWithSignal = (options: RequestInit = {}) => {

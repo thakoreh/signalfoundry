@@ -63,6 +63,9 @@ export function OutreachWorkspace({
   useEffect(() => {
     const controller = new AbortController();
     scope.current = controller;
+    // An aborted mutation cannot clear its own flight in finally. The new
+    // profile-return scope must be usable, while obsolete completions stay inert.
+    flight.current = false;
     if (mode !== "local-demo" || suspended) {
       return () => controller.abort();
     }
@@ -72,6 +75,7 @@ export function OutreachWorkspace({
     )
       .then((data) => {
         if (controller.signal.aborted) return;
+        setBusy("");
         setThreads(data.threads);
         setActive((current) =>
           data.threads.some((t) => t.id === current)

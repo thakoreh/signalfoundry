@@ -96,6 +96,31 @@ it("preserves message and inbound edits through sender repair and reloads curren
   expect(field("Paste a received reply").value).toBe("Keep my pasted reply");
   expect(button("Copy approved message").disabled).toBe(true);
 });
+it("releases a cancelled save flight after profile suspension without losing edits", async () => {
+  await mount();
+  await change("Message", "Keep this draft");
+  const original = api.getMockImplementation()!;
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementation((path: string, options: RequestInit = {}) =>
+    path.endsWith("/draft")
+      ? new Promise((resolve) => {
+          finish = resolve;
+        })
+      : original(path, options),
+  );
+  await click("Save changes");
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" suspended />),
+  );
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
+  await act(async () => finish({ ...thread, body: "Obsolete completion" }));
+  expect(field("Message").value).toBe("Keep this draft");
+  expect(button("Save changes").disabled).toBe(false);
+  api.mockImplementation(original);
+  await click("Save changes");
+  expect(field("Message").value).toBe("Keep this draft");
+  expect(thread.body).toBe("Keep this draft");
+});
 it("records actual text separately when manually sent with changes", async () => {
   await mount();
   await click("Approve exact message");
