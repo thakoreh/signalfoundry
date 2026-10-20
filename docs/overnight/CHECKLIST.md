@@ -1,7 +1,15 @@
 # Source-backed release acceptance map
 
-## CURRENT S3 checkpoint (not accepted)
-S1/S2 accepted input is f1b3b325 (controller WAVE3_SCOPE.md); earlier pending-S2 notes below are historical. S3 backend contact_basis v1/PUT/admission/hash/replay/recipient invalidation built and backend159 locally tested. UI repair/proxy/types, frontend regressions/full checks, real Next/FastAPI/SQLite Chrome1440/390/320, published final-head CI and same-card independent review remain OPEN. The old frontend cannot yet repair missing-basis denial. No legal permission/verified-address/whole-RC acceptance. See current PROGRESS entry for exact scope and evidence.
+## CURRENT S3 implementation-ready engineering handoff — not self-approval/full-release readiness
+
+Source checkpoint `944c8002911b423c782efaeb4cd9d1097d728f54` is the exact tested S3 code checkpoint. It keeps the existing additive contact-basis v1 safety contract and adds a narrow recipient-refresh race repair: local basis overlays survive ordinary refreshes only when their `published_email` still matches the refreshed thread recipient; a recipient changed outside the editor clears the stale overlay. The RED regression and GREEN fix are recorded in `PROGRESS.md`.
+
+Verification completed: backend 159 tests; frontend source 60, landing 85 across 16 files, typecheck, lint; fresh real Next/FastAPI/fake SQLite/installed Chrome 155 at actual 1440/390/320 all PASS. The browser matrix covers missing/incomplete basis denial, explicit repair/save, exact copy with no send, typing/save invalidation, recipient change, sticky suppression, current replay, immutable approved/actual history, and source/date/email/notice/publisher/region negatives. Evidence is under the control directory's `s3-integration/`. Final exact remote head/CI and independent same-card review are still gates. No legal permission, consent verification, production readiness, or whole RC acceptance is claimed.
+
+Reviewer guide and setup/rollback are `docs/overnight/S3_REVIEW_GUIDE.md` and `docs/overnight/S3_SETUP.md`; immutable handoff is `/Users/hiren/.hermes/cto-pilot/signalfoundry-rc/S3_STANDARD_HANDOFF.md`.
+
+## CURRENT S3 frontend checkpoint — historical pre-race-fix status
+S1/S2 accepted input is f1b3b325 (controller WAVE3_SCOPE.md); earlier pending-S2 notes below are historical. S3 backend contact_basis v1/PUT/admission/hash/replay/recipient invalidation built and backend159 locally tested. UI repair/proxy/types, frontend regressions/full checks, real Next/FastAPI/SQLite Chrome1440/390/320, published final-head CI and same-card independent review remain OPEN. The old frontend cannot yet repair missing-basis denial. No legal permission/verified-address/whole-RC acceptance. See current PROGRESS entry for exact scope and evidence. This paragraph is superseded by the current handoff above, not deleted.
 
 ## Current S2 integrated overlay (supersedes older pending seam notes)
 - Built + locally integrated tested: additive saved sender name/company/address/contact, legacy profile safe opening and omitted-field preservation; saved Selling as/inline repair/Back; deterministic exact footer admission/tamper denial; sender-change stale approval invalidation; immutable sent history; validated exact Copy bytes with no send event. S1/S2A/S2B prerequisite reviews accepted; S2 independent review NEXT, not accepted.
