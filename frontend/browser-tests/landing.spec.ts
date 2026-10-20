@@ -78,9 +78,12 @@ test("website validation is keyboard-accessible and never analyzes invalid input
     if (/\/api\//.test(request.url())) requests.push(request.url());
   });
   const website = page.getByRole("textbox", { name: "Your business website" });
+  const validationAlert = page
+    .getByRole("form", { name: "Start with your business website" })
+    .getByRole("alert");
   await website.fill("not a website");
   await website.press("Enter");
-  await expect(page.getByRole("alert")).toContainText(
+  await expect(validationAlert).toContainText(
     "Enter a public business website",
   );
   await expect(website).toBeFocused();
@@ -93,7 +96,7 @@ test("website validation is keyboard-accessible and never analyzes invalid input
   ).toBeNull();
   expect(requests).toEqual([]);
   await website.fill("example.com");
-  await expect(page.getByRole("alert")).toHaveCount(0);
+  await expect(validationAlert).toHaveCount(0);
   await expect(website).toHaveAttribute("aria-invalid", "false");
 });
 
