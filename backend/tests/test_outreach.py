@@ -72,6 +72,48 @@ class OutreachTest(unittest.TestCase):
         self.assertIsNone(thread.approval)
         self.assertEqual(Repository(self.path).outreach_thread(thread.id).messages[-1], message)
 
+    def test_changed_sent_http_retry_binds_mode_and_actual_text(self):
+        thread = self.ready()
+        payload = {**self.fields(thread), 'sent_as': 'with_changes',
+                   'actual_subject': 'Actual subject', 'actual_body': 'Actual body'}
+        with TestClient(create_app(self.path, testing=True)) as client:
+            url = f'/api/outreach/{thread.id}/sent'
+            first = client.post(url, json=payload)
+            self.assertEqual(first.status_code, 200, first.text)
+            replay = client.post(url, json=payload)
+            self.assertEqual(replay.status_code, 200, replay.text)
+            self.assertEqual(replay.json(), first.json())
+            for changes in ({'actual_subject': 'Other subject'}, {'actual_body': 'Other body'},
+                            {'sent_as': 'approved', 'actual_subject': '', 'actual_body': ''}):
+                conflict = client.post(url, json={**payload, **changes})
+                self.assertEqual(conflict.status_code, 409, conflict.text)
+            self.assertEqual(len(self.repo.outreach_thread(thread.id).messages), 1)
+
+    def test_legacy_sent_http_retry_returns_current_state_without_duplicate_events(self):
+        thread = self.ready()
+        legacy = RevisionRequest(**self.fields(thread))
+        sent = self.repo.mutate_outreach(thread.id, 'sent', legacy)
+        with TestClient(create_app(self.path, testing=True)) as client:
+            url = f'/api/outreach/{thread.id}/sent'
+            for payload in (legacy.model_dump(), {**legacy.model_dump(), 'sent_as': 'approved'}):
+                response = client.post(url, json=payload)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), sent.model_dump())
+            for changes in ({'sent_as': 'with_changes', 'actual_subject': 'Changed', 'actual_body': 'Changed'},
+                            {'actual_subject': 'Changed'}, {'actual_body': 'Changed'},
+                            {'expected_revision': legacy.expected_revision + 1}):
+                response = client.post(url, json={**legacy.model_dump(), **changes})
+                self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(len(self.repo.outreach_thread(thread.id).messages), 1)
+            suppressed = self.repo.mutate_outreach(sent.id, 'reply', PasteReply(
+                **self.fields(sent), body='Unsubscribe me', reply_state='opt_out'))
+            replay = client.post(url, json=legacy.model_dump())
+            self.assertEqual(replay.status_code, 200, replay.text)
+            self.assertEqual(replay.json(), suppressed.model_dump())
+            self.assertTrue(replay.json()['suppressed'])
+            self.assertFalse(replay.json()['ready_for_manual_action'])
+            self.assertEqual(len(replay.json()['messages']), 2)
+
     def test_create_reopens_same_eligible_customers_and_survives_repository_restart(self):
         first = self.start()
         self.assertEqual(first.id, self.start().id)

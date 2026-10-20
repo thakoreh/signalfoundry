@@ -211,7 +211,15 @@ class OutreachStore:
         prior = db.execute('SELECT fingerprint,resource_ids FROM outreach_requests WHERE tenant_id=? AND request_key=?',
                            (self.tenant, body.idempotency_key)).fetchone()
         if prior:
-            if prior['fingerprint'] != request_hash(operation, body):
+            fingerprints = {request_hash(operation, body)}
+            # Before changed-send reports, /sent accepted only RevisionRequest.
+            # Honor that fingerprint only for identical approved-send semantics;
+            # never drop changed text or its mode from an idempotency binding.
+            if (operation.startswith('sent:') and isinstance(body, SentRequest)
+                    and body.sent_as == 'approved' and not body.actual_subject and not body.actual_body):
+                legacy = RevisionRequest(expected_revision=body.expected_revision, idempotency_key=body.idempotency_key)
+                fingerprints.add(request_hash(operation, legacy))
+            if prior['fingerprint'] not in fingerprints:
                 raise OutreachError('This request key was already used for different changes')
             return [self._get(db, value) for value in json.loads(prior['resource_ids'])]
         # Bounded local ledger admission, including cached/replayed creates.
