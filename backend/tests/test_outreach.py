@@ -54,7 +54,18 @@ class OutreachTest(unittest.TestCase):
         thread = self.edit(thread, body=thread.body + thread.sender_footer)
         if thread.messages and thread.reply_state not in ('interested', 'question'):
             thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+        thread = self.basis(thread)
         return self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def basis(self, thread, **changes):
+        from app.outreach import ContactBasis, ContactBasisRequest
+        evidence = dict(version=1, published_email=thread.recipient, source_url='https://business.com/contact',
+                        captured_at='2026-01-01T12:00:00Z', publisher_attribution='recipient', notice_status='clear',
+                        recipient_role='Operations team', message_relevance='Question about their property operations',
+                        recipient_country='CA', basis_type='conspicuous_publication')
+        evidence.update(changes)
+        return self.repo.mutate_outreach(thread.id, 'contact-basis', ContactBasisRequest(
+            **self.fields(thread), contact_basis=ContactBasis(**evidence)))
 
     def sender(self):
         profile = DEMO_PROFILE.model_copy(update={'sender_name': 'Alex Fixture',
@@ -70,6 +81,7 @@ class OutreachTest(unittest.TestCase):
         with self.assertRaisesRegex(OutreachError, 'footer'):
             self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         thread = self.edit(thread, body='Can we talk?' + footer)
+        thread = self.basis(thread)
         approved = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         self.assertTrue(approved.ready_for_manual_action)
         tampered = self.edit(approved, body=approved.body.replace('unsubscribe', 'subscribe'))
@@ -316,6 +328,7 @@ class OutreachTest(unittest.TestCase):
         self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Interested, can we meet?', reply_state='interested'))
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Meeting', body='Would a meeting help?', booking_link='https://cal.business.com/intro')
         thread = self.edit(thread, body=thread.body + thread.sender_footer)
+        thread = self.basis(thread)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
         changed = self.edit(sent, booking_link='https://cal.business.com/different')

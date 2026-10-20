@@ -1,5 +1,8 @@
 # Source-backed release acceptance map
 
+## CURRENT S3 checkpoint (not accepted)
+S1/S2 accepted input is f1b3b325 (controller WAVE3_SCOPE.md); earlier pending-S2 notes below are historical. S3 backend contact_basis v1/PUT/admission/hash/replay/recipient invalidation built and backend159 locally tested. UI repair/proxy/types, frontend regressions/full checks, real Next/FastAPI/SQLite Chrome1440/390/320, published final-head CI and same-card independent review remain OPEN. The old frontend cannot yet repair missing-basis denial. No legal permission/verified-address/whole-RC acceptance. See current PROGRESS entry for exact scope and evidence.
+
 ## Current S2 integrated overlay (supersedes older pending seam notes)
 - Built + locally integrated tested: additive saved sender name/company/address/contact, legacy profile safe opening and omitted-field preservation; saved Selling as/inline repair/Back; deterministic exact footer admission/tamper denial; sender-change stale approval invalidation; immutable sent history; validated exact Copy bytes with no send event. S1/S2A/S2B prerequisite reviews accepted; S2 independent review NEXT, not accepted.
 - Real Next/FastAPI/fresh SQLite installed Chrome155 FULL flow1440/390/320 PASS, actual viewport logged (s2-final-width-*); old screenshot-loop partial coverage superseded. Source60/component82/backend152/typecheck/lint PASS. See PROGRESS and pilot S2_REVIEW_HANDOFF.md for exact-head CI, evidence and limitations.

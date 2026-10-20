@@ -7,6 +7,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from urllib.parse import urlsplit
 from typing import Annotated, Literal
 
@@ -89,6 +91,56 @@ class EditDraft(RevisionRequest):
         return value
 
 
+class ContactBasis(StrictModel):
+    version: Literal[1] = 1
+    published_email: Annotated[str, StringConstraints(strip_whitespace=True, max_length=320)] = ''
+    source_url: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2048)] = ''
+    captured_at: str = ''
+    publisher_attribution: Literal['recipient', 'caused_by_recipient', 'third_party', 'unknown'] = 'unknown'
+    notice_status: Literal['clear', 'prohibits', 'unknown'] = 'unknown'
+    recipient_role: Annotated[str, StringConstraints(strip_whitespace=True, max_length=300)] = ''
+    message_relevance: Annotated[str, StringConstraints(strip_whitespace=True, max_length=2000)] = ''
+    recipient_country: Literal['US', 'CA', 'unknown', 'other'] = 'unknown'
+    recipient_timezone: str | None = None
+    basis_type: Literal['conspicuous_publication'] = 'conspicuous_publication'
+
+    @field_validator('source_url')
+    @classmethod
+    def source(cls, value):
+        if value:
+            try:
+                value = normalize_url(value)
+            except FetchError:
+                raise ValueError('Use a public HTTP(S) source URL without credentials') from None
+        return value
+
+    @field_validator('captured_at')
+    @classmethod
+    def observed(cls, value):
+        if value:
+            timestamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
+            if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+                raise ValueError('Observation time must include a timezone')
+            if timestamp > datetime.now(timezone.utc) + timedelta(minutes=5):
+                raise ValueError('Observation time cannot be in the future (5 minute clock tolerance)')
+            value = timestamp.astimezone(timezone.utc).isoformat()
+        return value
+
+    @field_validator('recipient_timezone')
+    @classmethod
+    def zone(cls, value):
+        if value:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError):
+                raise ValueError('Use an IANA timezone or leave unknown') from None
+        return value or None
+
+
+class ContactBasisRequest(RevisionRequest):
+    contact_basis: ContactBasis | None
+
+
 class SentRequest(RevisionRequest):
     sent_as: Literal['approved', 'with_changes'] = 'approved'
     actual_subject: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)] = ''
@@ -147,6 +199,7 @@ class OutreachThread(StrictModel):
     body: str = ''
     booking_link: str = ''
     sender_footer: str = ''
+    contact_basis: ContactBasis | None = None
     paused: bool = False
     suppressed: bool = False
     suppression_reason: str | None = None
@@ -163,8 +216,18 @@ class OutreachThread(StrictModel):
 
 def content_hash(thread: OutreachThread) -> str:
     inbound = next((m.id for m in reversed(thread.messages) if m.direction == 'inbound'), None)
-    data = [thread.recipient, thread.subject, thread.body, thread.booking_link, inbound]
+    data = [thread.recipient, thread.subject, thread.body, thread.booking_link, inbound,
+            thread.contact_basis.model_dump() if thread.contact_basis else None]
     return hashlib.sha256(json.dumps(data, ensure_ascii=True).encode()).hexdigest()
+
+
+def contact_basis_ready(thread: OutreachThread) -> bool:
+    basis = thread.contact_basis
+    return bool(basis and basis.published_email.lower() == thread.recipient.lower()
+                and thread.recipient and basis.source_url and basis.captured_at
+                and basis.publisher_attribution in ('recipient', 'caused_by_recipient')
+                and basis.notice_status == 'clear' and basis.recipient_role and basis.message_relevance
+                and basis.recipient_country in ('US', 'CA'))
 
 
 def blocked(thread: OutreachThread) -> bool:
@@ -211,7 +274,7 @@ class OutreachStore:
                                  (self.tenant, domain_target(thread.domain), 'email:' + thread.recipient.lower())).fetchone()
         if suppression:
             thread.suppressed, thread.suppression_reason = True, suppression['reason']
-        if blocked(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
+        if blocked(thread) or not contact_basis_ready(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
             thread.approval = None
         thread.ready_for_manual_action = bool(not blocked(thread) and thread.recipient and thread.subject and thread.body and
                                                thread.approval and thread.approval.content_hash == content_hash(thread))
@@ -345,10 +408,13 @@ class OutreachStore:
                 changed = any(getattr(thread, name) != getattr(body, name) for name in ('recipient', 'subject', 'body', 'booking_link'))
                 if thread.recipient != body.recipient:
                     thread.recipient_status = 'user_entered' if body.recipient else 'missing'
+                    thread.contact_basis = None
                 for name in ('recipient', 'subject', 'body', 'booking_link'):
                     setattr(thread, name, getattr(body, name))
                 if changed:
                     thread.approval = None
+            elif operation == 'contact-basis':
+                thread.contact_basis, thread.approval = body.contact_basis, None
             elif operation == 'approve':
                 if not thread.sender_footer:
                     raise OutreachError('Save your sender name, company, mailing address and reachable contact in Edit business before approval.')
@@ -360,6 +426,8 @@ class OutreachStore:
                     raise OutreachError('This conversation is paused, suppressed or needs reply review. Approval is blocked.')
                 if not all((thread.recipient, thread.subject, thread.body)):
                     raise OutreachError('Save a recipient, subject and message before approving.')
+                if not contact_basis_ready(thread):
+                    raise OutreachError('Review and save the recipient contact basis before approval.')
                 thread.approval = Approval(content_hash=content_hash(thread), approved_at=now(), revision=next_revision)
             elif operation == 'sent':
                 if not thread.ready_for_manual_action:
@@ -449,6 +517,10 @@ def outreach_router(repository, *, blocked_preview=False):
     @router.put('/{thread_id}/draft', response_model=OutreachThread)
     def edit(thread_id: str, body: EditDraft):
         return call(service().mutate_outreach, thread_id, 'draft', body)
+
+    @router.put('/{thread_id}/contact-basis', response_model=OutreachThread)
+    def contact_basis(thread_id: str, body: ContactBasisRequest):
+        return call(service().mutate_outreach, thread_id, 'contact-basis', body)
 
     @router.post('/{thread_id}/approve', response_model=OutreachThread)
     def approve(thread_id: str, body: RevisionRequest):
