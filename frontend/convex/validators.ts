@@ -33,6 +33,14 @@ export const profile = v.object({
   exclusions: v.array(v.string()),
 });
 export type Profile = Infer<typeof profile>;
+export const customerDraft = v.object({
+  subject: v.string(),
+  body: v.string(),
+  evidence_ids: v.array(v.string()),
+  warnings: v.array(v.string()),
+  generation_engine: v.literal("deepseek"),
+  created_at: v.string(),
+});
 export const evidence = v.object({
   id: v.string(),
   title: v.string(),

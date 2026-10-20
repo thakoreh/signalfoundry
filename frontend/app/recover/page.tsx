@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AuthShell } from "@/components/setup-state";
+export const metadata = { title: "Recover your account" };
 export default function RecoveryPage() {
   return (
     <AuthShell>

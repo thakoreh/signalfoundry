@@ -1,0 +1,344 @@
+// @vitest-environment jsdom
+import React, { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { OutreachWorkspace } from "../components/outreach-workspace";
+import { PrepareOutreach } from "../components/prepare-outreach";
+import type { OutreachThread } from "../lib/outreach";
+const { api, session } = vi.hoisted(() => ({
+  api: vi.fn(),
+  session: { mode: "local-demo" },
+}));
+vi.mock("../components/workspace-session", () => ({
+  useWorkspaceSession: () => ({ api, mode: session.mode }),
+}));
+let container: HTMLDivElement, root: Root, thread: OutreachThread;
+const fixture = (): OutreachThread => ({
+  id: "thread_a",
+  search_id: "search_a",
+  account_id: "account_a",
+  company_name: "Example business",
+  domain: "example.org",
+  recipient: "hello@example.org",
+  recipient_status: "published_unverified",
+  subject: "A specific introduction",
+  body: "A reviewed factual message.",
+  booking_link: "",
+  paused: false,
+  suppressed: false,
+  suppression_reason: null,
+  reply_state: "awaiting_review",
+  revision: 1,
+  approval: null,
+  ready_for_manual_action: false,
+  messages: [],
+  meeting_state: "not_recorded",
+  sale_state: "not_recorded",
+  created_at: "2026-10-19",
+  updated_at: "2026-10-19",
+});
+function button(text: string) {
+  return [...container.querySelectorAll<HTMLButtonElement>("button")].find(
+    (element) => element.textContent === text,
+  )!;
+}
+function field(text: string) {
+  return [...container.querySelectorAll("label")]
+    .find(
+      (element) =>
+        [...element.childNodes]
+          .filter((node) => node.nodeType === Node.TEXT_NODE)
+          .map((node) => node.textContent)
+          .join("")
+          .trim() === text,
+    )!
+    .querySelector<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(
+      "input,textarea,select",
+    )!;
+}
+async function click(text: string) {
+  await act(async () => button(text).click());
+}
+async function change(label: string, value: string) {
+  const element = field(label);
+  await act(async () => {
+    const prototype =
+      element.tagName === "TEXTAREA"
+        ? HTMLTextAreaElement.prototype
+        : element.tagName === "SELECT"
+          ? HTMLSelectElement.prototype
+          : HTMLInputElement.prototype;
+    Object.getOwnPropertyDescriptor(prototype, "value")!.set!.call(
+      element,
+      value,
+    );
+    element.dispatchEvent(
+      new Event(element.tagName === "SELECT" ? "change" : "input", {
+        bubbles: true,
+      }),
+    );
+  });
+}
+async function mount() {
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
+}
+beforeEach(() => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  session.mode = "local-demo";
+  api.mockReset();
+  thread = fixture();
+  Object.defineProperty(navigator, "clipboard", {
+    configurable: true,
+    value: { writeText: vi.fn().mockResolvedValue(undefined) },
+  });
+  container = document.createElement("div");
+  document.body.append(container);
+  root = createRoot(container);
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.startsWith("/outreach?"))
+      return { threads: [structuredClone(thread)] };
+    const body = JSON.parse((options.body as string) || "{}");
+    const action = path.split("/").at(-1);
+    expect(body.expected_revision).toBe(thread.revision);
+    expect(body.idempotency_key).toBeTruthy();
+    if (action === "draft") {
+      thread = {
+        ...thread,
+        ...body,
+        approval: null,
+        ready_for_manual_action: false,
+      };
+    }
+    if (action === "approve") {
+      thread.approval = {
+        content_hash: "exact",
+        approved_at: "now",
+        revision: thread.revision,
+      };
+      thread.ready_for_manual_action = true;
+    }
+    if (action === "pause") {
+      thread.paused = body.paused;
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "sent") {
+      thread.messages.push({
+        id: "sent",
+        direction: "outbound",
+        recipient: thread.recipient,
+        subject: thread.subject,
+        body: thread.body,
+        source: "user_reported",
+        reply_state: null,
+        created_at: "now",
+      });
+      thread.body = "";
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "replies") {
+      thread.messages.push({
+        id: "reply",
+        direction: "inbound",
+        recipient: "",
+        subject: "",
+        body: body.body,
+        source: "user_reported",
+        reply_state: body.reply_state,
+        created_at: "now",
+      });
+      thread.reply_state = body.reply_state;
+      thread.body = "";
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "reply-state") {
+      thread.reply_state = body.reply_state;
+      if (body.reply_state === "opt_out") thread.suppressed = true;
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "outcomes") {
+      thread.meeting_state = body.meeting_state;
+      thread.sale_state = body.sale_state;
+    }
+    thread.revision++;
+    return structuredClone(thread);
+  });
+});
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
+describe("persisted manual outreach journey", () => {
+  it("reads existing threads without creation or generation and fails closed in hosted mode", async () => {
+    await mount();
+    expect(api.mock.calls).toHaveLength(1);
+    expect(api.mock.calls[0][0]).toBe("/outreach?search_id=search_a");
+    expect(container.textContent).toContain("No mailbox is connected");
+    expect(container.textContent).toContain("Unverified email");
+    await act(async () => root.unmount());
+    root = createRoot(container);
+    session.mode = "saas";
+    api.mockClear();
+    await mount();
+    expect(api).not.toHaveBeenCalled();
+    expect(container.textContent).toContain("isn’t available");
+  });
+  it("requires saved exact approval, invalidates local readiness on edit, and records manual sends only explicitly", async () => {
+    await mount();
+    expect(button("Copy approved message").disabled).toBe(true);
+    expect(container.querySelector(".outreach-lead small")?.textContent).toBe(
+      "Needs review",
+    );
+    await click("Approve exact message");
+    expect(button("Copy approved message").disabled).toBe(false);
+    expect(container.querySelector(".outreach-lead small")?.textContent).toBe(
+      "Approved",
+    );
+    await change("Message", "The edited exact message.");
+    expect(button("Copy approved message").disabled).toBe(true);
+    expect(button("Record sent externally").disabled).toBe(true);
+    expect(button("Approve exact message").disabled).toBe(true);
+    await click("Save changes");
+    await click("Approve exact message");
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      expect.stringContaining("The edited exact message."),
+    );
+    expect(thread.messages).toHaveLength(0);
+    await click("Record sent externally");
+    expect(thread.messages[0].body).toBe("The edited exact message.");
+    expect(container.textContent).toContain("Clientrove did not send");
+    expect(container.querySelector(".outreach-lead small")?.textContent).toBe(
+      "Sent externally",
+    );
+    expect(button("Copy approved message").disabled).toBe(true);
+  });
+  it("persists received replies and blocks opt-outs even after classification correction", async () => {
+    await mount();
+    await click("Conversations");
+    await change("Paste a received reply", "Please stop contacting us.");
+    await click("Save received reply");
+    expect(thread.messages[0].direction).toBe("inbound");
+    expect(button("Approve exact message").disabled).toBe(true);
+    await change("Review reply status", "opt_out");
+    expect(thread.suppressed).toBe(true);
+    expect(container.textContent).toContain("Further outreach is blocked");
+    await change("Review reply status", "interested");
+    expect(thread.suppressed).toBe(true);
+    await change("Message", "A new response");
+    await click("Save changes");
+    expect(button("Approve exact message").disabled).toBe(true);
+  });
+  it("keeps booking-link edits distinct from user-reported meeting and customer outcomes", async () => {
+    await mount();
+    await click("Meetings");
+    await change("Booking link", "https://example.org/book");
+    await click("Save booking link");
+    expect(thread.meeting_state).toBe("not_recorded");
+    await change("Meeting · reported by you", "booked_reported");
+    expect(thread.meeting_state).toBe("booked_reported");
+    expect(thread.sale_state).toBe("not_recorded");
+    await change("Customer outcome · reported by you", "won_reported");
+    expect(thread.sale_state).toBe("won_reported");
+    expect(
+      api.mock.calls.some(
+        ([path]) => path.includes("/draft") && path.includes("/customers/"),
+      ),
+    ).toBe(false);
+  });
+  it("preserves unsaved message edits across navigation and blocks paused actions", async () => {
+    await mount();
+    await change("Message", "Keep this edit.");
+    await click("Meetings");
+    await click("Review");
+    expect(field("Message").value).toBe("Keep this edit.");
+    await click("Pause");
+    expect(field("Message").value).toBe("Keep this edit.");
+    await click("Save changes");
+    expect(button("Approve exact message").disabled).toBe(true);
+    await click("Resume");
+    expect(button("Approve exact message").disabled).toBe(false);
+  });
+  it("prepares only the explicit selection, reusing its key after uncertain failure", async () => {
+    const navigate = vi.fn();
+    api.mockRejectedValueOnce(new Error("Connection interrupted"));
+    await act(async () =>
+      root.render(
+        <PrepareOutreach
+          searchId="search_a"
+          accountIds={["account_a", "account_b"]}
+          onPrepared={navigate}
+        />,
+      ),
+    );
+    expect(api).not.toHaveBeenCalled();
+    await click("Prepare outreach (2)");
+    const first = JSON.parse(api.mock.calls[0][1].body);
+    api.mockResolvedValueOnce({ threads: [] });
+    await click("Prepare outreach (2)");
+    expect(JSON.parse(api.mock.calls[1][1].body)).toEqual(first);
+    expect(first.account_ids).toEqual(["account_a", "account_b"]);
+    expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a");
+  });
+  it("retrieves AI only on explicit action, keeps uncertain retries idempotent, and leaves the result unsaved", async () => {
+    const original = api.getMockImplementation()!;
+    let attempts = 0;
+    api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+      if (path.startsWith("/customers/")) {
+        if (++attempts === 1) throw new Error("Connection interrupted");
+        return {
+          subject: "Grounded introduction",
+          body: "Facts reviewed from public sources.",
+          evidence_ids: ["source_a"],
+          warnings: [],
+          generation_engine: "deepseek",
+          created_at: "now",
+        };
+      }
+      return original(path, options);
+    });
+    await mount();
+    expect(attempts).toBe(0);
+    await click("Retrieve original AI draft");
+    expect(attempts).toBe(1);
+    await click("Retrieve original AI draft");
+    const calls = api.mock.calls.filter(([path]) =>
+      path.startsWith("/customers/"),
+    );
+    expect(calls).toHaveLength(2);
+    expect(JSON.parse(calls[0][1].body)).toEqual(JSON.parse(calls[1][1].body));
+    expect(field("Message").value).toBe("Facts reviewed from public sources.");
+    expect(thread.body).toBe("A reviewed factual message.");
+    expect(button("Approve exact message").disabled).toBe(true);
+  });
+  it("includes the approved booking link when copying and aborts pending mutations on unmount", async () => {
+    thread.booking_link = "https://example.org/book";
+    await mount();
+    await click("Approve exact message");
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+      expect.stringContaining(
+        "A reviewed factual message.\n\nBooking link: https://example.org/book",
+      ),
+    );
+    let finish!: (value: OutreachThread) => void;
+    api.mockImplementationOnce(
+      () =>
+        new Promise<OutreachThread>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await click("Record sent externally");
+    const options = api.mock.calls.at(-1)![1] as RequestInit;
+    expect(options.signal?.aborted).toBe(false);
+    await act(async () => root.unmount());
+    expect(options.signal?.aborted).toBe(true);
+    await act(async () => finish(structuredClone(thread)));
+    root = createRoot(container);
+  });
+});

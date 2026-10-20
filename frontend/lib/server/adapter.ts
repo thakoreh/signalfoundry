@@ -3,6 +3,10 @@ import type { Account } from "../types.ts";
 import { exportAccountsCsv } from "../account-export.ts";
 
 export type FunctionName =
+  | "customers.engine"
+  | "customers.start"
+  | "customers.get"
+  | "customerDrafts.generate"
   | "workspaces.get"
   | "workspaces.analyze"
   | "workspaces.provision"
@@ -138,6 +142,7 @@ export function csvCell(value: unknown): string {
 export function safeProviderError(error: unknown): {
   status: number;
   detail: string;
+  code?: string;
 } {
   const data =
     typeof error === "object" && error !== null && "data" in error
@@ -175,6 +180,10 @@ export function safeProviderError(error: unknown): {
       503,
       "Research could not be completed. Check the campaign status or try again later.",
     ],
+    DRAFT_FAILED: [
+      503,
+      "AI drafting could not finish. You can explicitly try again; nothing was sent.",
+    ],
     CONFIGURATION_ERROR: [
       503,
       "This service is not configured. Contact your administrator.",
@@ -190,7 +199,11 @@ export function safeProviderError(error: unknown): {
   };
   const result = known[code];
   return result
-    ? { status: result[0], detail: result[1] }
+    ? {
+        status: result[0],
+        detail: result[1],
+        ...(code === "DRAFT_FAILED" ? { code } : {}),
+      }
     : {
         status: 503,
         detail:
@@ -213,8 +226,15 @@ export async function handleApi(
     const method = request.method;
     if (!["GET", "POST", "PUT", "PATCH"].includes(method))
       fail(405, "Method not allowed.");
+    const customerDraftPath =
+      method === "POST" &&
+      path.length === 6 &&
+      path[0] === "customers" &&
+      path[1] === "searches" &&
+      path[3] === "accounts" &&
+      path[5] === "draft";
     if (
-      path.length > 3 ||
+      (path.length > 3 && !customerDraftPath) ||
       path.some((part) => !/^[A-Za-z0-9._-]{1,128}$/.test(part))
     )
       fail(404, "Route not found.");
@@ -246,12 +266,58 @@ export async function handleApi(
       );
     const body = mutation ? await readBody(request) : {};
     const route = `${method} /${path.join("/")}`;
+    // The local outreach repository must never become a fallback for hosted
+    // organizations. Enable this surface only after tenant-backed parity exists.
+    if (path[0] === "outreach")
+      fail(503, "Outreach is not connected in this hosted workspace yet.");
     const invoke = (name: FunctionName, args: Record<string, unknown> = {}) =>
       deps.invoke(name, args, token);
     const admin = () => {
       if (session.orgRole !== "org:admin")
         fail(403, "An organization administrator must perform this action.");
     };
+    if (route === "GET /customers/engine")
+      return json(await invoke("customers.engine"));
+    if (customerDraftPath) {
+      keys(body, ["idempotency_key"]);
+      const requestKey = string(body.idempotency_key, 128);
+      if (!/^[A-Za-z0-9_-]{8,128}$/.test(requestKey))
+        fail(400, "Invalid draft request key.");
+      return json(
+        await invoke("customerDrafts.generate", {
+          searchId: path[2],
+          accountId: path[4],
+          idempotency_key: requestKey,
+        }),
+      );
+    }
+    if (route === "POST /customers/search") {
+      keys(body, ["target", "geography", "limit", "idempotency_key"]);
+      if (
+        !Number.isInteger(body.limit) ||
+        Number(body.limit) < 1 ||
+        Number(body.limit) > 5
+      )
+        fail(400, "Choose between 1 and 5 results.");
+      if (typeof body.geography !== "string" || body.geography.length > 120)
+        fail(400, "Use a location up to 120 characters.");
+      return json(
+        await invoke("customers.start", {
+          target: string(body.target, 200),
+          geography: body.geography,
+          limit: body.limit,
+          idempotency_key: string(body.idempotency_key, 128),
+        }),
+        202,
+      );
+    }
+    if (
+      method === "GET" &&
+      path.length === 3 &&
+      path[0] === "customers" &&
+      path[1] === "searches"
+    )
+      return json(await invoke("customers.get", { id: path[2] }));
     if (route === "GET /workspace") return json(await invoke("workspaces.get"));
     if (route === "POST /workspace") {
       admin();
@@ -272,7 +338,8 @@ export async function handleApi(
         }),
       );
     }
-    if (route === "GET /billing/offer") return json(await invoke("stripe.offer"));
+    if (route === "GET /billing/offer")
+      return json(await invoke("stripe.offer"));
     if (route === "GET /health") {
       await invoke("workspaces.get");
       return json({
@@ -285,8 +352,7 @@ export async function handleApi(
     if (route === "GET /campaigns") return json(await invoke("campaigns.list"));
     if (route === "POST /campaigns") {
       keys(body, ["name", "mode", "domains"]);
-      if (body.mode !== "manual")
-        fail(400, "Choose a valid research mode.");
+      if (body.mode !== "manual") fail(400, "Choose a valid research mode.");
       return json(
         await invoke("campaigns.create", {
           name: string(body.name),
@@ -315,7 +381,9 @@ export async function handleApi(
         );
       }
       if (method === "GET" && path[2] === "export.csv") {
-        const accounts = (await invoke("campaigns.accounts", { id })) as Account[];
+        const accounts = (await invoke("campaigns.accounts", {
+          id,
+        })) as Account[];
         const csv = exportAccountsCsv(accounts);
         return new Response(csv, {
           headers: {
@@ -371,6 +439,9 @@ export async function handleApi(
     if (error instanceof HttpError)
       return json({ detail: error.message }, error.status);
     const safe = safeProviderError(error);
-    return json({ detail: safe.detail }, safe.status);
+    return json(
+      { detail: safe.detail, ...(safe.code ? { code: safe.code } : {}) },
+      safe.status,
+    );
   }
 }

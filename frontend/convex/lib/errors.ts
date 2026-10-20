@@ -13,6 +13,7 @@ export type ErrorCode =
   | "WORKSPACE_REQUIRED"
   | "CONFLICT"
   | "RESEARCH_FAILED"
+  | "DRAFT_FAILED"
   | "BILLING_UNAVAILABLE";
 export const appError = (code: ErrorCode, message: string) =>
   new ConvexError({ code, message });

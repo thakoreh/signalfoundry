@@ -25,28 +25,35 @@ def source_files():
 
 class ProductionSourceChecks(unittest.TestCase):
     def test_worker_image_is_isolated_nonroot_and_secret_free(self):
-        dockerfile = (ROOT / 'deploy/worker.Dockerfile').read_text()
+        dockerfile = (ROOT / 'deploy/worker.Dockerfile').read_text(encoding='utf-8')
         self.assertIn('USER 10001:10001', dockerfile)
         self.assertIn('app.worker:app', dockerfile)
         self.assertIn('--no-access-log', dockerfile)
         self.assertIn('FORWARDED_ALLOW_IPS=""', dockerfile)
         self.assertNotIn('COPY . ', dockerfile)
-        self.assertIn('**/.convex', (ROOT / '.dockerignore').read_text())
+        self.assertIn('**/.convex', (ROOT / '.dockerignore').read_text(encoding='utf-8'))
         self.assertNotIn('COPY backend/app /', dockerfile)
         copy_lines = '\n'.join(line for line in dockerfile.splitlines() if line.startswith('COPY '))
         for forbidden in ('app/main.py', 'app/store.py', '.env', 'data/', '.htpasswd'):
             self.assertNotIn(forbidden, copy_lines)
-        compose = (ROOT / 'deploy/worker.compose.yml').read_text()
+        compose = (ROOT / 'deploy/worker.compose.yml').read_text(encoding='utf-8')
         for required in ('read_only: true', 'cap_drop: [ALL]', 'no-new-privileges:true',
                          'pids_limit: 64', 'mem_limit: 256m', 'SIGNALFOUNDRY_WORKER_ALLOW_PRIVATE_HTTP: "false"'):
             self.assertIn(required, compose)
         self.assertNotIn('\n    ports:', compose)
         self.assertNotIn('\n    volumes:', compose)
+        for provider in ('DEEPSEEK', 'HUNTER', 'BRAVE_SEARCH'):
+            self.assertIn(f'CLIENTROVE_{provider}_ENABLED: ${{CLIENTROVE_{provider}_ENABLED:-false}}', compose)
+        for secret in ('DEEPSEEK_API_KEY', 'HUNTER_API_KEY', 'BRAVE_SEARCH_API_KEY'):
+            self.assertIn(f'{secret}: ${{{secret}:-}}', compose)
+        self.assertIn('CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED: ${CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED:-false}', compose)
 
     def test_worker_imports_cannot_reach_demo_persistence(self):
-        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', '__init__'}
+        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', 'customers', 'customer_drafts', '__init__'}
+        dockerfile = (ROOT / 'deploy/worker.Dockerfile').read_text(encoding='utf-8')
         for name in allowed:
-            tree = ast.parse((ROOT / 'backend/app' / f'{name}.py').read_text())
+            self.assertIn(f'backend/app/{name}.py', dockerfile, f'Worker image omits required module {name}')
+            tree = ast.parse((ROOT / 'backend/app' / f'{name}.py').read_text(encoding='utf-8'))
             for node in ast.walk(tree):
                 if isinstance(node, ast.ImportFrom) and node.level:
                     self.assertIn(node.module, allowed, f'{name} imported forbidden module {node.module}')
@@ -55,7 +62,7 @@ class ProductionSourceChecks(unittest.TestCase):
                         self.assertNotIn(imported.name, ('sqlite3', 'app.main', 'app.store'))
 
     def test_only_blank_secret_placeholders_in_worker_example(self):
-        example = (ROOT / 'deploy/worker.env.example').read_text()
+        example = (ROOT / 'deploy/worker.env.example').read_text(encoding='utf-8')
         for line in example.splitlines():
             if line and not line.startswith('#'):
                 key, value = line.split('=', 1)
@@ -79,13 +86,13 @@ class ProductionSourceChecks(unittest.TestCase):
 
     def test_provider_auth_tests_use_runtime_generated_fixtures(self):
         path = ROOT / 'backend/tests/test_jev.py'
-        source = path.read_text()
+        source = path.read_text(encoding='utf-8')
         self.assertIn('secrets.token_urlsafe(', source)
         for node in ast.walk(ast.parse(source)):
             if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id == 'JevDecisionProvider':
                 if node.args and isinstance(node.args[0], ast.Constant):
                     self.assertIsNone(node.args[0].value, 'Never hardcode provider test credentials')
-        preview_test = (ROOT / 'scripts/test_deployment.py').read_text()
+        preview_test = (ROOT / 'scripts/test_deployment.py').read_text(encoding='utf-8')
         self.assertIn('secrets.choice(', preview_test)
         self.assertNotIn("'a'*53", preview_test)
 

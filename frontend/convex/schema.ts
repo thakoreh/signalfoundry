@@ -6,9 +6,49 @@ import {
   jobStatus,
   mode,
   profile,
+  workerAccount,
+  customerDraft,
 } from "./validators";
 
 export default defineSchema({
+  customerDrafts: defineTable({
+    orgId: v.string(),
+    requestKey: v.string(),
+    cacheKey: v.string(),
+    status: v.union(v.literal("pending"), v.literal("complete"), v.literal("failed")),
+    draft: v.optional(customerDraft),
+    charged: v.boolean(),
+    createdAt: v.number(),
+  })
+    .index("by_orgId_and_requestKey", ["orgId", "requestKey"])
+    .index("by_orgId_and_cacheKey", ["orgId", "cacheKey"])
+    .index("by_orgId_and_charged", ["orgId", "charged"])
+    .index("by_orgId", ["orgId"]),
+  customerSearches: defineTable({
+    orgId: v.string(),
+    createdBy: v.string(),
+    requestKey: v.string(),
+    status: v.union(
+      v.literal("queued"),
+      v.literal("running"),
+      v.literal("complete"),
+      v.literal("partial"),
+      v.literal("failed"),
+    ),
+    stage: v.string(),
+    query: v.string(),
+    target: v.string(),
+    geography: v.string(),
+    limit: v.number(),
+    profile,
+    website: v.union(v.string(), v.null()),
+    accounts: v.array(workerAccount),
+    errors: v.array(v.string()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_orgId", ["orgId"])
+    .index("by_orgId_and_requestKey", ["orgId", "requestKey"]),
   billingThrottle: defineTable({
     orgId: v.string(),
     windowStart: v.number(),
@@ -78,6 +118,7 @@ export default defineSchema({
     orgId: v.string(),
     month: v.string(),
     researchStarts: v.number(),
+    draftStarts: v.optional(v.number()),
   }).index("by_orgId_and_month", ["orgId", "month"]),
   systemLimits: defineTable({ key: v.string(), activeJobs: v.number() }).index(
     "by_key",

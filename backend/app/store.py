@@ -6,11 +6,13 @@ always injects one server-controlled tenant and does not accept client tenant ID
 from __future__ import annotations
 import json
 import sqlite3
+from datetime import datetime, timezone
 from contextlib import contextmanager
 from pathlib import Path
 
 from .models import Account, Campaign, Profile, Workspace
 from .primitives import new_id, now
+from .customers import CustomerSearch
 
 
 class Repository:
@@ -35,6 +37,42 @@ class Repository:
                 FOREIGN KEY (tenant_id,campaign_id) REFERENCES campaigns(tenant_id,id)
               );
               CREATE INDEX IF NOT EXISTS accounts_campaign ON accounts(tenant_id,campaign_id);
+              CREATE TABLE IF NOT EXISTS customer_searches (
+                tenant_id TEXT NOT NULL, id TEXT NOT NULL, request_key TEXT NOT NULL,
+                created_at TEXT NOT NULL, data TEXT NOT NULL,
+                PRIMARY KEY (tenant_id,id), UNIQUE(tenant_id,request_key)
+              );
+              CREATE INDEX IF NOT EXISTS customer_searches_tenant_created ON customer_searches(tenant_id,created_at);
+              CREATE TABLE IF NOT EXISTS customer_drafts (
+                tenant_id TEXT NOT NULL, cache_key TEXT NOT NULL, request_key TEXT NOT NULL,
+                created_at TEXT NOT NULL, status TEXT NOT NULL, data TEXT,
+                PRIMARY KEY (tenant_id,cache_key), UNIQUE(tenant_id,request_key)
+              );
+              CREATE INDEX IF NOT EXISTS customer_drafts_tenant_created ON customer_drafts(tenant_id,created_at);
+              CREATE TABLE IF NOT EXISTS customer_draft_requests (
+                tenant_id TEXT NOT NULL, request_key TEXT NOT NULL, cache_key TEXT NOT NULL,
+                created_at TEXT NOT NULL, status TEXT NOT NULL, charged INTEGER NOT NULL, data TEXT,
+                PRIMARY KEY (tenant_id,request_key)
+              );
+              CREATE INDEX IF NOT EXISTS customer_draft_requests_tenant_created ON customer_draft_requests(tenant_id,created_at);
+              CREATE INDEX IF NOT EXISTS customer_draft_requests_cached_aliases ON customer_draft_requests(tenant_id,cache_key,charged,created_at);
+              INSERT OR IGNORE INTO customer_draft_requests
+                SELECT tenant_id,request_key,cache_key,created_at,status,1,data FROM customer_drafts;
+              CREATE TABLE IF NOT EXISTS outreach_threads (
+                tenant_id TEXT NOT NULL, id TEXT NOT NULL, search_id TEXT NOT NULL,
+                account_id TEXT NOT NULL, data TEXT NOT NULL,
+                PRIMARY KEY(tenant_id,id), UNIQUE(tenant_id,search_id,account_id)
+              );
+              CREATE INDEX IF NOT EXISTS outreach_threads_search ON outreach_threads(tenant_id,search_id);
+              CREATE TABLE IF NOT EXISTS outreach_requests (
+                tenant_id TEXT NOT NULL, request_key TEXT NOT NULL, fingerprint TEXT NOT NULL,
+                resource_ids TEXT NOT NULL, created_at TEXT NOT NULL,
+                PRIMARY KEY(tenant_id,request_key)
+              );
+              CREATE TABLE IF NOT EXISTS outreach_suppressions (
+                tenant_id TEXT NOT NULL, target TEXT NOT NULL, reason TEXT NOT NULL,
+                created_at TEXT NOT NULL, PRIMARY KEY(tenant_id,target)
+              );
             ''')
             workspace = Workspace(id=tenant_id, name='Your workspace', website=None,
                                   profile=None, created_at=now())
@@ -56,6 +94,121 @@ class Repository:
         with self.connect() as db:
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
         return Workspace.model_validate_json(row['data'])
+
+    def outreach_threads(self, search_id=None):
+        from .outreach import OutreachStore
+        return OutreachStore(self).list(search_id)
+
+    def outreach_thread(self, thread_id):
+        from .outreach import OutreachStore
+        return OutreachStore(self).get(thread_id)
+
+    def start_outreach(self, body):
+        from .outreach import OutreachStore
+        return OutreachStore(self).start(body)
+
+    def mutate_outreach(self, thread_id, operation, body):
+        from .outreach import OutreachStore
+        return OutreachStore(self).mutate(thread_id, operation, body)
+
+    def customer_search(self, search_id: str) -> CustomerSearch | None:
+        with self.connect() as db:
+            row = db.execute('SELECT data FROM customer_searches WHERE tenant_id=? AND id=?', (self.tenant_id, search_id)).fetchone()
+        return CustomerSearch.model_validate_json(row['data']) if row else None
+
+    def create_customer_search(self, request_key: str, query: str) -> tuple[CustomerSearch, bool]:
+        timestamp = now()
+        search = CustomerSearch(id=new_id('search'), status='queued', stage='Queued', query=query, created_at=timestamp, updated_at=timestamp)
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            old = db.execute('SELECT data FROM customer_searches WHERE tenant_id=? AND request_key=?', (self.tenant_id, request_key)).fetchone()
+            if old:
+                return CustomerSearch.model_validate_json(old['data']), False
+            recent = db.execute('SELECT created_at,data FROM customer_searches WHERE tenant_id=? ORDER BY created_at DESC LIMIT 6', (self.tenant_id,)).fetchall()
+            current = datetime.now(timezone.utc)
+            def age(value):
+                return (current - datetime.fromisoformat(value.replace('Z', '+00:00'))).total_seconds()
+            if sum(age(row['created_at']) < 3600 for row in recent) >= 5:
+                raise ValueError('Search allowance reached (5 per hour). Try again later.')
+            if any(age(row['created_at']) < 180 and json.loads(row['data'])['status'] in ('queued', 'running') for row in recent):
+                raise ValueError('A customer search is already running. Wait for it to finish.')
+            db.execute('INSERT INTO customer_searches VALUES (?,?,?,?,?)', (self.tenant_id, search.id, request_key, timestamp, search.model_dump_json()))
+        return search, True
+
+    def save_customer_search(self, search: CustomerSearch) -> None:
+        with self.connect() as db:
+            db.execute('UPDATE customer_searches SET data=? WHERE tenant_id=? AND id=?', (search.model_dump_json(), self.tenant_id, search.id))
+
+    def reserve_customer_draft(self, cache_key: str, request_key: str):
+        """Transactionally admit one attempt per immutable profile/evidence snapshot.
+
+        A request key is never charged twice. Only an explicit new key after a
+        terminal failure admits another attempt. Pending/successful snapshots
+        deduplicate across keys; cached response aliases stay bound to the input.
+        """
+        from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError
+        with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            current = datetime.now(timezone.utc)
+            def age(timestamp):
+                return (current - datetime.fromisoformat(timestamp.replace('Z', '+00:00'))).total_seconds()
+            def recover(expired_key):
+                db.execute('UPDATE customer_drafts SET status=? WHERE tenant_id=? AND cache_key=? AND request_key=? AND status=?',
+                           ('failed', self.tenant_id, cache_key, expired_key, 'pending'))
+                db.execute('UPDATE customer_draft_requests SET status=? WHERE tenant_id=? AND request_key=? AND status=?',
+                           ('failed', self.tenant_id, expired_key, 'pending'))
+                # The terminal exception must not roll back this recovery.
+                db.commit()
+                raise DraftTerminalError('The earlier draft was interrupted. Choose Try draft again to make a new attempt.')
+            old_request = db.execute('SELECT cache_key,status,data,created_at FROM customer_draft_requests WHERE tenant_id=? AND request_key=?',
+                                     (self.tenant_id, request_key)).fetchone()
+            if old_request and old_request['cache_key'] != cache_key:
+                raise DraftError('This draft request belongs to an earlier business profile. Use a new request.')
+            if old_request:
+                if old_request['status'] == 'complete':
+                    return CustomerDraft.model_validate_json(old_request['data'])
+                if old_request['status'] == 'failed':
+                    raise DraftTerminalError('This attempt could not finish. Choose Try draft again to make a new attempt.')
+                if age(old_request['created_at']) > 90:
+                    recover(request_key)
+                raise DraftError('This draft is already in progress. Check it again shortly; no extra attempt was made.')
+            old = db.execute('SELECT status,data,request_key,created_at FROM customer_drafts WHERE tenant_id=? AND cache_key=?',
+                             (self.tenant_id, cache_key)).fetchone()
+            if old:
+                if old['status'] == 'complete':
+                    aliases = db.execute('SELECT created_at FROM customer_draft_requests WHERE tenant_id=? AND cache_key=? AND charged=0 ORDER BY created_at DESC LIMIT 100',
+                                         (self.tenant_id, cache_key)).fetchall()
+                    if sum(age(row['created_at']) < 3600 for row in aliases) >= 100:
+                        raise DraftError('Saved draft request allowance reached (100 per hour). Reuse the original request or try later.')
+                    db.execute('INSERT INTO customer_draft_requests VALUES (?,?,?,?,?,?,?)',
+                               (self.tenant_id, request_key, cache_key, now(), 'complete', 0, old['data']))
+                    return CustomerDraft.model_validate_json(old['data'])
+                if old['status'] == 'pending':
+                    if age(old['created_at']) > 90:
+                        recover(old['request_key'])
+                    raise DraftError('This draft is already in progress. Check it again shortly; no extra attempt was made.')
+            recent = db.execute('SELECT created_at FROM customer_draft_requests WHERE tenant_id=? AND charged=1 ORDER BY created_at DESC LIMIT 5',
+                                (self.tenant_id,)).fetchall()
+            if sum((current - datetime.fromisoformat(row['created_at'].replace('Z', '+00:00'))).total_seconds() < 3600 for row in recent) >= 5:
+                raise DraftError('AI draft allowance reached (5 per hour). Try again later.')
+            timestamp = now()
+            db.execute('INSERT INTO customer_draft_requests VALUES (?,?,?,?,?,?,NULL)',
+                       (self.tenant_id, request_key, cache_key, timestamp, 'pending', 1))
+            db.execute('INSERT INTO customer_drafts VALUES (?,?,?,?,?,NULL) ON CONFLICT(tenant_id,cache_key) DO UPDATE SET request_key=excluded.request_key,created_at=excluded.created_at,status=excluded.status,data=NULL',
+                       (self.tenant_id, cache_key, request_key, timestamp, 'pending'))
+        return None
+
+    def finish_customer_draft(self, cache_key: str, request_key: str, draft=None) -> bool:
+        with self.connect() as db:
+            updated = db.execute('UPDATE customer_drafts SET status=?,data=? WHERE tenant_id=? AND cache_key=? AND request_key=? AND status=?',
+                       ('complete' if draft else 'failed', draft.model_dump_json() if draft else None,
+                        self.tenant_id, cache_key, request_key, 'pending'))
+            if not updated.rowcount:
+                return False
+            db.execute('UPDATE customer_draft_requests SET status=?,data=? WHERE tenant_id=? AND cache_key=? AND request_key=? AND status=?',
+                       ('complete' if draft else 'failed', draft.model_dump_json() if draft else None,
+                        self.tenant_id, cache_key, request_key, 'pending'))
+        return True
 
     def save_profile(self, profile: Profile, website: str | None = None, *, set_website: bool = False) -> Workspace:
         with self.connect() as db:

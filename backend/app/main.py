@@ -20,6 +20,9 @@ from .models import Account, AccountStatus, AnalyzeRequest, Campaign, CampaignCr
 from .research import RulesDecisionProvider, demo_accounts, infer_profile, make_draft
 from .safety import FetchError, fetch_public_page, normalize_url
 from .store import Repository
+from .customers import CustomerSearch, CustomerSearchRequest, DiscoveryRequest, ProviderError, discover_customers, engine_status
+from .primitives import now
+from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
 
 logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = [f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 8000)]
@@ -76,6 +79,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         from .jev import JevDecisionProvider
         app.state.decision_provider = JevDecisionProvider.from_environment()
     app.state.research_lock = threading.Lock()
+    app.state.generate_customer_draft = generate_customer_draft
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=allowed_origins,
                        allow_methods=['GET', 'POST', 'PUT', 'PATCH'], allow_headers=['Content-Type'],
@@ -137,6 +141,60 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     def workspace():
         return repository().workspace()
 
+    @app.get('/api/customers/engine')
+    def customer_engine():
+        state = engine_status()
+        if configured_origin:
+            state['discovery'].update(status='unavailable', detail='Customer discovery requires an authenticated workspace on hosted deployments.')
+        return state
+
+    @app.post('/api/customers/search', response_model=CustomerSearch)
+    def customer_search_start(body: CustomerSearchRequest):
+        if configured_origin:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
+        if engine_status()['discovery']['status'] != 'ready':
+            raise HTTPException(503, 'Customer discovery is not connected yet.')
+        workspace = repository().workspace()
+        if workspace.profile is None:
+            raise HTTPException(422, 'Save your business profile before finding customers.')
+        try:
+            search, created = repository().create_customer_search(body.idempotency_key, body.target)
+        except ValueError as exc:
+            raise HTTPException(429, str(exc)) from None
+        if created:
+            request = DiscoveryRequest(profile=workspace.profile, website=workspace.website, search_id=search.id,
+                                       target=body.target, geography=body.geography, limit=body.limit)
+            def execute():
+                try:
+                    search.status, search.stage, search.updated_at = 'running', 'Finding businesses and checking public facts', now()
+                    repository().save_customer_search(search)
+                    result = discover_customers(request, fetch_page=app.state.fetch_page)
+                    search.accounts, search.errors, search.query = result.accounts, result.errors, result.query
+                    search.status = ('partial' if result.accounts else 'failed') if result.errors else 'complete'
+                    search.stage = 'Search finished'
+                except ProviderError as exc:
+                    search.status, search.stage, search.errors = 'failed', 'Search could not finish', [str(exc)]
+                except Exception:
+                    search.status, search.stage, search.errors = 'failed', 'Search could not finish', ['Customer research could not complete. No automatic retry was made.']
+                finally:
+                    search.updated_at = now()
+                    repository().save_customer_search(search)
+            threading.Thread(target=execute, daemon=True, name='customer-search').start()
+        return search
+
+    @app.get('/api/customers/searches/{search_id}', response_model=CustomerSearch)
+    def customer_search_get(search_id: str):
+        search = repository().customer_search(search_id)
+        if search is None:
+            raise HTTPException(404, 'Customer search not found')
+        from datetime import datetime, timezone
+        if search.status in ('queued', 'running') and (datetime.now(timezone.utc) - datetime.fromisoformat(search.created_at.replace('Z', '+00:00'))).total_seconds() > 180:
+            search.status, search.stage = 'failed', 'Search interrupted'
+            search.errors = ['Search was interrupted or timed out. Start a new search when ready; no automatic retry was made.']
+            search.updated_at = now()
+            repository().save_customer_search(search)
+        return search
+
     @app.post('/api/workspace/analyze', response_model=Workspace)
     def analyze(body: AnalyzeRequest):
         if public_access:
@@ -148,6 +206,40 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         except ValueError as exc:
             raise HTTPException(422, 'The website content could not produce a readable draft profile. Try another public page or edit your ICP manually.') from exc
         return repository().save_profile(profile, page.url, set_website=True)
+
+    @app.post('/api/customers/searches/{search_id}/accounts/{account_id}/draft', response_model=CustomerDraft)
+    def customer_draft(search_id: str, account_id: str, body: DraftRequest):
+        if configured_origin or public_access:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
+        search = repository().customer_search(search_id)
+        account = next((a for a in search.accounts if a.id == account_id), None) if search else None
+        if not search or not account:
+            raise HTTPException(404, 'Customer not found in this search')
+        if search.status not in ('complete', 'partial'):
+            raise HTTPException(409, 'Wait for customer research to finish before drafting.')
+        profile = repository().workspace().profile
+        if profile is None:
+            raise HTTPException(422, 'Save your business profile before drafting a message.')
+        try:
+            key = draft_cache_key(profile, account)
+            if draft_status()['status'] != 'ready':
+                raise HTTPException(503, 'AI message drafting is not connected yet.')
+            cached = repository().reserve_customer_draft(key, body.idempotency_key)
+            if cached:
+                return cached
+        except DraftTerminalError as exc:
+            return JSONResponse({'detail': str(exc), 'code': 'DRAFT_FAILED'}, status_code=503)
+        except DraftError as exc:
+            raise HTTPException(409, str(exc)) from None
+        try:
+            draft = app.state.generate_customer_draft(DraftInput(profile=profile, account=account))
+        except Exception:
+            repository().finish_customer_draft(key, body.idempotency_key)
+            # Never log/stringify the model, provider, prompt or credential error.
+            return JSONResponse({'detail': 'AI drafting could not finish safely. No automatic retry was made.', 'code': 'DRAFT_FAILED'}, status_code=503)
+        if not repository().finish_customer_draft(key, body.idempotency_key, draft):
+            return JSONResponse({'detail': 'This draft attempt was interrupted. Choose Try draft again when ready.', 'code': 'DRAFT_FAILED'}, status_code=503)
+        return draft
 
     @app.put('/api/workspace/profile', response_model=Workspace)
     def save_profile(body: Profile):
@@ -254,6 +346,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         return Response(output.getvalue(), media_type='text/csv',
                         headers={'Content-Disposition': f'attachment; filename="signalfoundry-{campaign_id}.csv"'})
 
+    from .outreach import outreach_router
+    app.include_router(outreach_router(repository, blocked_preview=bool(configured_origin or public_access)))
     return app
 
 

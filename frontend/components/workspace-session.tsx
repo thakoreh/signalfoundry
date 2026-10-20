@@ -1,7 +1,13 @@
 "use client";
-import { createContext, useContext, useEffect, useMemo, useRef } from "react";
-import { api as callApi } from "@/lib/api";
-import type { AppMode } from "@/lib/runtime-config";
+import {
+  createContext,
+  useContext,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+} from "react";
+import { api as callApi } from "../lib/api";
+import type { AppMode } from "../lib/runtime-config";
 
 type SessionClient = {
   mode: AppMode;
@@ -49,8 +55,9 @@ export function WorkspaceSession({
         }),
     };
   }, [mode, role, organizationId]);
-  useEffect(() => {
-    // React strict-mode remounts effects; each live session gets a fresh controller.
+  useLayoutEffect(() => {
+    // Refresh before child passive data effects replay in StrictMode. Calls never
+    // revive an aborted controller, so stale API closures remain blocked after unmount.
     if (!controller.current || controller.current.signal.aborted)
       controller.current = new AbortController();
     return () => controller.current?.abort();

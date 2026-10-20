@@ -21,7 +21,6 @@ function parse(source: string) {
     ts.ScriptKind.TSX,
   );
 }
-
 function visit(node: ts.Node, check: (node: ts.Node) => void) {
   check(node);
   ts.forEachChild(node, (child) => visit(child, check));
@@ -40,28 +39,24 @@ test("public section navigation uses native anchors instead of Next route naviga
       assert.equal(node.tagName.getText(), "a", prop.initializer.text);
     }
   });
-  for (const destination of ["#workflow", "#examples", "#plans", "#faq"]) {
+  for (const destination of [
+    "#main-content",
+    "#workflow",
+    "#your-list",
+    "#faq",
+  ])
     assert.ok(sectionLinks.includes(destination), destination);
-  }
 });
 
-test("sample walkthrough stays client-local with no backend or persistent storage", () => {
+test("illustrative preview is a static server component without data or mutation dependencies", () => {
   const parsed = parse(demo);
-  assert.match(demo, /^\s*["']use client["'];/);
-  const imports = parsed.statements.filter(ts.isImportDeclaration);
-  assert.ok(imports.length > 0);
-  for (const statement of imports) {
-    assert.ok(ts.isStringLiteral(statement.moduleSpecifier));
-    assert.ok(
-      ["react", "./landing-motion-provider"].includes(
-        statement.moduleSpecifier.text,
-      ),
-      `Unexpected demo dependency: ${statement.moduleSpecifier.text}`,
-    );
-  }
+  const dependencies = parsed.statements.filter(ts.isImportDeclaration);
+  assert.equal(dependencies.length, 1);
+  assert.equal(dependencies[0].moduleSpecifier.getText(), '"./icons"');
   assert.doesNotMatch(
     demo,
-    /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB)\b/,
+    /\b(?:fetch|XMLHttpRequest|WebSocket|EventSource|sendBeacon|localStorage|sessionStorage|indexedDB|setInterval|setTimeout)\b/,
   );
   assert.doesNotMatch(demo, /\b(?:import|require)\s*\(/);
+  assert.doesNotMatch(demo, /^\s*["']use client["'];/);
 });

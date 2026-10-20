@@ -71,6 +71,89 @@ async function call(
   );
   return { ...state, response };
 }
+
+test("hosted outreach fails closed after authentication without reaching a local or Convex repository", async () => {
+  for (const [path, method] of [
+    ["outreach", "GET"],
+    ["outreach", "POST"],
+    ["outreach/thread_a/draft", "PUT"],
+    ["outreach/thread_a/approve", "POST"],
+    ["outreach/thread_a/sent", "POST"],
+  ]) {
+    const result = await call(path, method, {});
+    assert.equal(result.response.status, 503);
+    assert.deepEqual(result.calls, []);
+    assert.match((await result.response.json()).detail, /not connected/);
+  }
+  const anonymous = await call("outreach", "POST", {}, { userId: null });
+  assert.equal(anonymous.response.status, 401);
+  assert.deepEqual(anonymous.calls, []);
+  const state = setup();
+  const response = await handleApi(
+    request("outreach", "POST", {}, { origin: "https://outside.example" }),
+    ["outreach"],
+    state.deps,
+  );
+  assert.equal(response.status, 403);
+  assert.deepEqual(state.calls, []);
+});
+
+test("customer AI draft maps one closed tenant-bound route with no client-supplied facts", async () => {
+  const path = "customers/searches/search_a/accounts/account_a/draft";
+  const result = await call(
+    path,
+    "POST",
+    { idempotency_key: "draft_request_a" },
+    { orgRole: "org:member" },
+  );
+  assert.equal(result.response.status, 200);
+  assert.deepEqual(
+    result.calls.map(({ name, args }) => ({ name, args })),
+    [
+      {
+        name: "customerDrafts.generate",
+        args: {
+          searchId: "search_a",
+          accountId: "account_a",
+          idempotency_key: "draft_request_a",
+        },
+      },
+    ],
+  );
+  for (const body of [
+    { idempotency_key: "short" },
+    { idempotency_key: "draft_request_a", profile: {} },
+    { idempotency_key: "draft_request_a", orgId: "org_b" },
+  ]) {
+    const rejected = await call(path, "POST", body);
+    assert.equal(rejected.response.status, 400);
+    assert.deepEqual(rejected.calls, []);
+  }
+  const wrong = await call(path.replace("accounts", "anything"), "POST", {
+    idempotency_key: "draft_request_a",
+  });
+  assert.equal(wrong.response.status, 404);
+  assert.deepEqual(wrong.calls, []);
+});
+
+test("confirmed draft failure preserves only its safe retry signal across the SaaS adapter", async () => {
+  const state = setup();
+  state.deps.invoke = async () => {
+    throw {
+      data: { code: "DRAFT_FAILED", detail: "private upstream diagnostics" },
+    };
+  };
+  const path = "customers/searches/search_a/accounts/account_a/draft";
+  const response = await handleApi(
+    request(path, "POST", { idempotency_key: "draft_request_a" }),
+    path.split("/"),
+    state.deps,
+  );
+  assert.equal(response.status, 503);
+  const data = await response.json();
+  assert.equal(data.code, "DRAFT_FAILED");
+  assert.doesNotMatch(data.detail, /private upstream/);
+});
 test("configuration, authentication, active organization, role, and template token fail closed", async () => {
   for (const [overrides, status] of [
     [{ userId: null }, 401],
@@ -335,14 +418,59 @@ test("provider internals never leak; CSV neutralizes spreadsheet formulas", asyn
 });
 
 test("billing offer is a tenant-readable authenticated action without a client price", async () => {
-  const result = await call("billing/offer", "GET", undefined, { orgRole: "org:member" });
+  const result = await call("billing/offer", "GET", undefined, {
+    orgRole: "org:member",
+  });
   assert.equal(result.response.status, 200);
-  assert.deepEqual(result.calls.map(c => ({ name: c.name, args: c.args })), [{ name: "stripe.offer", args: {} }]);
+  assert.deepEqual(
+    result.calls.map((c) => ({ name: c.name, args: c.args })),
+    [{ name: "stripe.offer", args: {} }],
+  );
 });
 
 test("real CSV API preserves evidence, reasons, unknowns and engines", async () => {
- const {deps}=setup(); deps.invoke=async()=>[{name:"Public business",domain:"business.example",score:70,confidence:"medium",status:"new",description:"Public facts",why_fit:["Supported fit"],why_now:[],unknowns:["Budget unknown"],score_breakdown:[],evidence:[{id:"ev",url:"https://business.example",excerpt:"Quoted public fact",published_at:null,retrieved_at:"2026-10-01T00:00:00Z"}],researched_at:"2026-10-01T00:00:00Z",decision_engine:"jev",is_demo:false}];
- const response=await handleApi(request("campaigns/c1/export.csv"),["campaigns","c1","export.csv"],deps);
- assert.equal(response.status,200); const csv=await response.text();
- for(const value of ["evidence_urls","evidence_snippets","score_breakdown","decision_engine","Budget unknown","https://business.example","Quoted public fact"]) assert.ok(csv.includes(value),value);
+  const { deps } = setup();
+  deps.invoke = async () => [
+    {
+      name: "Public business",
+      domain: "business.example",
+      score: 70,
+      confidence: "medium",
+      status: "new",
+      description: "Public facts",
+      why_fit: ["Supported fit"],
+      why_now: [],
+      unknowns: ["Budget unknown"],
+      score_breakdown: [],
+      evidence: [
+        {
+          id: "ev",
+          url: "https://business.example",
+          excerpt: "Quoted public fact",
+          published_at: null,
+          retrieved_at: "2026-10-01T00:00:00Z",
+        },
+      ],
+      researched_at: "2026-10-01T00:00:00Z",
+      decision_engine: "jev",
+      is_demo: false,
+    },
+  ];
+  const response = await handleApi(
+    request("campaigns/c1/export.csv"),
+    ["campaigns", "c1", "export.csv"],
+    deps,
+  );
+  assert.equal(response.status, 200);
+  const csv = await response.text();
+  for (const value of [
+    "evidence_urls",
+    "evidence_snippets",
+    "score_breakdown",
+    "decision_engine",
+    "Budget unknown",
+    "https://business.example",
+    "Quoted public fact",
+  ])
+    assert.ok(csv.includes(value), value);
 });

@@ -22,10 +22,12 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import Field, StringConstraints, model_validator
 
-from .models import Account, AnalyzeRequest, Profile, StrictModel, URLText
+from .models import Account, AnalyzeRequest, EmptyRequest, Profile, StrictModel, URLText
+from .customers import DiscoveryRequest, DiscoveryResult, ProviderError, discover_customers, engine_status
 from .research import RulesDecisionProvider, infer_profile
 from .safety import FetchError, fetch_public_page, normalize_url
 from .worker_config import WorkerSettings
+from .customer_drafts import CustomerDraft, DraftError, DraftInput, generate_customer_draft
 
 logger = logging.getLogger('signalfoundry.worker')
 # Uvicorn only configures its own loggers. Emit the redacted worker record too.
@@ -79,7 +81,9 @@ class WorkerBoundary:
         acquired = False
         response_started = False
         path = scope.get('path', '')
-        operation = {'/healthz': 'health', '/readyz': 'ready', '/worker/research': 'research', '/worker/analyze': 'analyze'}.get(path, 'unknown')
+        operation = {'/healthz': 'health', '/readyz': 'ready', '/worker/research': 'research', '/worker/analyze': 'analyze',
+                     '/worker/customer-status': 'customer-status', '/worker/customers': 'customers',
+                     '/worker/customer-draft': 'customer-draft'}.get(path, 'unknown')
 
         async def response_send(message):
             nonlocal status, response_started
@@ -191,6 +195,14 @@ def create_worker() -> FastAPI:
     async def fetch_error(_, error):
         return JSONResponse({'detail': str(error)}, status_code=422)
 
+    @app.exception_handler(ProviderError)
+    async def provider_error(_, error):
+        return JSONResponse({'detail': str(error)}, status_code=503)
+
+    @app.exception_handler(DraftError)
+    async def draft_error(_, error):
+        return JSONResponse({'detail': str(error)}, status_code=503)
+
     @app.get('/healthz')
     async def health():
         return {'status': 'ok'}
@@ -204,6 +216,18 @@ def create_worker() -> FastAPI:
     def analyze(body: AnalyzeRequest):
         page = app.state.fetch_page(normalize_url(body.website))
         return AnalyzeResponse(profile=infer_profile(page), website=page.url)
+
+    @app.post('/worker/customer-status')
+    def customer_status(body: EmptyRequest):
+        return engine_status()
+
+    @app.post('/worker/customers', response_model=DiscoveryResult)
+    def customers(body: DiscoveryRequest):
+        return discover_customers(body, fetch_page=app.state.fetch_page)
+
+    @app.post('/worker/customer-draft', response_model=CustomerDraft)
+    def customer_draft(body: DraftInput):
+        return generate_customer_draft(body)
 
     @app.post('/worker/research', response_model=ResearchResponse)
     def research(body: ResearchRequest):

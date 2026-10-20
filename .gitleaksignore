@@ -1,0 +1,4 @@
+# Exact historical false positive: synthetic idempotency_key in the tenant-override
+# rejection fixture, not a credential. Current test uses the per-test key helper.
+# Keep full-history scanning and every other finding enabled.
+373164e33df3f316f5184d514041fe26cc0389be:backend/tests/test_outreach.py:generic-api-key:215
