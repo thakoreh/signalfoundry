@@ -1,5 +1,7 @@
 # Overnight technical requirements and release evidence
 
+**Current run priorities:** follow [refined GOAL.md](overnight/GOAL.md) and [PROGRESS.md](overnight/PROGRESS.md): local daily loop first, local/global/tenant spending admission second, hosted parity third. Add server-enforced sender/recipient-basis gates; exact final footer/content approval; separate approved versus actually reported sent snapshots; revision-safe Next up/reminder state; business-day follow-up limits; referral/new-recipient suppression; dated snooze/OOO; bounce invalidation; immediate sticky company/email opt-outs and company hold races; meeting-time prompts; safe encoded mailto fallback. No state may infer sending, consent, geography or reply outcome. All transitions require isolated regression and mobile/return evidence. Official US/Canada research informs conservative gates, not legal certification. No paid/live operations during automated QA. Current owner-approved GitHub policy requires a PR and source/container checks, not another person's approval.
+
 Prepared October 19, 2026 from the current repository and its release runbooks. This is a contribution to the overnight agent brief, not a claim that production can be guaranteed by morning. No implementation, deployment, provider request, account change, purchase, or external message was performed for this document.
 
 ## Starting truth

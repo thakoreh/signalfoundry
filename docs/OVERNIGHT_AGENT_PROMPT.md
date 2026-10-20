@@ -1,5 +1,7 @@
 # Clientrove: overnight implementation brief
 
+**Current run:** [refined owner goal](overnight/GOAL.md) and [live progress/checklist](overnight/PROGRESS.md) add the daily-use workflow, compliance and execution requirements. They override conflicting older scope/order and GitHub approval wording below. Start from latest main after merged PR 5; work on the new release-candidate branch, not its finished outreach branch. Local daily use precedes hosted parity. Main retains PR + required source/container checks, with zero second-person approvals under the owner's explicit solo-maintainer policy.
+
 Continue building the existing application into a coherent, trustworthy release candidate. Implement and verify the work; a strategy report alone is insufficient. Work through all unblocked priorities, use parallel implementation agents with clearly separated files, integrate their changes, and use fresh independent reviewers for security and UX. A morning deadline does not establish production readiness: deliver the strongest verified result and identify the exact remaining launch gates.
 
 ## 1. Establish the starting point

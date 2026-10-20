@@ -1,5 +1,9 @@
 # Overnight handoff contribution: product, commercial journey, and acceptance
 
+## Refined owner additions governing this run
+
+Read [GOAL.md](overnight/GOAL.md) and track every item in [PROGRESS.md](overnight/PROGRESS.md). The local daily loop now comes before hosted parity: returning Next up queue, two-tap unknown-safe reporting, mailto/Copy fallback, immutable actual sent-with-changes records, up to two individually approved manual follow-ups, manual referral/snooze/OOO/bounce/source-challenge types, same-company holds, role-inbox/provenance awareness, meeting confirmation/outcome prompts and factual draft review. Saved sender identity/address/contact basis and US/Canada scope gates apply before copy/mailto approval; no automatic sending or invented consent. Default introductions are roughly 50–125 plain-text words with one observation, seller line and interest question. These requirements supersede earlier list-only and shorter manual-ledger boundaries. Budget admission includes local mode. Every added transition needs tests and first-session plus next-day mobile review; a ten-minute first sendable message is a measured target, not a performance claim.
+
 Prepared October 19, 2026. This is input to the parent agent's integrated handoff prompt, not a claim of production readiness. It reflects the latest user direction; older list-only conclusions and illustrative $150 acquisition budgets are superseded. No external actions, code edits, provider calls, purchases, or messages occurred for this contribution.
 
 ## Product contract to preserve
