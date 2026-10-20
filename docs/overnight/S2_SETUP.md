@@ -1,5 +1,13 @@
 # S2 sender safety — partial checkpoint
 
+### S2A pending Copy safety
+
+No new setup/env/dependencies. Copy preflights current saved readiness for one immutable user intent. You can keep editing while it checks: any edit cancels that attempt, even if you restore the old text. Switching thread/view/search/session or leaving the screen also cancels it. Concurrent clicks share one pending attempt. A later explicit click starts a fresh check. Copy never saves edits or records sending; it copies only exact approved saved bytes with the current server footer/readiness, not unsaved text.
+
+If the connection/clipboard fails, nothing is recorded as sent; fix the connection/permission and try Copy again. If approval changed, review the saved profile/footer, save and approve again; do not bypass failed readiness by manually copying supposedly approved text. Mailto/Open in email app remains absent and pending integration, not implemented or launched here.
+
+Verification: slow-GET component races and fresh isolated Chrome clipboard/focus fixture; browser proof is component-only with mocked readiness, not the full S2/backend journey. Independent review remains next. Existing pause/stop off switches apply. Roll back this frontend-only repair using a new revert commit while preserving saved data/history; this reintroduces the race, so keep Copy unavailable until a forward fix. No schema or migration added.
+
 Continuation: loaded nonempty drafts and explicitly generated drafts include the saved footer as unsaved reviewable text. Restore saved sender footer appends missing current details without deleting user text; review/remove any outdated footer manually, save, approve exact text. Copy re-fetches the thread and denies stale approval. Opening/copying never records sent; no mailto launch was added. Invalid/missing reachable-contact syntax blocks approval but syntax is not a provider reachability check. Booking field/common calendar URLs are blocked before interest; arbitrary custom booking URLs in prose need further review. Persistent Selling-as and real isolated Chrome flow proof remain required before S2 acceptance. Existing off-switch/rollback rules below still apply.
 
 Status: incomplete, backend/profile subseam only. No release acceptance, deployment or permission to send.

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { errorMessage, jsonBody } from "../lib/api";
 import {
   replyLabels,
@@ -39,6 +39,18 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   const scope = useRef<AbortController | null>(null);
   const flight = useRef(false);
   const keys = useRef(new Map<string, string>());
+  const copyGeneration = useRef(0);
+  const copyAttempt = useRef<AbortController | null>(null);
+  function cancelCopy() {
+    copyGeneration.current++;
+    copyAttempt.current?.abort();
+    copyAttempt.current = null;
+  }
+  // Invalidate intent at committed navigation/session changes and unmount.
+  // Capture the original request signal; a replacement scope cannot revive it.
+  useLayoutEffect(() => {
+    return () => cancelCopy();
+  }, [api, mode, searchId, active, step, reload]);
   useEffect(() => {
     const controller = new AbortController();
     scope.current = controller;
@@ -99,6 +111,7 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   );
   function edit(field: keyof OutreachDraft, value: string) {
     if (!thread || !draft) return;
+    cancelCopy();
     setDrafts((current) => ({
       ...current,
       [thread.id]: { ...draft, [field]: value },
@@ -111,6 +124,7 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
     payload: Record<string, unknown> = {},
   ) {
     if (!thread || flight.current || !scope.current) return;
+    cancelCopy();
     flight.current = true;
     setBusy(action);
     setError("");
@@ -169,6 +183,7 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   }
   async function generate() {
     if (!thread || flight.current || !scope.current) return;
+    cancelCopy();
     flight.current = true;
     setBusy("generate");
     setError("");
@@ -220,21 +235,53 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
     }
   }
   async function copy() {
-    if (!draft || !canAct) return;
+    if (
+      !thread ||
+      !draft ||
+      !canAct ||
+      flight.current ||
+      copyAttempt.current ||
+      !scope.current ||
+      scope.current.signal.aborted
+    )
+      return;
+    const controller = new AbortController();
+    copyAttempt.current = controller;
+    const signal = AbortSignal.any([controller.signal, scope.current.signal]);
+    const generation = copyGeneration.current;
+    const intent = {
+      id: thread.id,
+      searchId: thread.search_id,
+      revision: thread.revision,
+      approval: { ...thread.approval! },
+      footer: thread.sender_footer,
+      draft: { ...draft },
+    };
+    const isCurrent = () =>
+      !signal.aborted &&
+      generation === copyGeneration.current &&
+      copyAttempt.current === controller;
+    setError("");
+    setNotice("");
     try {
       const current = await api<OutreachThread>(
-        `/outreach/${encodeURIComponent(thread!.id)}`,
-        { signal: scope.current!.signal },
+        `/outreach/${encodeURIComponent(intent.id)}`,
+        { signal },
       );
-      if (scope.current!.signal.aborted) return;
-      setThreads((items) =>
-        items.map((item) => (item.id === current.id ? current : item)),
-      );
+      if (!isCurrent()) return;
       if (
-        !current.ready_for_manual_action ||
+        current.id !== intent.id ||
+        current.search_id !== intent.searchId ||
+        current.revision !== intent.revision ||
+        current.ready_for_manual_action !== true ||
+        current.paused !== false ||
+        current.suppressed !== false ||
         !current.approval ||
-        current.approval.content_hash !== thread!.approval?.content_hash ||
-        !sameOutreachDraft(draft, threadDraft(current))
+        current.approval.content_hash !== intent.approval.content_hash ||
+        current.approval.approved_at !== intent.approval.approved_at ||
+        current.approval.revision !== intent.approval.revision ||
+        current.sender_footer !== intent.footer ||
+        !sameOutreachDraft(intent.draft, threadDraft(current))
       ) {
         setError(
           "Approval changed. Restore the saved sender footer, save and approve again. Your edits are still here.",
@@ -244,11 +291,14 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
       await navigator.clipboard.writeText(
         `To: ${current.recipient}\nSubject: ${current.subject}\n\n${outreachMessageBody(current)}`,
       );
-      setNotice("Approved message copied. Nothing was sent.");
+      if (isCurrent()) setNotice("Approved message copied. Nothing was sent.");
     } catch {
-      setError(
-        "Copy was unavailable. Select the approved text and copy it manually.",
-      );
+      if (isCurrent())
+        setError(
+          "Copy readiness could not be confirmed or clipboard access failed. Nothing was sent. Check your connection and try Copy again.",
+        );
+    } finally {
+      if (copyAttempt.current === controller) copyAttempt.current = null;
     }
   }
   if (mode !== "local-demo")

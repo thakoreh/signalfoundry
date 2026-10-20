@@ -122,6 +122,136 @@ it("restores the saved footer without losing edits and copies only revalidated a
   expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Approval changed");
 });
+describe("pending Copy intent", () => {
+  async function pendingCopy() {
+    await mount();
+    await click("Approve exact message");
+    const snapshot = structuredClone(thread);
+    let finish!: (value: OutreachThread) => void;
+    api.mockImplementationOnce(
+      () =>
+        new Promise<OutreachThread>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await click("Copy approved message");
+    return { snapshot, finish };
+  }
+  it.each(["Message", "Subject", "Recipient", "Booking link · optional"])(
+    "denies late ready bytes after %s edits, even when reverted",
+    async (label) => {
+      const { snapshot, finish } = await pendingCopy();
+      const original = field(label).value;
+      await change(label, "New keystrokes");
+      await act(async () => finish(snapshot));
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(field(label).value).toBe("New keystrokes");
+      expect(thread.messages).toHaveLength(0);
+      await change(label, original);
+      await click("Copy approved message");
+      expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("denies an edit/revert while the same preflight is pending", async () => {
+    const { snapshot, finish } = await pendingCopy();
+    await change("Message", "Temporary edit");
+    await change("Message", snapshot.body);
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+  it.each([
+    "approval identity",
+    "revision",
+    "footer",
+    "wrong thread",
+    "unknown readiness",
+    "paused",
+    "suppressed",
+  ])("fails closed when preflight changes %s", async (kind) => {
+    const { snapshot, finish } = await pendingCopy();
+    if (kind === "approval identity")
+      snapshot.approval!.approved_at = "new approval";
+    if (kind === "revision") snapshot.revision++;
+    if (kind === "footer") snapshot.sender_footer = "New sender identity";
+    if (kind === "wrong thread") snapshot.id = "thread_other";
+    if (kind === "unknown readiness")
+      Object.assign(snapshot, { ready_for_manual_action: "unknown" });
+    if (kind === "paused") snapshot.paused = true;
+    if (kind === "suppressed") snapshot.suppressed = true;
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(thread.messages).toHaveLength(0);
+  });
+  it.each(["thread", "search", "session", "unmount", "stage"])(
+    "denies late completion after %s navigation",
+    async (kind) => {
+      const original = api.getMockImplementation()!;
+      api.mockImplementation(async (path: string, options?: RequestInit) => {
+        if (path.startsWith("/outreach?"))
+          return {
+            threads: [
+              structuredClone(thread),
+              { ...fixture(), id: "thread_b", company_name: "Other business" },
+            ],
+          };
+        return original(path, options);
+      });
+      const { snapshot, finish } = await pendingCopy();
+      if (kind === "thread")
+        await act(async () =>
+          container
+            .querySelectorAll<HTMLButtonElement>(".outreach-lead")[1]
+            .click(),
+        );
+      if (kind === "stage") await click("Conversations");
+      if (kind === "search")
+        await act(async () =>
+          root.render(<OutreachWorkspace searchId="search_b" />),
+        );
+      if (kind === "session") {
+        session.mode = "saas";
+        await mount();
+      }
+      if (kind === "unmount") {
+        await act(async () => root.unmount());
+        root = createRoot(container);
+      }
+      await act(async () => finish(snapshot));
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(container.textContent).not.toContain("Approved message copied");
+      expect(thread.messages).toHaveLength(0);
+    },
+  );
+  it("coalesces concurrent clicks and allows an explicit subsequent retry", async () => {
+    const { snapshot, finish } = await pendingCopy();
+    // Same-tick clicks also need a synchronous guard, not just a disabled button.
+    await act(async () => {
+      button("Copy approved message").click();
+      button("Copy approved message").click();
+    });
+    await act(async () => finish(snapshot));
+    expect(
+      api.mock.calls.filter(([path]) => path === "/outreach/thread_a"),
+    ).toHaveLength(1);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+    expect(thread.messages).toHaveLength(0);
+  });
+  it("offers safe retry without a manual-copy bypass on failed readiness", async () => {
+    await mount();
+    await click("Approve exact message");
+    api.mockRejectedValueOnce(new Error("Offline"));
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("copy it manually");
+    expect(container.textContent).toContain("try Copy again");
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+});
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }
