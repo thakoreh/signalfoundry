@@ -212,7 +212,7 @@ class OutreachTest(unittest.TestCase):
             thread = response.json()['threads'][0]
             self.assertEqual(client.get('/api/outreach', params={'search_id': self.search.id}).json()['threads'][0]['id'], thread['id'])
             self.assertEqual(client.post(f"/api/outreach/{thread['id']}/reply-draft", json={}).status_code, 503)
-            self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': 'api_other_123', 'tenant_id': 'other'}).status_code, 422)
+            self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': self.key(), 'tenant_id': 'other'}).status_code, 422)
             self.assertEqual(client.put(f"/api/outreach/{thread['id']}/draft", json={'expected_revision': 1, 'idempotency_key': 'bad_address_123', 'recipient': 'bad\nBcc:another@business.com', 'subject': '', 'body': ''}).status_code, 422)
         with patch.dict(os.environ, {'SIGNALFOUNDRY_PUBLIC_ACCESS': 'true'}), TestClient(create_app(self.path, testing=True)) as client:
             self.assertEqual(client.get('/api/outreach').status_code, 403)
