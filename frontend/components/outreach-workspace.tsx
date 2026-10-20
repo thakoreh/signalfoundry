@@ -378,7 +378,7 @@ export function OutreachWorkspace({
               setReload((value) => value + 1);
             }}
           >
-            {dirty
+            {dirty || Object.values(incoming).some(Boolean) || changedSent
               ? "Reload saved version (discard edits)"
               : "Reload saved outreach"}
           </button>

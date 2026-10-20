@@ -121,6 +121,40 @@ it("releases a cancelled save flight after profile suspension without losing edi
   expect(field("Message").value).toBe("Keep this draft");
   expect(thread.body).toBe("Keep this draft");
 });
+it("keeps profile-return conflict edits until explicit discard reload, then permits fresh revision retry", async () => {
+  await mount();
+  await change("Message", "Private conflict draft");
+  await click("Conversations");
+  await change("Paste a received reply", "Private inbound");
+  thread.revision++;
+  thread.approval = null;
+  const original = api.getMockImplementation()!;
+  let conflict = true;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/draft") && conflict)
+      throw new Error("Request failed (409). Refresh current revision.");
+    return original(path, options);
+  });
+  await click("Save changes");
+  expect(field("Message").value).toBe("Private conflict draft");
+  expect(field("Paste a received reply").value).toBe("Private inbound");
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Reload saved version (discard edits)");
+  expect(field("Paste a received reply").value).toBe("");
+  conflict = false;
+  await change("Message", "Fresh retry");
+  await click("Save changes");
+  expect(thread.body).toBe("Fresh retry");
+});
+it("labels inbound-only conflict reload as explicit discard", async () => {
+  await mount();
+  await click("Conversations");
+  await change("Paste a received reply", "Private unsaved inbound");
+  api.mockRejectedValueOnce(new Error("Request failed (409)."));
+  await click("Approve exact message");
+  expect(button("Reload saved version (discard edits)")).toBeTruthy();
+  expect(field("Paste a received reply").value).toBe("Private unsaved inbound");
+});
 it("records actual text separately when manually sent with changes", async () => {
   await mount();
   await click("Approve exact message");

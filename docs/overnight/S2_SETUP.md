@@ -1,5 +1,8 @@
 # S2 sender safety — partial checkpoint
 
+### Verified S2B conflict recovery and boundaries
+If another saved revision wins, the failed action keeps local message and pasted reply intact. Review the error, then deliberately choose **Reload saved version (discard edits)** to fetch current server revision and discard these local edits; review/edit/save again before fresh exact approval. Inbound-only edits also get an explicit discard label. Reload does not send or auto-approve. Working-screen Back retains edits instead of discarding. Forced user/org/logout replacement discards prior memory-only scope; mocked identity tests verify isolation, not real Clerk integration. Chrome Back/Forward guard verified in installed isolated Chrome; process crash/mobile suspension/unsupported browser SPA traversal recovery is not promised. No additional setup/env/dependencies. Existing stop/pause off switches and additive-revert/roll-forward rollback apply unchanged.
+
 ## S2B seller repair / off switch / rollback
 
 Saved Selling as is shared by setup/search/results/outreach. Edit business on working screens opens the existing profile editor inline; Back to saved work keeps message, pasted reply, targeting and profile edits mounted. Saving identity re-reads current outreach readiness; unsaved words are retained for deliberate review/save, never approved automatically. Opening setup with an existing profile opens it instead of rerunning website analysis. No new service, dependency, environment variable, paid call or hosted outreach capability.
