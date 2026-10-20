@@ -1,8 +1,10 @@
-# SignalFoundry
+# Clientrove (SignalFoundry repository)
 
-An AI B2B prospecting and outreach-preparation application: define an ICP, import company domains or CSV, inspect public-site evidence, prioritize a shortlist, draft and export. SignalFoundry targets the established outbound market, not an agency-only niche.
+An application for B2B SaaS founders moving from a product website to relevant prospects and customer conversations. Start with a website, review the business and buyer profile, research businesses, prepare editable AI introductions, and export selected leads.
 
-The public homepage lives at `/`; the application lives at `/workspace`. It includes a responsive landing page, legal/contact routes, real-domain CSV importing, and an optional server-side Jev qualification adapter. Automatic prospect discovery, verified contact enrichment, email delivery, reply tracking and meeting booking are **not implemented**. They remain launch requirements for a full outbound platform.
+The homepage lives at `/`, website-first setup at `/workspace/setup`, discovery at `/workspace/customers`, and saved results at `/workspace/customers/[searchId]`. DeepSeek Search and explicit AI drafting use configured server credentials; optional Hunter verification remains separate. Research and published emails are not proof of buying intent or permission to send.
+
+The private local application also has persistent `/workspace/outreach/[searchId]` views for Review, Conversations, and Meetings: exact-message approval, copy/manual-send records, pasted replies and opt-outs, and user-reported meeting/customer outcomes. **Connected sending, inbox synchronization, AI reply drafting, automatic follow-ups, and calendar-confirmed booking are not implemented. Hosted outreach fails closed until tenant-backed parity exists.** See [local outreach](docs/LOCAL_OUTREACH.md), [engine setup](docs/CUSTOMER_ENGINE_SETUP.md), and [the intended outreach journey](docs/OUTREACH_JOURNEY.md).
 
 **SaaS launch is gated.** The new multi-user code requires provider configuration, review, and live-environment acceptance before customer use. Start with [SaaS setup](docs/SAAS_SETUP.md), [launch gates](docs/PRODUCTION_READINESS.md), and [operations](docs/OPERATIONS.md). Nothing in this branch automatically provisions accounts, credentials, prices, migrations, or a deployment.
 
@@ -14,7 +16,22 @@ The public homepage lives at `/`; the application lives at `/workspace`. It incl
 
 Requirements: Python 3.11+ with `venv`, Node.js 22.6+ and npm (tested with Node 24), and a Bash shell.
 
-### Windows: recommended WSL 2 route
+### Native Windows
+
+Use Python 3.11+ and Node.js 22.6+ (tested on this PC with Node 24). From the repository in PowerShell:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r backend/requirements.lock.txt
+Push-Location frontend
+npm ci
+Pop-Location
+.\.venv\Scripts\python.exe scripts/dev.py
+```
+
+The launcher starts both services on loopback. Set optional provider credentials in the backend's inherited environment as described in the engine setup; never commit secrets. The local workspace is stored in ignored SQLite data. Native Windows local startup, browser layouts and build/tests have been checked; that is not evidence of a deployed multi-user service.
+
+### Windows: optional WSL 2 route
 
 Use Ubuntu in WSL 2 for the supplied shell scripts. If needed, follow [Microsoft’s WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install). Install Python and Node **inside Ubuntu**, not only on Windows; some distributions require the `python3-venv` package. Extract the project under your WSL Linux home directory, open its folder in the Ubuntu terminal, and run:
 
@@ -23,7 +40,7 @@ bash scripts/setup.sh
 bash scripts/dev.sh
 ```
 
-Then try http://localhost:3000 in your Windows browser. Keep both servers bound to loopback; do not expose them to your network. Linux checks passed in the build environment; **WSL 2 and native Windows were not tested**. Native PowerShell/Command Prompt launch scripts are not included. The separate protected-preview Docker setup does not change these local instructions.
+Then try http://localhost:3000 in your Windows browser. Keep both servers bound to loopback. WSL 2 was not separately tested. The separate protected-preview Docker setup does not change these local instructions.
 
 ### Linux / macOS shell
 
@@ -31,11 +48,11 @@ From the extracted project folder, run the same two Bash commands above. Verific
 
 Open http://localhost:3000. FastAPI is available at http://127.0.0.1:8000/api/health and its interactive development API documentation at http://127.0.0.1:8000/docs.
 
-1. Open `/workspace`, enter your public business website and review the draft ideal customer profile
-2. Edit your target industries, roles, company sizes, regions and keywords
-3. Create a research campaign by importing a CSV website column or pasting public business domains
-4. Run research, inspect each account's sources and scoring, and shortlist promising accounts
-5. Create an evidence-grounded outreach draft for human review and export a CSV
+1. Open `/workspace/setup`, enter a public business website, or use the quieter manual option.
+2. Review the offering and ideal business buyer; advanced targeting is optional.
+3. Choose a focused customer search (one to five businesses during testing); review progress on its saved run page.
+4. Review the compact, contact-first list, explicitly create an AI draft if configured, or export selected businesses.
+5. Choose Prepare outreach to save selected businesses into the local review/conversation/meeting workflow. Sending and outcomes are manual records, not external actions performed by the app.
 
 A draft is never sent. Public preview and SaaS reject demo campaigns and demo-reset requests; test fixtures are limited to isolated private tests. A homepage observation is not a verified buying signal. Unknown company details, contacts, email verification and event dates remain unknown.
 
@@ -46,7 +63,8 @@ A draft is never sent. Public preview and SaaS reject demo campaigns and demo-re
 - SQLite repository with tenant-scoped operations, using a single fixed local workspace
 - Bounded public-website research and timestamped evidence records
 - Replaceable decision-provider boundary; deterministic, explainable rules are the default
-- Evidence-grounded text templates for drafts; no invented prior relationship or claim of personal experience
+- Explicit, bounded DeepSeek AI introductions from the saved offering and company evidence, with cached originals and human review
+- SQLite-backed local outreach approvals, conversation records, suppression and reported outcomes; hosted outreach remains unavailable
 
 See [API contract](API_CONTRACT.md), [production checklist](docs/PRODUCTION_READINESS.md), and the backend and frontend README files for implementation details.
 

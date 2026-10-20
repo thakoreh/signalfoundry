@@ -36,9 +36,15 @@ const fields = [
 export function ProfileEditor({
   profile,
   onSaved,
+  onboarding = false,
+  onContinue,
+  onBusyChange,
 }: {
   profile: Profile | null;
   onSaved: (workspace: WorkspaceData) => void;
+  onboarding?: boolean;
+  onContinue?: () => void;
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { api, mode: appMode, isAdmin } = useWorkspaceSession();
   const [name, setName] = useState(profile?.company_name || "");
@@ -54,6 +60,7 @@ export function ProfileEditor({
   async function save(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
+    onBusyChange?.(true);
     setError("");
     setSaved(false);
     try {
@@ -70,33 +77,155 @@ export function ProfileEditor({
       });
       onSaved(result);
       setSaved(true);
+      onContinue?.();
     } catch (e) {
       setError(errorMessage(e));
     } finally {
       setBusy(false);
+      onBusyChange?.(false);
     }
+  }
+  if (onboarding) {
+    return (
+      <form onSubmit={save} className="profile-form">
+        {error && (
+          <div role="alert" className="notice error">
+            <Icon name="info" />
+            {error}
+          </div>
+        )}
+        <div className="business-onboarding-detail-fields">
+          <label>
+            Business name
+            <input
+              required
+              disabled={busy || !isAdmin}
+              maxLength={200}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setSaved(false);
+              }}
+              placeholder="Your business or product name"
+            />
+          </label>
+          <label>
+            What does your business do?
+            <textarea
+              required
+              disabled={busy || !isAdmin}
+              value={description}
+              onChange={(e) => {
+                setDescription(e.target.value);
+                setSaved(false);
+              }}
+              rows={3}
+              maxLength={3000}
+              placeholder="Briefly describe what you offer and how it helps."
+            />
+          </label>
+          <label>
+            Your ideal customers
+            <textarea
+              disabled={busy || !isAdmin}
+              value={values.industries}
+              onChange={(e) => {
+                setValues({ ...values, industries: e.target.value });
+                setSaved(false);
+              }}
+              rows={2}
+              placeholder="e.g. B2B SaaS, Software, Financial services"
+            />
+            <span className="input-hint">
+              List customer industries or business types, separated by commas.
+            </span>
+          </label>
+        </div>
+        <details className="business-onboarding-targeting">
+          <summary>More targeting details</summary>
+          <div className="business-onboarding-detail-fields">
+            {fields.slice(1).map(([key, label, placeholder]) => (
+              <label key={key}>
+                {label}
+                <textarea
+                  disabled={busy || !isAdmin}
+                  value={values[key]}
+                  onChange={(e) => {
+                    setValues({ ...values, [key]: e.target.value });
+                    setSaved(false);
+                  }}
+                  rows={2}
+                  placeholder={placeholder}
+                />
+                <span className="input-hint">
+                  {key === "company_sizes" || key === "geographies"
+                    ? "Planning context only; not yet used in scoring. Separate with commas."
+                    : "Separate values with commas"}
+                </span>
+              </label>
+            ))}
+          </div>
+        </details>
+        {isAdmin && (
+          <button
+            className="btn primary business-onboarding-save"
+            disabled={busy || !isAdmin}
+            type="submit"
+          >
+            {busy ? (
+              <>
+                <span className="spinner" />
+                Saving business details…
+              </>
+            ) : saved ? (
+              <>
+                <Icon name="check" size={16} />
+                Business details saved
+              </>
+            ) : (
+              <>
+                {onContinue ? "Find customers" : "Save business details"}
+                <Icon name="arrow" size={16} />
+              </>
+            )}
+          </button>
+        )}
+      </form>
+    );
   }
   return (
     <form onSubmit={save} className="profile-form">
       <div className="section-heading">
         <div>
-          <span className="eyebrow">YOUR NORTH STAR</span>
-          <h2>A sharper profile. Better prospects.</h2>
-          <p>Tell us who you help and what makes a customer a great fit.</p>
+          {!onboarding && <span className="eyebrow">YOUR NORTH STAR</span>}
+          <h2>
+            {onboarding
+              ? "Your business details"
+              : "A sharper profile. Better prospects."}
+          </h2>
+          <p>
+            {onboarding
+              ? "Tell us what your business does. Add any targeting preferences you already know."
+              : "Tell us who you help and what makes a customer a great fit."}
+          </p>
         </div>
-        <span className="tag green">
-          <Icon name="edit" size={13} />{" "}
-          {isAdmin ? "Admin managed" : "Read only"}
-        </span>
+        {!onboarding && (
+          <span className="tag green">
+            <Icon name="edit" size={13} />{" "}
+            {isAdmin ? "Admin managed" : "Read only"}
+          </span>
+        )}
       </div>
-      <div className="notice soft">
-        <Icon name="info" size={17} />
-        <span>
-          {appMode === "saas"
-            ? "Your organization’s targeting preferences guide research. Only administrators can save changes."
-            : "Website analysis creates a rules-based draft. Review these inputs before researching accounts. You can also fill this out from scratch."}
-        </span>
-      </div>
+      {!onboarding && (
+        <div className="notice soft">
+          <Icon name="info" size={17} />
+          <span>
+            {appMode === "saas"
+              ? "Your organization’s targeting preferences guide research. Only administrators can save changes."
+              : "Website analysis creates a rules-based draft. Review these inputs before researching accounts. You can also fill this out from scratch."}
+          </span>
+        </div>
+      )}
       {error && (
         <div role="alert" className="notice error">
           <Icon name="info" />
@@ -187,7 +316,7 @@ export function ProfileEditor({
             </>
           ) : (
             <>
-              Save customer profile
+              {onboarding ? "Save business details" : "Save customer profile"}
               <Icon name="arrow" size={16} />
             </>
           )}

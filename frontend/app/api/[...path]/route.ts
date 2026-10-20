@@ -12,6 +12,10 @@ const functionKinds: Record<FunctionName, "query" | "mutation" | "action"> = {
   "workspaces.analyze": "action",
   "workspaces.provision": "mutation",
   "workspaces.saveProfile": "mutation",
+  "customers.engine": "action",
+  "customers.start": "action",
+  "customers.get": "query",
+  "customerDrafts.generate": "action",
   "campaigns.list": "query",
   "campaigns.create": "mutation",
   "campaigns.get": "query",
@@ -94,7 +98,11 @@ async function handler(
           new Promise<never>((_, reject) => {
             timer = setTimeout(
               () => reject(new Error("Provider timeout")),
-              name === "workspaces.analyze" ? 150_000 : 25_000,
+              name === "workspaces.analyze"
+                ? 150_000
+                : name === "customerDrafts.generate"
+                  ? 45_000
+                  : 25_000,
             );
           }),
         ]);

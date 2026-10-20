@@ -1,3 +1,12 @@
+export class ApiError extends Error {
+  readonly code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.code = code;
+  }
+}
+
 export async function api<T>(
   path: string,
   options: RequestInit = {},
@@ -20,15 +29,17 @@ export async function api<T>(
   }
   if (!response.ok) {
     let message = `Request failed (${response.status}). Please try again.`;
+    let code: string | undefined;
     try {
       const payload = await response.json();
+      if (payload.code === "DRAFT_FAILED") code = payload.code;
       if (typeof payload.detail === "string") message = payload.detail;
       else if (Array.isArray(payload.detail))
         message = payload.detail.map((e: { msg: string }) => e.msg).join("; ");
     } catch {
       /* A proxy can return HTML; preserve the readable fallback. */
     }
-    throw new Error(message);
+    throw new ApiError(message, code);
   }
   return response.json() as Promise<T>;
 }

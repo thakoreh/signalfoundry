@@ -1,0 +1,40 @@
+.sf-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: max-content;
+  min-height: 44px;
+  font-size: 21px;
+  font-weight: 760;
+  letter-spacing: -0.06em;
+}
+.sf-brand-light {
+  font-weight: 450;
+}
+.sf-brand b {
+  color: var(--sf-green-dark, #17664c);
+}
+.sf-brand-mark {
+  display: inline-flex;
+  align-items: end;
+  gap: 3px;
+  width: 24px;
+  height: 26px;
+  transform: skewY(-14deg);
+}
+.sf-brand-mark i {
+  width: 5px;
+  background: var(--sf-green-dark, #17664c);
+  border-radius: 2px;
+}
+.sf-brand-mark i:nth-child(1) {
+  height: 11px;
+  opacity: 0.48;
+}
+.sf-brand-mark i:nth-child(2) {
+  height: 18px;
+  opacity: 0.7;
+}
+.sf-brand-mark i:nth-child(3) {
+  height: 25px;
+}
