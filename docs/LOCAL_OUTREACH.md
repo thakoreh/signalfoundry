@@ -64,7 +64,7 @@ Every thread mutation accepts `expected_revision` and `idempotency_key`:
 
 - `PUT /{id}/draft`: `recipient`, `subject`, `body`, optional `booking_link`.
 - `POST /{id}/approve`: no additional fields.
-- `POST /{id}/sent`: no additional fields; records a manual report only.
+- `POST /{id}/sent`: optional `sent_as` (`approved` by default or `with_changes`), `actual_subject`, `actual_body`; changed reports require complete actual subject/body. Records a manual report only, retaining original approved text/hash separately. Recipient changes are not supported; see overnight/S1_SETUP.md.
 - `POST /{id}/replies`: pasted `body`, optional `reply_state` (defaults to review).
 - `PATCH /{id}/reply-state`: corrected `reply_state` for the latest pasted reply.
 - `PATCH /{id}/pause`: `paused` boolean.

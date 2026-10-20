@@ -2,6 +2,8 @@
 
 S1 baseline at cfd22af. **Incomplete**, no hosted/staging/production verification. This is a staged backlog, not waived acceptance. Source paths relative to repo; UI under frontend/components, server under backend/app. Existing unit coverage is evidence of logic only. Fresh S1 evidence recorded in PROGRESS; no inherited screenshots count as verification.
 
+Resume overlay: the baseline gaps below remain historical source mapping, not current completion claims. Changed-send subject/body snapshots and original approval disclosure are now built and locally tested (15 outreach +9 component tests; fresh Chrome1440/390/320 and isolated production build). Not yet cancels the reporting form. Actual recipient changes remain unsupported. No full-step6/compliance acceptance: sender/footer/contact-basis/region controls move to `t_bddffc6d`. No full journey, hosted, monetary, transport, device or accessibility acceptance is claimed. PR7 remains draft pending independent checkpoint review and final controller acceptance. See PROGRESS for commands and generated-type/build isolation.
+
 ## Canonical journey 1–14
 
 | Step | Source / existing test seam | Baseline and remaining acceptance |
