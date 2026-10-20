@@ -98,6 +98,21 @@ class OutreachTest(unittest.TestCase):
             with self.assertRaisesRegex(OutreachError, 'sender|contact'):
                 self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
 
+    def test_sender_contact_rejects_malformed_email_domains(self):
+        for contact in ('alex@-example.com', 'alex@example..com', 'alex@exa_mple.com', '.alex@example.com', 'alex..fixture@example.com'):
+            with self.subTest(contact=contact):
+                self.repo.save_profile(self.sender().model_copy(update={'sender_contact': contact}))
+                self.assertEqual(self.start().sender_footer, '')
+
+    def test_cold_calendar_urls_without_slash_are_denied_in_subject_or_body(self):
+        for field, value in (('body', 'See https://calendly.com'), ('subject', 'Meet https://cal.com?user=fixture')):
+            with self.subTest(field=field):
+                thread = self.ready()
+                changes = {field: value + (thread.sender_footer if field == 'body' else '')}
+                thread = self.edit(thread, **changes)
+                with self.assertRaisesRegex(OutreachError, 'booking'):
+                    self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
     def test_cold_booking_link_is_denied_but_interested_reply_can_include_it(self):
         thread = self.ready()
         thread = self.edit(thread, booking_link='https://calendar.business.com/book')

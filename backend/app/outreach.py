@@ -176,7 +176,7 @@ def sender_footer(profile) -> str:
     if not profile or not all((profile.sender_name, profile.company_name, profile.mailing_address, profile.sender_contact)):
         return ''
     contact = profile.sender_contact
-    email = re.fullmatch(r'[^\s@]+@[^\s@]+\.[A-Za-z]{2,63}', contact)
+    email = re.fullmatch(r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}", contact)
     phone = re.fullmatch(r'\+?[0-9 ()-]{7,30}', contact) and len(re.sub(r'\D', '', contact)) >= 7
     web = False
     if contact.startswith('https://'):
@@ -352,7 +352,7 @@ class OutreachStore:
             elif operation == 'approve':
                 if not thread.sender_footer:
                     raise OutreachError('Save your sender name, company, mailing address and reachable contact in Edit business before approval.')
-                if not any(m.direction == 'inbound' and m.reply_state in ('interested', 'question') for m in thread.messages) and (thread.booking_link or re.search(r'https?://(?:www\.)?(?:calendly\.com|cal\.com|calendar\.[^/\s]+)/', thread.body, re.I)):
+                if not any(m.direction == 'inbound' and m.reply_state in ('interested', 'question') for m in thread.messages) and (thread.booking_link or re.search(r'https?://(?:www\.)?(?:calendly\.com|cal\.com|calendar\.[^/\s?#]+)(?=[/?#\s]|$)', thread.subject + '\n' + thread.body, re.I)):
                     raise OutreachError('Remove the booking link from the cold message. Offer it only after interest is shown.')
                 if not thread.body.endswith(thread.sender_footer):
                     raise OutreachError('Restore the current saved sender footer in your message, then save and approve again.')
