@@ -48,10 +48,52 @@ class OutreachTest(unittest.TestCase):
         return self.repo.mutate_outreach(thread.id, 'draft', EditDraft(**self.fields(thread), **fields))
 
     def ready(self):
+        # Approval fixtures now explicitly provide a fictional saved sender.
+        self.sender()
         thread = self.edit(self.start(), recipient='hello@business.com', subject='A relevant introduction', body='Hello, could we discuss a possible fit?')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         if thread.messages and thread.reply_state not in ('interested', 'question'):
             thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
         return self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def sender(self):
+        profile = DEMO_PROFILE.model_copy(update={'sender_name': 'Alex Fixture',
+            'mailing_address': '100 Example Street, Toronto ON M5V 1A1', 'sender_contact': 'alex@example.com'})
+        self.repo.save_profile(profile)
+        return profile
+
+    def test_footer_is_exact_and_sender_change_invalidates_without_rewriting_history(self):
+        profile = self.sender()
+        footer = '\n\n--\nAlex Fixture | ' + profile.company_name + '\n100 Example Street, Toronto ON M5V 1A1\nContact: alex@example.com\nTo opt out, reply "unsubscribe".'
+        thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+        self.assertEqual(thread.sender_footer, footer)
+        with self.assertRaisesRegex(OutreachError, 'footer'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.edit(thread, body='Can we talk?' + footer)
+        approved = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        self.assertTrue(approved.ready_for_manual_action)
+        tampered = self.edit(approved, body=approved.body.replace('unsubscribe', 'subscribe'))
+        with self.assertRaisesRegex(OutreachError, 'footer'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(tampered)))
+        thread = self.edit(tampered, body=approved.body)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
+        snapshot = sent.messages[0].model_dump()
+        pending = self.edit(sent, body='Another message' + footer)
+        pending = self.repo.mutate_outreach(pending.id, 'approve', RevisionRequest(**self.fields(pending)))
+        self.repo.save_profile(profile.model_copy(update={'sender_name': 'Another Fixture'}))
+        current = self.repo.outreach_thread(pending.id)
+        self.assertFalse(current.ready_for_manual_action)
+        self.assertIsNone(current.approval)
+        self.assertEqual(current.messages[0].model_dump(), snapshot)
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(current.id, 'sent', RevisionRequest(**self.fields(current)))
+
+    def test_missing_sender_blocks_approval_without_hiding_old_thread(self):
+        thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+        self.assertEqual(self.repo.outreach_thread(thread.id).body, 'Can we talk?')
+        with self.assertRaisesRegex(OutreachError, 'sender'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
 
     def test_sent_with_changes_preserves_approved_and_actual_snapshots(self):
         thread = self.ready()
@@ -194,6 +236,7 @@ class OutreachTest(unittest.TestCase):
         thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='question'))
         self.assertEqual(thread.messages[-1].reply_state, 'question')
         thread = self.edit(thread, body='An answer written by the user')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         self.assertTrue(thread.ready_for_manual_action)
         thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Please remove me', reply_state='opt_out'))
@@ -233,12 +276,14 @@ class OutreachTest(unittest.TestCase):
         self.assertEqual(thread.sale_state, 'won_reported')
 
     def test_sent_snapshot_preserves_exact_approved_link_after_later_edits(self):
+        self.sender()
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Meeting', body='Would a meeting help?', booking_link='https://cal.business.com/intro')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
         changed = self.edit(sent, booking_link='https://cal.business.com/different')
         self.assertEqual(changed.messages[0].booking_link, 'https://cal.business.com/intro')
-        self.assertEqual(changed.messages[0].body, 'Would a meeting help?\n\nBooking link: https://cal.business.com/intro')
+        self.assertEqual(changed.messages[0].body, 'Would a meeting help?' + thread.sender_footer + '\n\nBooking link: https://cal.business.com/intro')
         self.assertIsNotNone(changed.messages[0].approved_content_hash)
 
     def test_opt_out_classification_suppresses_original_inbound_recipient_after_edit(self):
@@ -252,7 +297,9 @@ class OutreachTest(unittest.TestCase):
         self.assertIn('email:changed@business.com', targets)
 
     def test_concurrent_approval_and_edit_are_serialized_by_revision(self):
+        self.sender()
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Subject', body='Body')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         def change(which):
             try:
                 if which == 'approve':

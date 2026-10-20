@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 from fastapi import APIRouter, HTTPException
 from pydantic import Field, StringConstraints, field_validator
 
-from .models import EmptyRequest, StrictModel
+from .models import EmptyRequest, StrictModel, Workspace
 from .primitives import new_id, now
 from .safety import FetchError, normalize_url
 
@@ -146,6 +146,7 @@ class OutreachThread(StrictModel):
     subject: str = ''
     body: str = ''
     booking_link: str = ''
+    sender_footer: str = ''
     paused: bool = False
     suppressed: bool = False
     suppression_reason: str | None = None
@@ -171,6 +172,13 @@ def blocked(thread: OutreachThread) -> bool:
     return thread.suppressed or thread.paused or (has_reply and thread.reply_state not in ('interested', 'question'))
 
 
+def sender_footer(profile) -> str:
+    if not profile or not all((profile.sender_name, profile.company_name, profile.mailing_address, profile.sender_contact)):
+        return ''
+    return (f'\n\n--\n{profile.sender_name} | {profile.company_name}\n{profile.mailing_address}\n'
+            f'Contact: {profile.sender_contact}\nTo opt out, reply "unsubscribe".')
+
+
 def domain_target(domain):
     host = urlsplit(domain if '://' in domain else 'https://' + domain).hostname or domain
     return 'domain:' + host.rstrip('.').lower().removeprefix('www.')
@@ -186,11 +194,13 @@ class OutreachStore:
         self.tenant = repository.tenant_id
 
     def _view(self, db, thread):
+        workspace = Workspace.model_validate_json(db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant,)).fetchone()['data'])
+        thread.sender_footer = sender_footer(workspace.profile)
         suppression = db.execute('SELECT reason FROM outreach_suppressions WHERE tenant_id=? AND (target=? OR target=?) LIMIT 1',
                                  (self.tenant, domain_target(thread.domain), 'email:' + thread.recipient.lower())).fetchone()
         if suppression:
             thread.suppressed, thread.suppression_reason = True, suppression['reason']
-        if blocked(thread):
+        if blocked(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
             thread.approval = None
         thread.ready_for_manual_action = bool(not blocked(thread) and thread.recipient and thread.subject and thread.body and
                                                thread.approval and thread.approval.content_hash == content_hash(thread))
@@ -329,6 +339,11 @@ class OutreachStore:
                 if changed:
                     thread.approval = None
             elif operation == 'approve':
+                profile = Workspace.model_validate_json(db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant,)).fetchone()['data']).profile
+                if not profile or not all((profile.sender_name, profile.company_name, profile.mailing_address, profile.sender_contact)):
+                    raise OutreachError('Save your sender name, company, mailing address and reachable contact in Edit business before approval.')
+                if not thread.body.endswith(thread.sender_footer):
+                    raise OutreachError('Restore the current saved sender footer in your message, then save and approve again.')
                 if blocked(thread):
                     raise OutreachError('This conversation is paused, suppressed or needs reply review. Approval is blocked.')
                 if not all((thread.recipient, thread.subject, thread.body)):

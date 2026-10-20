@@ -48,6 +48,11 @@ export function ProfileEditor({
 }) {
   const { api, mode: appMode, isAdmin } = useWorkspaceSession();
   const [name, setName] = useState(profile?.company_name || "");
+  const [sender, setSender] = useState({
+    sender_name: profile?.sender_name || "",
+    mailing_address: profile?.mailing_address || "",
+    sender_contact: profile?.sender_contact || "",
+  });
   const [description, setDescription] = useState(profile?.description || "");
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -66,6 +71,7 @@ export function ProfileEditor({
     try {
       const payload = {
         company_name: name.trim(),
+        ...(appMode === "local-demo" ? sender : {}),
         description: description.trim(),
         ...Object.fromEntries(
           fields.map(([key]) => [key, tokens(values[key])]),
@@ -85,6 +91,41 @@ export function ProfileEditor({
       onBusyChange?.(false);
     }
   }
+  const senderFields =
+    appMode === "local-demo" ? (
+      <fieldset className="business-onboarding-detail-fields">
+        <legend>Sender details for outreach</legend>
+        <p>
+          Outreach must include your name, company, mailing address and a
+          reachable contact. These saved details form the footer; nothing is
+          sent here.
+        </p>
+        {(
+          [
+            ["sender_name", "Sender name", 240],
+            ["mailing_address", "Mailing address", 1000],
+            ["sender_contact", "Reachable contact", 320],
+          ] as const
+        ).map(([key, label, maxLength]) => (
+          <label key={key}>
+            {label}
+            <input
+              disabled={busy || !isAdmin}
+              maxLength={maxLength}
+              value={sender[key]}
+              onChange={(event) => {
+                setSender({ ...sender, [key]: event.target.value });
+                setSaved(false);
+              }}
+            />
+          </label>
+        ))}
+        <span className="input-hint">
+          Contact: an email address, public HTTPS contact page or phone number
+          you actually monitor. Never enter fictional details for real outreach.
+        </span>
+      </fieldset>
+    ) : null;
   if (onboarding) {
     return (
       <form onSubmit={save} className="profile-form">
@@ -166,6 +207,7 @@ export function ProfileEditor({
             ))}
           </div>
         </details>
+        {senderFields}
         {isAdmin && (
           <button
             className="btn primary business-onboarding-save"
@@ -294,6 +336,7 @@ export function ProfileEditor({
           </label>
         ))}
       </div>
+      {senderFields}
       <div className="form-footer">
         <p>
           <Icon name="shield" size={16} /> Your profile guides scoring across

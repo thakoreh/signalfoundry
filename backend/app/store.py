@@ -212,9 +212,27 @@ class Repository:
 
     def save_profile(self, profile: Profile, website: str | None = None, *, set_website: bool = False) -> Workspace:
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
             workspace = Workspace.model_validate_json(row['data'])
+            # Older clients/website analysis do not know sender fields. Omission
+            # preserves saved identity; an explicit empty string can clear it.
+            if workspace.profile:
+                profile = profile.model_copy(update={name: getattr(workspace.profile, name)
+                    for name in ('sender_name', 'mailing_address', 'sender_contact')
+                    if name not in profile.model_fields_set})
             workspace.name = profile.company_name
+            if workspace.profile and any(getattr(workspace.profile, name) != getattr(profile, name)
+                    for name in ('company_name', 'sender_name', 'mailing_address', 'sender_contact')):
+                # Invalidate pending approvals, never rewrite immutable sent messages.
+                from .outreach import OutreachThread
+                for row in db.execute('SELECT id,data FROM outreach_threads WHERE tenant_id=?', (self.tenant_id,)).fetchall():
+                    thread = OutreachThread.model_validate_json(row['data'])
+                    if thread.approval:
+                        thread.approval, thread.ready_for_manual_action = None, False
+                        thread.revision += 1
+                        db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?',
+                                   (thread.model_dump_json(), self.tenant_id, row['id']))
             workspace.profile = profile
             if set_website:
                 workspace.website = website

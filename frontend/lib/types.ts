@@ -1,5 +1,8 @@
 export type Profile = {
   company_name: string;
+  sender_name?: string;
+  mailing_address?: string;
+  sender_contact?: string;
   description: string;
   industries: string[];
   company_sizes: string[];

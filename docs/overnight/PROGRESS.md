@@ -1,4 +1,12 @@
-# Release candidate progress — S1
+# Release candidate progress — S1 / S2
+
+## S2 partial working checkpoint — not stage acceptance
+
+Native run bounded at32 turns: additive local sender fields (name/address/reachable contact; company reused), old-profile safe reads and omitted-field preservation; local-only founder editor; deterministic expected footer and fail-closed backend approval; profile identity changes transactionally invalidate pending approvals without rewriting sent messages. No Convex/hosted enablement. This is a WORKING BACKEND/PROFILE SUBSEAM, not the complete sender/footer vertical slice: composer still needs footer insertion/restore, persistent Selling-as, contact syntax/cold-booking guards, stale-client copy/open revalidation and actual Chrome proof. Do not approve real outreach from this checkpoint.
+
+RED evidence in control directory: s2-profile-red.log missing sender field, s2-footer-red.log approval unexpectedly allowed, s2-exact-red.log missing deterministic footer, s2-component-red.log missing founder controls. GREEN: backend148 (`../.venv/bin/python -m unittest discover -s tests -v`, s2-backend.log); focused component10, typecheck and lint passed. The existing valid-approval fixtures explicitly add fictional sender data and exact footer; negative and history assertions retained, link-snapshot expectation enriched to include required footer. Initial component harness import failure resolved by aliasing existing @ path in Vitest (no weakened checks). No paid providers, owner data, external sends or browser actions. No browser/integration/CI/push/readiness claim yet.
+
+NEXT REQUIRED P0 remains recipient contact-source/CASL publication/no-solicitation/role relevance and region admission. Sender footer alone is NOT legal compliance. US-source freshness qualification does not prevent fixture implementation. Generated next-env.d.ts dev-path drift preserved; previous listeners3001/8017 untouched. Continue this same card before independent review.
 
 Verdict: incomplete; no release-candidate acceptance claimed.
 
