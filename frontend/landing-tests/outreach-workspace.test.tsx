@@ -105,6 +105,28 @@ it("explicitly saves recipient publication evidence without losing message or in
   expect(field("Message").value).toBe("Private draft stays");
   expect(field("Paste a received reply").value).toBe("Private inbound stays");
 });
+it("clears local basis when a refreshed recipient no longer has the saved evidence", async () => {
+  thread.contact_basis = {
+    version: 1,
+    basis_type: "conspicuous_publication",
+    published_email: "hello@example.org",
+    source_url: "https://example.org/team",
+    captured_at: "2026-01-01T12:00:00Z",
+    publisher_attribution: "recipient",
+    notice_status: "clear",
+    recipient_role: "Operations lead",
+    message_relevance: "A specific role-relevant reason.",
+    recipient_country: "CA",
+    recipient_timezone: null,
+  };
+  await mount();
+  await change("Recipient role", "Private stale role");
+  thread = { ...thread, recipient: "new@example.org", contact_basis: null };
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" profileRefresh={1} />));
+  expect(field("Recipient role").value).toBe("");
+  expect(container.textContent).not.toContain("Private stale role");
+});
+
 it("keeps newer evidence typed during a delayed save and denies late Copy after evidence typing", async () => {
   await mount();
   await click("Approve exact message");

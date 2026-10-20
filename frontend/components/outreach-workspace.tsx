@@ -81,6 +81,15 @@ export function OutreachWorkspace({
         if (controller.signal.aborted) return;
         setBusy("");
         setThreads(data.threads);
+        setBases((current) => {
+          const next: Record<string, ContactBasis> = {};
+          for (const [id, basis] of Object.entries(current)) {
+            const refreshed = data.threads.find((item) => item.id === id);
+            if (refreshed && basis.published_email === refreshed.recipient)
+              next[id] = basis;
+          }
+          return next;
+        });
         setActive((current) =>
           data.threads.some((t) => t.id === current)
             ? current
