@@ -19,7 +19,21 @@ export type OutreachMessage = {
   reply_state: ReplyState | null;
   created_at: string;
 };
+export type ContactBasis = {
+  version: 1;
+  basis_type: "conspicuous_publication";
+  published_email: string;
+  source_url: string;
+  captured_at: string | null;
+  publisher_attribution: "recipient" | "caused_by_recipient" | "third_party" | "unknown";
+  notice_status: "clear" | "prohibits" | "unknown";
+  recipient_role: string;
+  message_relevance: string;
+  recipient_country: "US" | "CA" | "unknown" | "other";
+  recipient_timezone: string | null;
+};
 export type OutreachThread = {
+  contact_basis?: ContactBasis | null;
   id: string;
   search_id: string;
   account_id: string;

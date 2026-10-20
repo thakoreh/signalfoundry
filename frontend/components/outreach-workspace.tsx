@@ -8,9 +8,11 @@ import {
   outreachMessageBody,
   sameOutreachDraft,
   threadDraft,
+  type ContactBasis,
   type OutreachDraft,
   type OutreachThread,
 } from "../lib/outreach";
+import { ContactBasisEditor, emptyContactBasis } from "./contact-basis-editor";
 import { isCustomerMessageDraft } from "./customer-result-view";
 import { useWorkspaceSession } from "./workspace-session";
 import { useUnsavedChanges } from "./use-unsaved-changes";
@@ -31,6 +33,8 @@ export function OutreachWorkspace({
   const [active, setActive] = useState("");
   const [step, setStep] = useState<Step>("Review");
   const [drafts, setDrafts] = useState<Record<string, OutreachDraft>>({});
+  const [bases, setBases] = useState<Record<string, ContactBasis>>({});
+  const basisGeneration = useRef(0);
   const [incoming, setIncoming] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
@@ -112,7 +116,10 @@ export function OutreachWorkspace({
   const dirty = Boolean(
     thread && draft && !sameOutreachDraft(draft, threadDraft(thread)),
   );
+  const basis = thread ? bases[thread.id] || thread.contact_basis || emptyContactBasis(thread.recipient) : null;
+  const basisDirty = Boolean(thread && bases[thread.id]);
   useUnsavedChanges(
+    Object.keys(bases).length > 0 ||
     Object.keys(drafts).length > 0 ||
       Object.values(incoming).some(Boolean) ||
       !!changedSent,
@@ -124,6 +131,7 @@ export function OutreachWorkspace({
   const canAct = Boolean(
     thread?.ready_for_manual_action &&
     !dirty &&
+    !basisDirty &&
     !thread.paused &&
     !thread.suppressed &&
     thread.approval,
@@ -149,6 +157,7 @@ export function OutreachWorkspace({
     setError("");
     setNotice("");
     const signal = scope.current.signal;
+    const basisVersion = basisGeneration.current;
     const signature = JSON.stringify([
       thread.id,
       thread.revision,
@@ -180,6 +189,10 @@ export function OutreachWorkspace({
           delete next[updated.id];
           return next;
         });
+      if (action === "contact-basis" && basisGeneration.current === basisVersion)
+        setBases((current) => { const next = { ...current }; delete next[updated.id]; return next; });
+      if (action === "draft" && updated.recipient !== thread.recipient)
+        setBases((current) => { const next = { ...current }; delete next[updated.id]; return next; });
       if (action === "replies")
         setIncoming((current) => ({ ...current, [thread.id]: "" }));
       if (action === "sent") setChangedSent(null);
@@ -371,6 +384,7 @@ export function OutreachWorkspace({
             type="button"
             disabled={!!busy}
             onClick={() => {
+              setBases({});
               setDrafts({});
               setIncoming({});
               setLoading(true);
@@ -378,7 +392,7 @@ export function OutreachWorkspace({
               setReload((value) => value + 1);
             }}
           >
-            {dirty || Object.values(incoming).some(Boolean) || changedSent
+            {dirty || basisDirty || Object.values(incoming).some(Boolean) || changedSent
               ? "Reload saved version (discard edits)"
               : "Reload saved outreach"}
           </button>
@@ -683,6 +697,10 @@ export function OutreachWorkspace({
                       />
                     </label>
                   </div>
+                  {basis && <ContactBasisEditor value={basis} disabled={!!busy && busy !== "contact-basis"}
+                    dirty={basisDirty} recipientChanged={draft.recipient !== thread.recipient}
+                    onChange={(value) => { cancelCopy(); basisGeneration.current++; setBases(current => ({ ...current, [thread.id]: value })); setNotice(""); }}
+                    onSave={() => void mutate("contact-basis", "PUT", { contact_basis: basis })} />}
                   {step === "Review" && !thread.messages.length && (
                     <p className="outreach-review-note">
                       The first cold message must not include a booking link.
@@ -756,6 +774,7 @@ export function OutreachWorkspace({
                       disabled={
                         !!busy ||
                         dirty ||
+                        basisDirty ||
                         !draft.recipient.trim() ||
                         !draft.subject.trim() ||
                         !draft.body.trim() ||

@@ -79,6 +79,52 @@ async function change(label: string, value: string) {
     );
   });
 }
+it("explicitly saves recipient publication evidence without losing message or inbound edits", async () => {
+  await mount();
+  await change("Message", "Private draft stays");
+  await click("Conversations");
+  await change("Paste a received reply", "Private inbound stays");
+  expect(container.textContent).toContain("Contact basis");
+  await change("Publication source URL", "https://example.org/team");
+  await change("Observation time (with timezone)", "2026-10-19T10:00:00Z");
+  await change("Recipient role", "Founder");
+  await change("Message relevance to this role", "Our message discusses their published product");
+  await change("Recipient country", "CA");
+  await change("Publication attribution", "recipient");
+  await change("Unsolicited-message notice review", "clear");
+  expect(api.mock.calls.some(([path]) => path.endsWith("/contact-basis"))).toBe(false);
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Save contact basis");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/contact-basis"));
+  expect(call?.[1].method).toBe("PUT");
+  expect(JSON.parse(call![1].body).contact_basis).toMatchObject({
+    version: 1, published_email: "hello@example.org", recipient_country: "CA",
+    source_url: "https://example.org/team", notice_status: "clear",
+    publisher_attribution: "recipient", basis_type: "conspicuous_publication",
+  });
+  expect(field("Message").value).toBe("Private draft stays");
+  expect(field("Paste a received reply").value).toBe("Private inbound stays");
+});
+it("keeps newer evidence typed during a delayed save and denies late Copy after evidence typing", async () => {
+  await mount();
+  await click("Approve exact message");
+  const snapshot = structuredClone(thread);
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await click("Copy approved message");
+  await change("Recipient role", "New role");
+  await act(async () => finish(snapshot));
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(button("Copy approved message").disabled).toBe(true);
+  api.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await click("Save contact basis");
+  // Inputs should remain editable while evidence save is pending.
+  expect(field("Recipient role").disabled).toBe(false);
+  await change("Recipient role", "Newer role");
+  await act(async () => finish({ ...thread, contact_basis: { version: 1 } as never }));
+  expect(field("Recipient role").value).toBe("Newer role");
+  expect(button("Save contact basis").disabled).toBe(false);
+});
 it("preserves message and inbound edits through sender repair and reloads current approval", async () => {
   await act(async () =>
     root.render(<OutreachWorkspace searchId="search_a" profileRefresh={0} />),
