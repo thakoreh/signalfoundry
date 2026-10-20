@@ -105,7 +105,9 @@ export function CustomerWorkspaceScreen({
         >
           {outreach && searchId ? (
             <OutreachWorkspace
-              key={`${mode}:${workspace?.id}:${searchId}`}
+              // Session boundaries already remount this screen. Initial profile
+              // hydration is not a scope switch and must not destroy drafts.
+              key={`${mode}:${searchId}`}
               searchId={searchId}
               profileRefresh={profileRefresh}
               suspended={editing}

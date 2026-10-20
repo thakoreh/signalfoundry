@@ -1,5 +1,7 @@
 # Source-backed release acceptance map
 
+S2B review round1: independent delayed initial profile-load draft-loss defect reproduced RED, minimal stable same-session outreach identity repair GREEN. Source60/component82/type/lint and fresh Chrome155 delayed message+inbound/profile-return plus desktop1440/390/320/Back controls PASS. Existing true scope-switch guards retained. Independent round2/exact-head CI next; NOT S2/full-RC acceptance. See PROGRESS and s2b-hydration artifacts.
+
 Latest S2B verification: source60/component81/backend150/type/lint PASS; mocked-identity lifecycle matrix and409 explicit-discard/fresh-revision retry covered. Fresh isolated Chrome155 styled1440/390/320 plus actual Back cancel/discard/nested single prompt/clean Forward PASS. Component/API fixtures, not full Next/backend/auth integration. Independent S2B review NEXT; original S2 and entire RC remain incomplete. See newest PROGRESS entry; older overlays/rows below are historical evidence, not current acceptance.
 
 S2B overlay: shared saved Selling as and inline sender repair/back implemented; message/inbound/profile edits retained in memory. Deliberate browser discard policy, not durable crash recovery; no prospect text storage. Slow-save newer-keystroke guard tested. Candidate only; original S2 integrated acceptance, independent review, full legal/contact-source/region gates and whole RC remain incomplete. Historical rows below are baseline, not current completion claims.

@@ -1,5 +1,7 @@
 # S2 sender safety — partial checkpoint
 
+Review-round1 hydration repair: initial seller-profile loading is not a workspace switch and no longer remounts active outreach editors; early message and pasted inbound remain intact. Genuine authenticated user/org/role changes still replace the scoped session. No setup/env/dependency changes. Existing stop/pause off switches apply. A new revert of this frontend fix reintroduces silent early-draft loss; keep editing unavailable until profile loading completes if rolling it back, preferably roll forward. Preserve all saved history and generated files. No crash recovery or Next/backend integration claim.
+
 ### Verified S2B conflict recovery and boundaries
 If another saved revision wins, the failed action keeps local message and pasted reply intact. Review the error, then deliberately choose **Reload saved version (discard edits)** to fetch current server revision and discard these local edits; review/edit/save again before fresh exact approval. Inbound-only edits also get an explicit discard label. Reload does not send or auto-approve. Working-screen Back retains edits instead of discarding. Forced user/org/logout replacement discards prior memory-only scope; mocked identity tests verify isolation, not real Clerk integration. Chrome Back/Forward guard verified in installed isolated Chrome; process crash/mobile suspension/unsupported browser SPA traversal recovery is not promised. No additional setup/env/dependencies. Existing stop/pause off switches and additive-revert/roll-forward rollback apply unchanged.
 
