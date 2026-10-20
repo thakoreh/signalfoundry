@@ -105,6 +105,23 @@ it("explicitly saves recipient publication evidence without losing message or in
   expect(field("Message").value).toBe("Private draft stays");
   expect(field("Paste a received reply").value).toBe("Private inbound stays");
 });
+it("normalizes incomplete contact-basis editor values to the backend contract", async () => {
+  await mount();
+  await change("Publication source URL", "https://example.org/team");
+  await click("Save contact basis");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/contact-basis"));
+  expect(JSON.parse(call![1].body).contact_basis).toMatchObject({
+    source_url: "https://example.org/team",
+    captured_at: "",
+    recipient_timezone: "",
+  });
+});
+it("keeps unsafe contact-basis source URLs as text instead of actionable links", async () => {
+  await mount();
+  await change("Publication source URL", "http://127.0.0.1/contact");
+  expect(container.querySelector('a[href="http://127.0.0.1/contact"]')).toBeNull();
+  expect(container.textContent).toContain("Source URL is not a safe public link");
+});
 it("clears local basis when a refreshed recipient no longer has the saved evidence", async () => {
   thread.contact_basis = {
     version: 1,
@@ -247,7 +264,9 @@ it("restores the saved footer without losing edits and copies only revalidated a
     return original(path, options);
   });
   await mount();
-  expect(field("Message").value).toBe("A reviewed factual message." + footer);
+  expect(field("Message").value).toBe("A reviewed factual message.");
+  expect(button("Save changes").disabled).toBe(true);
+  expect(container.textContent).toContain("required sender footer");
   await change("Message", "Keep my unsaved words.");
   await click("Restore saved sender footer");
   expect(field("Message").value).toBe("Keep my unsaved words." + footer);
@@ -265,6 +284,39 @@ it("restores the saved footer without losing edits and copies only revalidated a
   await click("Copy approved message");
   expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
   expect(container.textContent).toContain("Approval changed");
+});
+
+it("keeps the untouched footer repair explicit and leaves approval fail-closed", async () => {
+  const footer =
+    '\n\n--\nAlex | Fixture Co\n100 Example Street\nContact: alex@example.com\nTo opt out, reply "unsubscribe".';
+  Object.assign(thread, { sender_footer: footer });
+  await mount();
+  expect(field("Message").value).toBe("A reviewed factual message.");
+  expect(container.textContent).toContain(
+    "Restore the required sender footer, then save changes before approval.",
+  );
+  expect(button("Save changes").disabled).toBe(true);
+  expect(button("Approve exact message").disabled).toBe(true);
+  await click("Restore saved sender footer");
+  expect(button("Save changes").disabled).toBe(false);
+});
+
+it("shows a persistent safe next action and scopes pause to this outreach", async () => {
+  await mount();
+  expect(container.textContent).toContain("Next: save your sender details in Edit business before approval.");
+  expect(container.querySelector('a[href="#outreach-actions"]')?.textContent).toContain(
+    "Jump to next safe action",
+  );
+  expect(button("Pause this outreach")).toBeTruthy();
+});
+
+it("keeps unknown email provenance unknown and separates approval from reachability", async () => {
+  await mount();
+  expect(container.textContent).toContain("Email status: published but not verified");
+  expect(container.textContent).toContain("Provenance: Unknown");
+  expect(container.textContent).toContain(
+    "Approval confirms exact content; it does not verify reachability or delivery.",
+  );
 });
 describe("pending Copy intent", () => {
   async function pendingCopy() {
@@ -498,7 +550,7 @@ describe("persisted manual outreach journey", () => {
     expect(api.mock.calls).toHaveLength(1);
     expect(api.mock.calls[0][0]).toBe("/outreach?search_id=search_a");
     expect(container.textContent).toContain("No mailbox is connected");
-    expect(container.textContent).toContain("Unverified email");
+    expect(container.textContent).toContain("Email status: published but not verified");
     await act(async () => root.unmount());
     root = createRoot(container);
     session.mode = "saas";
@@ -576,11 +628,11 @@ describe("persisted manual outreach journey", () => {
     await click("Meetings");
     await click("Review");
     expect(field("Message").value).toBe("Keep this edit.");
-    await click("Pause");
+    await click("Pause this outreach");
     expect(field("Message").value).toBe("Keep this edit.");
     await click("Save changes");
     expect(button("Approve exact message").disabled).toBe(true);
-    await click("Resume");
+    await click("Resume this outreach");
     expect(button("Approve exact message").disabled).toBe(false);
   });
   it("prepares only the explicit selection, reusing its key after uncertain failure", async () => {

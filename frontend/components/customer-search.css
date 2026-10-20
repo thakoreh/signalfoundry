@@ -114,6 +114,17 @@
   line-height: 1.8;
   color: #5d725f;
 }
+.customer-search-notice-detail {
+  font-size: 11px !important;
+  color: #718071 !important;
+}
+.customer-search-notice-footnote {
+  display: block;
+  margin-top: 3px;
+  color: #718071;
+  font-size: 11px;
+  line-height: 1.6;
+}
 .customer-search-text-button {
   background: transparent;
   border: 0;

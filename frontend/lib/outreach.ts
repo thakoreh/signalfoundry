@@ -71,6 +71,11 @@ export type OutreachDraft = Pick<
   OutreachThread,
   "recipient" | "subject" | "body" | "booking_link"
 >;
+export const normalizeContactBasisForApi = (value: ContactBasis) => ({
+  ...value,
+  captured_at: value.captured_at ?? "",
+  recipient_timezone: value.recipient_timezone ?? "",
+});
 export const threadDraft = (thread: OutreachThread): OutreachDraft => ({
   recipient: thread.recipient,
   subject: thread.subject,

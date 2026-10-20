@@ -112,9 +112,40 @@ describe("customer search form handoff", () => {
           "clientrove:customer-search:local-demo:workspace_a:draft",
         )!,
       ),
-    ).toMatchObject({
+  ).toMatchObject({
       target: "B2B SaaS, Developer tools, Agencies",
       limit: 5,
     });
+  });
+
+  it("explains the real local provider gate without inventing an admin or connect flow", async () => {
+    const unavailable = {
+      discovery: {
+        status: "unavailable",
+        detail: "Company research provider is not configured",
+        provider: "none",
+      },
+      contacts: {
+        status: "unavailable",
+        detail: "Email verification provider is not configured",
+        provider: "none",
+      },
+      max_results: 5,
+    };
+    api.mockImplementation(async (path: string) =>
+      path === "/customers/engine" ? unavailable : fixtureWorkspace,
+    );
+    await mount();
+    expect(container.textContent).toContain("Company search: Not connected");
+    expect(container.textContent).toContain("Email verification: Not connected");
+    expect(container.textContent).toContain("Company research is unavailable");
+    expect(container.textContent).toContain("Email verification is optional for research");
+    expect(container.textContent).toContain("local operator");
+    expect(container.textContent).toContain("does not configure or purchase a provider");
+    expect(container.textContent).not.toContain("workspace administrator");
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')!.disabled).toBe(
+      true,
+    );
+    expect(api.mock.calls.some(([path]) => path === "/customers/search")).toBe(false);
   });
 });

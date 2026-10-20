@@ -137,6 +137,38 @@
   overflow-wrap: anywhere;
   margin: 0;
 }
+.outreach-next-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border: 1px solid #cfddc8;
+  border-radius: 10px;
+  background: #f4f8ef;
+}
+.outreach-next-action strong {
+  display: block;
+  color: #2c5127;
+  font-size: 13px;
+}
+.outreach-next-action p {
+  margin-top: 5px;
+  color: #60705a;
+  font-size: 12px;
+  line-height: 1.65;
+}
+.outreach-next-action a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: #41663a;
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  white-space: nowrap;
+}
 .outreach-workspace label {
   display: flex;
   flex-direction: column;
@@ -201,6 +233,28 @@
 .outreach-recipient-status {
   margin-top: -12px;
   margin-bottom: 18px;
+}
+.outreach-recipient-evidence {
+  margin: -8px 0 18px;
+  padding: 10px 12px;
+  border-left: 3px solid #d1dfc7;
+  background: #fafcf8;
+}
+.outreach-recipient-evidence p {
+  margin: 0;
+  color: #6a7965;
+  font-size: 11px !important;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.outreach-recipient-evidence p + p {
+  margin-top: 3px;
+}
+.outreach-footer-repair-note {
+  margin: 16px 0 7px;
+  color: #6b5a32;
+  font-size: 12px !important;
+  line-height: 1.65;
 }
 .outreach-feedback,
 .outreach-blocked {
@@ -286,9 +340,10 @@
     scroll-snap-type: x proximity;
   }
   .outreach-leads .outreach-lead {
-    min-width: min(220px, 75vw);
-    width: auto;
-    flex: 1 0 auto;
+    min-width: 0;
+    width: min(220px, 75vw);
+    max-width: 100%;
+    flex: 0 0 min(220px, 75vw);
     border-right: 1px solid #e0e8d8;
     border-bottom: 0;
     scroll-snap-align: start;
@@ -299,6 +354,13 @@
   }
   .outreach-editor {
     padding: 20px 16px;
+  }
+  .outreach-next-action {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .outreach-next-action a {
+    justify-self: start;
   }
   .outreach-workspace input,
   .outreach-workspace textarea,
@@ -317,8 +379,15 @@
   .outreach-company h2 {
     font-size: 21px;
   }
+  .outreach-company {
+    flex-wrap: wrap;
+  }
+  .outreach-company > div {
+    min-width: 0;
+    flex: 1 1 100%;
+  }
   .outreach-company button {
-    flex-shrink: 0;
+    width: 100%;
   }
   .outreach-feedback {
     padding: 12px 14px;

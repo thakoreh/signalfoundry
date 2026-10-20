@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Profile, WorkspaceData } from "@/lib/types";
 import { PRODUCT_NAME } from "@/lib/product";
 import { Icon } from "./icons";
@@ -48,12 +48,41 @@ export function BusinessOnboarding({
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [billing, setBilling] = useState(false);
+  const [profileDirty, setProfileDirty] = useState(false);
+  const [discardDialog, setDiscardDialog] = useState(false);
+  const cancelDiscardRef = useRef<HTMLButtonElement>(null);
   const { mode, isAdmin } = useWorkspaceSession();
   const canManageBilling = mode === "saas" && isAdmin;
   const busy = loading || analyzing || saving;
   const reviewing = review || readOnly;
   const showDetails = manual || reviewing;
   const waitingForProfile = readOnly && !profile;
+
+  useEffect(() => {
+    if (!discardDialog) return;
+    cancelDiscardRef.current?.focus();
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setDiscardDialog(false);
+    }
+    document.addEventListener("keydown", closeOnEscape);
+    return () => document.removeEventListener("keydown", closeOnEscape);
+  }, [discardDialog]);
+
+  function requestWebsiteChange() {
+    if (profileDirty) {
+      setDiscardDialog(true);
+      return;
+    }
+    setManual(false);
+    changeWebsite();
+  }
+
+  function discardProfileAndChangeWebsite() {
+    setDiscardDialog(false);
+    setProfileDirty(false);
+    setManual(false);
+    changeWebsite();
+  }
 
   return (
     <div className="business-onboarding">
@@ -154,10 +183,7 @@ export function BusinessOnboarding({
                     className="business-onboarding-back"
                     type="button"
                     disabled={busy}
-                    onClick={() => {
-                      setManual(false);
-                      changeWebsite();
-                    }}
+                    onClick={requestWebsiteChange}
                   >
                     <span aria-hidden="true">←</span>{" "}
                     {reviewing ? "Change website" : "Use my website instead"}
@@ -173,6 +199,7 @@ export function BusinessOnboarding({
                     onboarding
                     onContinue={() => router.push("/workspace/customers")}
                     onBusyChange={setSaving}
+                    onDirtyChange={setProfileDirty}
                   />
                   {readOnly && (
                     <button
@@ -185,6 +212,45 @@ export function BusinessOnboarding({
                     </button>
                   )}
                 </div>
+                {discardDialog && (
+                  <div
+                    className="business-onboarding-dialog-backdrop"
+                    role="presentation"
+                  >
+                    <section
+                      className="business-onboarding-dialog"
+                      role="alertdialog"
+                      aria-modal="true"
+                      aria-labelledby="discard-business-title"
+                      aria-describedby="discard-business-description"
+                    >
+                      <h2 id="discard-business-title">
+                        Discard unsaved business changes?
+                      </h2>
+                      <p id="discard-business-description">
+                        Cancel keeps your edits here. Discard changes returns to
+                        the website step without saving this profile.
+                      </p>
+                      <div className="business-onboarding-dialog-actions">
+                        <button
+                          ref={cancelDiscardRef}
+                          type="button"
+                          className="btn secondary"
+                          onClick={() => setDiscardDialog(false)}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          className="btn primary"
+                          onClick={discardProfileAndChangeWebsite}
+                        >
+                          Discard changes
+                        </button>
+                      </div>
+                    </section>
+                  </div>
+                )}
               </>
             ) : (
               <>

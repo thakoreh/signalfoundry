@@ -355,6 +355,75 @@
   margin-bottom: 18px;
   font-size: 12px;
 }
+.business-onboarding-next-step {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 22px;
+  padding: 16px;
+  border: 1px solid #cbdccd;
+  border-radius: 10px;
+  background: #f5f9f3;
+}
+.business-onboarding-next-step strong {
+  display: block;
+  color: #234f40;
+  font-size: 13px;
+}
+.business-onboarding-next-step p {
+  margin-top: 4px;
+  color: #64766a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.business-onboarding-next-step button {
+  min-height: 44px;
+  white-space: nowrap;
+}
+.business-onboarding-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: #193a3240;
+}
+.business-onboarding-dialog {
+  width: min(100%, 430px);
+  padding: 25px;
+  border: 1px solid #d8e3d8;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 18px 50px #193a3230;
+}
+.business-onboarding-dialog h2 {
+  color: #193a32;
+  font-size: 19px;
+  line-height: 1.25;
+}
+.business-onboarding-dialog p {
+  margin-top: 10px;
+  color: #607168;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.business-onboarding-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+.business-onboarding-dialog-actions .btn {
+  min-height: 44px;
+  padding: 10px 14px;
+}
+.business-onboarding-dialog-actions .btn.secondary {
+  border: 1px solid #cbd8cd;
+  background: #fff;
+  color: #345e49;
+}
 /* Brief decorative motion; no layout movement or continuous attention loop. */
 @media (prefers-reduced-motion: no-preference) {
   .business-onboarding-intro {
@@ -403,6 +472,18 @@
   }
   .business-onboarding-details {
     padding: 24px 21px;
+  }
+  .business-onboarding-next-step {
+    grid-template-columns: 1fr;
+  }
+  .business-onboarding-next-step button {
+    width: 100%;
+  }
+  .business-onboarding-dialog-actions {
+    flex-direction: column-reverse;
+  }
+  .business-onboarding-dialog-actions .btn {
+    width: 100%;
   }
   .business-onboarding-header {
     min-height: 76px;

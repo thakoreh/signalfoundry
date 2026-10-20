@@ -40,12 +40,14 @@ export function ProfileEditor({
   onboarding = false,
   onContinue,
   onBusyChange,
+  onDirtyChange,
 }: {
   profile: Profile | null;
   onSaved: (workspace: WorkspaceData) => void;
   onboarding?: boolean;
   onContinue?: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { api, mode: appMode, isAdmin } = useWorkspaceSession();
   const [name, setName] = useState(profile?.company_name || "");
@@ -79,6 +81,7 @@ export function ProfileEditor({
   const changed = () => {
     edits.current++;
     setDirty(true);
+    onDirtyChange?.(true);
     setSaved(false);
   };
   async function save(e: React.FormEvent) {
@@ -108,6 +111,7 @@ export function ProfileEditor({
       if (edits.current === submitted) {
         setSaved(true);
         setDirty(false);
+        onDirtyChange?.(false);
         onContinue?.();
       }
     } catch (e) {
@@ -211,6 +215,22 @@ export function ProfileEditor({
             </span>
           </label>
         </div>
+        {isAdmin && (
+          <div className="business-onboarding-next-step" aria-label="Next step">
+            <div>
+              <strong>Next: find customers</strong>
+              <p>Optional targeting and sender details can be added below.</p>
+            </div>
+            <button
+              className="btn primary"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "Saving business details…" : "Find customers"}
+              <Icon name="arrow" size={16} />
+            </button>
+          </div>
+        )}
         <details className="business-onboarding-targeting">
           <summary>More targeting details</summary>
           <div className="business-onboarding-detail-fields">
@@ -237,30 +257,6 @@ export function ProfileEditor({
           </div>
         </details>
         {senderFields}
-        {isAdmin && (
-          <button
-            className="btn primary business-onboarding-save"
-            disabled={!isAdmin}
-            type="submit"
-          >
-            {busy ? (
-              <>
-                <span className="spinner" />
-                Saving business details…
-              </>
-            ) : saved ? (
-              <>
-                <Icon name="check" size={16} />
-                Business details saved
-              </>
-            ) : (
-              <>
-                {onContinue ? "Find customers" : "Save business details"}
-                <Icon name="arrow" size={16} />
-              </>
-            )}
-          </button>
-        )}
       </form>
     );
   }

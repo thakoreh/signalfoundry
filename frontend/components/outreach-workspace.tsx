@@ -6,6 +6,7 @@ import { errorMessage, jsonBody } from "../lib/api";
 import {
   replyLabels,
   outreachMessageBody,
+  normalizeContactBasisForApi,
   sameOutreachDraft,
   threadDraft,
   type ContactBasis,
@@ -95,22 +96,6 @@ export function OutreachWorkspace({
             ? current
             : data.threads[0]?.id || "",
         );
-        setDrafts((current) => ({
-          ...Object.fromEntries(
-            data.threads
-              .filter(
-                (item) =>
-                  item.body &&
-                  item.sender_footer &&
-                  !item.body.endsWith(item.sender_footer),
-              )
-              .map((item) => [
-                item.id,
-                { ...threadDraft(item), body: item.body + item.sender_footer },
-              ]),
-          ),
-          ...current,
-        }));
       })
       .catch((cause) => {
         if (!controller.signal.aborted) setError(errorMessage(cause));
@@ -145,6 +130,45 @@ export function OutreachWorkspace({
     !thread.suppressed &&
     thread.approval,
   );
+  const footerMissing = Boolean(
+    thread?.sender_footer &&
+      draft?.body.trim() &&
+      !draft.body.endsWith(thread.sender_footer),
+  );
+  const savedRecipientEvidence =
+    thread && draft?.recipient === thread.recipient
+      ? thread.contact_basis
+      : null;
+  const recipientStatus =
+    draft && thread && draft.recipient !== thread.recipient
+      ? "edited recipient · verification not established"
+      : thread?.recipient_status === "verified"
+        ? "provider reports verified"
+        : thread?.recipient_status === "published_unverified"
+          ? "published but not verified"
+          : thread?.recipient_status === "user_entered"
+            ? "user-entered · verification unknown"
+            : "unknown";
+  const nextAction =
+    !thread || !draft
+      ? ""
+      : thread.suppressed
+        ? "This outreach is blocked by an opt-out. Do not contact this recipient."
+        : thread.paused
+          ? "This outreach is paused. Resume this outreach only when appropriate."
+          : dirty
+            ? "Next: save your message edits. Approval stays off until the exact saved version is reviewed."
+            : footerMissing
+              ? "Next: restore the required sender footer, then save changes before approval."
+              : !thread.sender_footer
+                ? "Next: save your sender details in Edit business before approval."
+                : !thread.contact_basis
+                  ? "Next: review and save recipient evidence before approval."
+                  : !thread.approval
+                    ? "Next: approve the exact saved message after review."
+                    : canAct
+                      ? "Next: copy the approved message, then record what you sent externally."
+                      : "Review the current outreach state before taking action.";
   function edit(field: keyof OutreachDraft, value: string) {
     if (!thread || !draft) return;
     cancelCopy();
@@ -482,7 +506,7 @@ export function OutreachWorkspace({
                     void mutate("pause", "PATCH", { paused: !thread.paused })
                   }
                 >
-                  {thread.paused ? "Resume" : "Pause"}
+                  {thread.paused ? "Resume this outreach" : "Pause this outreach"}
                 </button>
               </header>
               {(thread.suppressed || thread.paused) && (
@@ -492,6 +516,13 @@ export function OutreachWorkspace({
                     : "Outreach is paused. Resume only when appropriate."}
                 </p>
               )}
+              <section className="outreach-next-action" aria-label="Current outreach step">
+                <div>
+                  <strong>Current state and next safe action</strong>
+                  <p>{nextAction}</p>
+                </div>
+                <a href="#outreach-actions">Jump to next safe action</a>
+              </section>
               {step === "Meetings" ? (
                 <div className="outreach-meetings">
                   <h3>Track what happened</h3>
@@ -665,14 +696,27 @@ export function OutreachWorkspace({
                       />
                     </label>
                     <p className="outreach-recipient-status">
-                      {draft.recipient === thread.recipient
-                        ? thread.recipient_status === "verified"
-                          ? "Provider verified email"
-                          : thread.recipient_status === "published_unverified"
-                            ? "Unverified email"
-                            : "Email status not verified"
-                        : "Edited recipient · verification not established"}
+                      Email status: {recipientStatus}
                     </p>
+                    <section
+                      className="outreach-recipient-evidence"
+                      aria-label="Recipient email evidence"
+                    >
+                      <p>
+                        <strong>Provenance:</strong>{" "}
+                        {savedRecipientEvidence?.source_url
+                          ? savedRecipientEvidence.source_url
+                          : "Unknown — no saved source evidence."}
+                      </p>
+                      <p>
+                        <strong>Observed:</strong>{" "}
+                        {savedRecipientEvidence?.captured_at || "Unknown"}
+                      </p>
+                      <p>
+                        Approval confirms exact content; it does not verify
+                        reachability or delivery.
+                      </p>
+                    </section>
                     <label>
                       Subject
                       <input
@@ -709,26 +753,34 @@ export function OutreachWorkspace({
                   {basis && <ContactBasisEditor value={basis} disabled={!!busy && busy !== "contact-basis"}
                     dirty={basisDirty} recipientChanged={draft.recipient !== thread.recipient}
                     onChange={(value) => { cancelCopy(); basisGeneration.current++; setBases(current => ({ ...current, [thread.id]: value })); setNotice(""); }}
-                    onSave={() => void mutate("contact-basis", "PUT", { contact_basis: basis })} />}
+                    onSave={() => void mutate("contact-basis", "PUT", { contact_basis: normalizeContactBasisForApi(basis) })} />}
                   {step === "Review" && !thread.messages.length && (
                     <p className="outreach-review-note">
                       The first cold message must not include a booking link.
                     </p>
                   )}
                   {thread.sender_footer ? (
-                    <button
-                      type="button"
-                      disabled={!!busy}
-                      onClick={() => {
-                        if (!draft.body.endsWith(thread.sender_footer!))
-                          edit(
-                            "body",
-                            draft.body.trimEnd() + thread.sender_footer,
-                          );
-                      }}
-                    >
-                      Restore saved sender footer
-                    </button>
+                    <>
+                      {footerMissing && (
+                        <p className="outreach-footer-repair-note" role="status">
+                          Restore the required sender footer, then save changes
+                          before approval.
+                        </p>
+                      )}
+                      <button
+                        type="button"
+                        disabled={!!busy}
+                        onClick={() => {
+                          if (!draft.body.endsWith(thread.sender_footer!))
+                            edit(
+                              "body",
+                              draft.body.trimEnd() + thread.sender_footer,
+                            );
+                        }}
+                      >
+                        Restore saved sender footer
+                      </button>
+                    </>
                   ) : (
                     <p>
                       Before approval,{" "}
@@ -776,13 +828,14 @@ export function OutreachWorkspace({
                         ? "This saved version is approved. Any edit requires a new approval."
                         : "Review the recipient and facts, save your message, then approve the exact content."}
                   </p>
-                  <div className="outreach-action-bar">
+                  <div className="outreach-action-bar" id="outreach-actions">
                     <button
                       className="btn primary"
                       type="button"
                       disabled={
                         !!busy ||
                         dirty ||
+                        footerMissing ||
                         basisDirty ||
                         !draft.recipient.trim() ||
                         !draft.subject.trim() ||

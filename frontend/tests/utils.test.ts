@@ -49,6 +49,12 @@ test("search is case insensitive and sort does not mutate the source", () => {
 });
 test("unsafe source URLs are never linked", () => {
   assert.equal(safeUrl("javascript:alert(1)"), undefined);
+  assert.equal(safeUrl("http://127.0.0.1/contact"), undefined);
+  assert.equal(safeUrl("http://[::1]/contact"), undefined);
+  assert.equal(safeUrl("http://[::ffff:127.0.0.1]/contact"), undefined);
+  assert.equal(safeUrl("http://2130706433/contact"), undefined);
+  assert.equal(safeUrl("http://0x7f000001/contact"), undefined);
+  assert.equal(safeUrl("http://user:pass@example.com/contact"), undefined);
   assert.equal(safeUrl("https://example.com/a"), "https://example.com/a");
 });
 test("missing publication dates remain unknown", () => {

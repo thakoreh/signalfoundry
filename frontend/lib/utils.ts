@@ -36,10 +36,60 @@ export function filterAccounts(
     );
 }
 export function safeUrl(value: string | null | undefined): string | undefined {
-  if (!value) return undefined;
+  if (!value || typeof value !== "string") return undefined;
+  const raw = value.trim();
+  if (
+    raw.length > 2048 ||
+    /[\u0000-\u0020\u007f\\]/.test(raw) ||
+    !raw
+  )
+    return undefined;
   try {
-    const url = new URL(value);
-    return ["https:", "http:"].includes(url.protocol) ? url.href : undefined;
+    const url = new URL(raw);
+    if (
+      !["https:", "http:"].includes(url.protocol) ||
+      url.username ||
+      url.password ||
+      (url.port &&
+        url.port !== (url.protocol === "http:" ? "80" : "443"))
+    )
+      return undefined;
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
+    if (
+      !host ||
+      host.startsWith("[") ||
+      host.endsWith("]") ||
+      host.length > 253 ||
+      !host.includes(".") ||
+      !/^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$/.test(host) ||
+      host.split(".").some((label) =>
+        !label || label.length > 63 || label.startsWith("-") || label.endsWith("-"),
+      ) ||
+      /^\d+$/.test(host.split(".").at(-1) || "")
+    )
+      return undefined;
+    const ipv4 = host.split(".");
+    if (
+      ipv4.length === 4 &&
+      ipv4.every((label) => /^\d+$/.test(label) && Number(label) <= 255)
+    )
+      return undefined;
+    const blocked = [
+      "localhost",
+      "local",
+      "internal",
+      "test",
+      "invalid",
+      "example",
+      "onion",
+      "home",
+      "lan",
+    ];
+    if (blocked.some((suffix) => host === suffix || host.endsWith(`.${suffix}`)))
+      return undefined;
+    url.hostname = host;
+    url.hash = "";
+    return url.href;
   } catch {
     return undefined;
   }
