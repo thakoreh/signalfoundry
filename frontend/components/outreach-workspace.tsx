@@ -27,6 +27,11 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [changedSent, setChangedSent] = useState<{
+    id: string;
+    subject: string;
+    body: string;
+  } | null>(null);
   const [reload, setReload] = useState(0);
   const [terminalFailures, setTerminalFailures] = useState<
     Record<string, boolean>
@@ -130,6 +135,7 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
         });
       if (action === "replies")
         setIncoming((current) => ({ ...current, [thread.id]: "" }));
+      if (action === "sent") setChangedSent(null);
       setNotice(
         action === "sent"
           ? "Recorded as sent externally. Clientrove did not send this message."
@@ -440,6 +446,15 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
                               : "Sent externally · recorded by you"}
                           </strong>
                           <p>{message.body}</p>
+                          {message.sent_as === "with_changes" && (
+                            <details>
+                              <summary>
+                                Sent with changes · original approval
+                              </summary>
+                              <p>{message.approved_subject}</p>
+                              <p>{message.approved_body}</p>
+                            </details>
+                          )}
                         </div>
                       ))}
                       <label>
@@ -637,7 +652,84 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
                     >
                       Record sent externally
                     </button>
+                    <button
+                      type="button"
+                      disabled={!!busy || !canAct}
+                      onClick={() =>
+                        setChangedSent({
+                          id: thread.id,
+                          subject: thread.subject,
+                          body: outreachMessageBody(draft),
+                        })
+                      }
+                    >
+                      Sent with changes
+                    </button>
                   </div>
+                  {changedSent?.id === thread.id && (
+                    <section
+                      className="outreach-draft-fields"
+                      aria-label="Record actual sent message"
+                    >
+                      <p>
+                        Reported by you, not sent by Clientrove. Include the
+                        complete text that actually went out. The original
+                        approved text stays separate.
+                      </p>
+                      <label>
+                        Actual subject sent
+                        <input
+                          maxLength={160}
+                          value={changedSent.subject}
+                          onChange={(e) =>
+                            setChangedSent({
+                              ...changedSent,
+                              subject: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        Actual message sent
+                        <textarea
+                          rows={6}
+                          maxLength={10000}
+                          value={changedSent.body}
+                          onChange={(e) =>
+                            setChangedSent({
+                              ...changedSent,
+                              body: e.target.value,
+                            })
+                          }
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        disabled={
+                          !!busy ||
+                          !canAct ||
+                          !changedSent.subject.trim() ||
+                          !changedSent.body.trim()
+                        }
+                        onClick={() =>
+                          void mutate("sent", "POST", {
+                            sent_as: "with_changes",
+                            actual_subject: changedSent.subject,
+                            actual_body: changedSent.body,
+                          })
+                        }
+                      >
+                        Record changed message
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!!busy}
+                        onClick={() => setChangedSent(null)}
+                      >
+                        Not yet
+                      </button>
+                    </section>
+                  )}
                   {!replyPermitsAction && !thread.suppressed && (
                     <p className="outreach-review-note">
                       This reply needs review or does not invite further

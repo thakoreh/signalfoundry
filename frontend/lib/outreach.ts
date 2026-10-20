@@ -13,6 +13,9 @@ export type OutreachMessage = {
   subject: string;
   body: string;
   source: "user_reported";
+  sent_as?: "approved" | "with_changes" | null;
+  approved_subject?: string | null;
+  approved_body?: string | null;
   reply_state: ReplyState | null;
   created_at: string;
 };

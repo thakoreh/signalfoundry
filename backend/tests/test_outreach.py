@@ -53,6 +53,25 @@ class OutreachTest(unittest.TestCase):
             thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
         return self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
 
+    def test_sent_with_changes_preserves_approved_and_actual_snapshots(self):
+        thread = self.ready()
+        approved_body = thread.body
+        approved_hash = thread.approval.content_hash
+        with TestClient(create_app(self.path, testing=True)) as client:
+            response = client.post(f'/api/outreach/{thread.id}/sent', json={
+                **self.fields(thread), 'sent_as': 'with_changes', 'actual_subject': 'Actually sent subject',
+                'actual_body': 'Actually sent text'})
+        self.assertEqual(response.status_code, 200, response.text)
+        thread = self.repo.outreach_thread(thread.id)
+        message = thread.messages[-1]
+        self.assertEqual(message.body, 'Actually sent text')
+        self.assertEqual(message.subject, 'Actually sent subject')
+        self.assertEqual(message.approved_body, approved_body)
+        self.assertEqual(message.approved_content_hash, approved_hash)
+        self.assertEqual(message.sent_as, 'with_changes')
+        self.assertIsNone(thread.approval)
+        self.assertEqual(Repository(self.path).outreach_thread(thread.id).messages[-1], message)
+
     def test_create_reopens_same_eligible_customers_and_survives_repository_restart(self):
         first = self.start()
         self.assertEqual(first.id, self.start().id)

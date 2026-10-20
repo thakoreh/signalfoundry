@@ -79,6 +79,20 @@ async function change(label: string, value: string) {
     );
   });
 }
+it("records actual text separately when manually sent with changes", async () => {
+  await mount();
+  await click("Approve exact message");
+  await click("Sent with changes");
+  await change("Actual subject sent", "My actual subject");
+  await change("Actual message sent", "My actual message");
+  await click("Record changed message");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/sent"));
+  expect(JSON.parse(call![1].body)).toMatchObject({
+    sent_as: "with_changes",
+    actual_subject: "My actual subject",
+    actual_body: "My actual message",
+  });
+});
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }

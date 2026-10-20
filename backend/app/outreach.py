@@ -89,6 +89,12 @@ class EditDraft(RevisionRequest):
         return value
 
 
+class SentRequest(RevisionRequest):
+    sent_as: Literal['approved', 'with_changes'] = 'approved'
+    actual_subject: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)] = ''
+    actual_body: Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)] = ''
+
+
 class PasteReply(RevisionRequest):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=6000)]
     reply_state: ReplyState = 'awaiting_review'
@@ -121,6 +127,9 @@ class ConversationMessage(StrictModel):
     body: str
     booking_link: str = ''
     approved_content_hash: str | None = None
+    approved_subject: str | None = None
+    approved_body: str | None = None
+    sent_as: Literal['approved', 'with_changes'] | None = None
     source: Literal['user_reported'] = 'user_reported'
     reply_state: ReplyState | None
     created_at: str
@@ -322,8 +331,17 @@ class OutreachStore:
                     raise OutreachError('Approve this exact saved message before recording it as sent outside Clientrove.')
                 if len(thread.messages) >= 50:
                     raise OutreachError('This local conversation has reached its 50-message allowance', 429)
+                sent_as = getattr(body, 'sent_as', 'approved')
+                approved_body = thread.body + ('\n\nBooking link: ' + thread.booking_link if thread.booking_link else '')
+                subject, text = thread.subject, approved_body
+                if sent_as == 'with_changes':
+                    subject, text = body.actual_subject, body.actual_body
+                    if not subject or not text or '\n' in subject or '\r' in subject:
+                        raise OutreachError('Enter the actual subject and message sent outside Clientrove.')
+                elif getattr(body, 'actual_subject', '') or getattr(body, 'actual_body', ''):
+                    raise OutreachError('Choose sent with changes to record different text.')
                 thread.messages.append(ConversationMessage(id=new_id('msg'), direction='outbound', recipient=thread.recipient,
-                    subject=thread.subject, body=thread.body + ('\n\nBooking link: ' + thread.booking_link if thread.booking_link else ''),
+                    subject=subject, body=text, approved_subject=thread.subject, approved_body=approved_body, sent_as=sent_as,
                     booking_link=thread.booking_link, approved_content_hash=thread.approval.content_hash, reply_state=None, created_at=now()))
                 thread.body, thread.approval = '', None
             elif operation == 'reply':
@@ -402,7 +420,7 @@ def outreach_router(repository, *, blocked_preview=False):
         return call(service().mutate_outreach, thread_id, 'approve', body)
 
     @router.post('/{thread_id}/sent', response_model=OutreachThread)
-    def sent(thread_id: str, body: RevisionRequest):
+    def sent(thread_id: str, body: SentRequest):
         return call(service().mutate_outreach, thread_id, 'sent', body)
 
     @router.post('/{thread_id}/replies', response_model=OutreachThread)
