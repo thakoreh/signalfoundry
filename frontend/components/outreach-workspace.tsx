@@ -13,10 +13,19 @@ import {
 } from "../lib/outreach";
 import { isCustomerMessageDraft } from "./customer-result-view";
 import { useWorkspaceSession } from "./workspace-session";
+import { useUnsavedChanges } from "./use-unsaved-changes";
 import "./outreach-workspace.css";
 
 type Step = "Review" | "Conversations" | "Meetings";
-export function OutreachWorkspace({ searchId }: { searchId: string }) {
+export function OutreachWorkspace({
+  searchId,
+  profileRefresh = 0,
+  suspended = false,
+}: {
+  searchId: string;
+  profileRefresh?: number;
+  suspended?: boolean;
+}) {
   const { api, mode } = useWorkspaceSession();
   const [threads, setThreads] = useState<OutreachThread[]>([]);
   const [active, setActive] = useState("");
@@ -50,11 +59,11 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
   // Capture the original request signal; a replacement scope cannot revive it.
   useLayoutEffect(() => {
     return () => cancelCopy();
-  }, [api, mode, searchId, active, step, reload]);
+  }, [api, mode, searchId, active, step, reload, profileRefresh, suspended]);
   useEffect(() => {
     const controller = new AbortController();
     scope.current = controller;
-    if (mode !== "local-demo") {
+    if (mode !== "local-demo" || suspended) {
       return () => controller.abort();
     }
     api<{ threads: OutreachThread[] }>(
@@ -69,8 +78,8 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
             ? current
             : data.threads[0]?.id || "",
         );
-        setDrafts(
-          Object.fromEntries(
+        setDrafts((current) => ({
+          ...Object.fromEntries(
             data.threads
               .filter(
                 (item) =>
@@ -83,7 +92,8 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
                 { ...threadDraft(item), body: item.body + item.sender_footer },
               ]),
           ),
-        );
+          ...current,
+        }));
       })
       .catch((cause) => {
         if (!controller.signal.aborted) setError(errorMessage(cause));
@@ -92,11 +102,16 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [api, mode, searchId, reload]);
+  }, [api, mode, searchId, reload, profileRefresh, suspended]);
   const thread = threads.find((item) => item.id === active);
   const draft = thread ? drafts[thread.id] || threadDraft(thread) : null;
   const dirty = Boolean(
     thread && draft && !sameOutreachDraft(draft, threadDraft(thread)),
+  );
+  useUnsavedChanges(
+    Object.keys(drafts).length > 0 ||
+      Object.values(incoming).some(Boolean) ||
+      !!changedSent,
   );
   const replyPermitsAction =
     !thread?.messages.some((message) => message.direction === "inbound") ||
@@ -352,6 +367,8 @@ export function OutreachWorkspace({ searchId }: { searchId: string }) {
             type="button"
             disabled={!!busy}
             onClick={() => {
+              setDrafts({});
+              setIncoming({});
               setLoading(true);
               setError("");
               setReload((value) => value + 1);

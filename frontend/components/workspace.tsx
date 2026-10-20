@@ -64,7 +64,8 @@ export default function Workspace({
           draft && "website" in draft ? draft.website : current?.website || "",
         );
         setInitialManual(Boolean(draft && "manual" in draft));
-        setReview(!setup && !draft && Boolean(current?.profile));
+        // Opening Edit business must show the saved profile, never restart analysis.
+        setReview(Boolean(current?.profile));
       } catch (cause) {
         if (!scope.signal.aborted) setError(errorMessage(cause));
       } finally {

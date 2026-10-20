@@ -79,6 +79,23 @@ async function change(label: string, value: string) {
     );
   });
 }
+it("preserves message and inbound edits through sender repair and reloads current approval", async () => {
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" profileRefresh={0} />),
+  );
+  await change("Message", "Keep my private unsaved words");
+  await click("Conversations");
+  await change("Paste a received reply", "Keep my pasted reply");
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" profileRefresh={1} />),
+  );
+  expect(
+    api.mock.calls.filter(([path]) => path.startsWith("/outreach?")).length,
+  ).toBe(2);
+  expect(field("Message").value).toBe("Keep my private unsaved words");
+  expect(field("Paste a received reply").value).toBe("Keep my pasted reply");
+  expect(button("Copy approved message").disabled).toBe(true);
+});
 it("records actual text separately when manually sent with changes", async () => {
   await mount();
   await click("Approve exact message");

@@ -1,5 +1,12 @@
 # Release candidate progress — S1 / S2
 
+## S2B bounded seller-return candidate — not S2 acceptance
+
+Saved Selling as across working views; inline existing profile editor retains message/inbound/profile text. Memory-only drafts with deliberate navigation/close discard guard, no prospect text stored globally or restored across users/workspaces. Slow profile save retains newer input and does not navigate/claim it saved. Existing server approval invalidation/history and S2A Copy preflight remain authoritative. No new dependencies/backend/Convex/providers.
+
+RED logs: s2b-seller-red (missing seller), s2b-return-red (no profile-refresh GET), s2b-profile-red (input disabled during slow save). GREEN component72/source60/typecheck/lint and backend1508.085s. Browser harness initial React resolve-directory error fixed; exact-label locator then timed out, corrected to existing composer selector. Browser component fixtures are NOT Next/backend integration. No full S2/RC/legal acceptance. See pilot S2B_HANDOFF.md for final exact commit/check/evidence and remaining limits. Generated next-env drift/owner processes preserved; contact-source/CASL/no-solicitation/role/region remains NEXT REQUIRED P0.
+
+
 ## S2A — bounded pending Copy race repair (author evidence; independent review next)
 
 Copy now captures immutable saved draft/revision/approval identity/footer and its original request scope. A synchronous single-attempt guard coalesces concurrent clicks. Editor changes (including edit/revert), mutations/generation, committed thread/stage/search/session changes and unmount invalidate the generation and abort the attempt. Even a transport ignoring abort cannot copy obsolete bytes or update editor state; old completion cannot release a newer attempt. Readiness must be exactly true with matching thread/search/revision/approval identity/footer/content, not just a matching hash. Preflight errors fail closed with an explicit Copy retry; no unvalidated manual-copy workaround. No implicit sent event, provider calls or mailto implementation.

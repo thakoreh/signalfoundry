@@ -1,5 +1,14 @@
 # S2 sender safety — partial checkpoint
 
+## S2B seller repair / off switch / rollback
+
+Saved Selling as is shared by setup/search/results/outreach. Edit business on working screens opens the existing profile editor inline; Back to saved work keeps message, pasted reply, targeting and profile edits mounted. Saving identity re-reads current outreach readiness; unsaved words are retained for deliberate review/save, never approved automatically. Opening setup with an existing profile opens it instead of rerunning website analysis. No new service, dependency, environment variable, paid call or hosted outreach capability.
+
+Draft policy: memory-only per mounted session/workspace/search/thread. Prospect text is NEVER persisted to an unscoped browser key. Leaving via links asks explicit discard; closing/reloading uses the browser's native unsaved-changes prompt (requires browser user interaction; crash/process-kill recovery is NOT provided). No previous-user/workspace draft restoration. Working-screen profile Back is non-destructive, not discard. Slow profile saves retain newer keystrokes and do not navigate/claim them saved; stale/unmounted responses do not notify the replacement session. Existing server revisions/approval invalidation/history remain authoritative.
+
+Off switch: leave edits unsaved, pause thread or stop isolated server. Rollback with a new revert commit only, preserve history/data. Reverting inline repair removes safe return, so avoid navigating away with unsaved work until a forward fix. Full S2 integration, legal/contact-source/region gates and original acceptance remain pending.
+
+
 ### S2A pending Copy safety
 
 No new setup/env/dependencies. Copy preflights current saved readiness for one immutable user intent. You can keep editing while it checks: any edit cancels that attempt, even if you restore the old text. Switching thread/view/search/session or leaving the screen also cancels it. Concurrent clicks share one pending attempt. A later explicit click starts a fresh check. Copy never saves edits or records sending; it copies only exact approved saved bytes with the current server footer/readiness, not unsaved text.

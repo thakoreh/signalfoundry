@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useUnsavedChanges } from "./use-unsaved-changes";
 import type { Profile, WorkspaceData } from "@/lib/types";
 import { jsonBody, errorMessage } from "@/lib/api";
 import { tokens } from "@/lib/utils";
@@ -62,8 +63,29 @@ export function ProfileEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const edits = useRef(0);
+  const alive = useRef(false);
+  const epoch = useRef(0);
+  useLayoutEffect(() => {
+    alive.current = true;
+    const generation = ++epoch.current;
+    return () => {
+      alive.current = false;
+      epoch.current = generation + 1;
+    };
+  }, [api]);
+  useUnsavedChanges(dirty);
+  const changed = () => {
+    edits.current++;
+    setDirty(true);
+    setSaved(false);
+  };
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    const submitted = edits.current;
+    const sessionEpoch = epoch.current;
     setBusy(true);
     onBusyChange?.(true);
     setError("");
@@ -81,14 +103,21 @@ export function ProfileEditor({
         method: "PUT",
         body: jsonBody(payload),
       });
+      if (!alive.current || epoch.current !== sessionEpoch) return;
       onSaved(result);
-      setSaved(true);
-      onContinue?.();
+      if (edits.current === submitted) {
+        setSaved(true);
+        setDirty(false);
+        onContinue?.();
+      }
     } catch (e) {
-      setError(errorMessage(e));
+      if (alive.current && epoch.current === sessionEpoch)
+        setError(errorMessage(e));
     } finally {
-      setBusy(false);
-      onBusyChange?.(false);
+      if (alive.current && epoch.current === sessionEpoch) {
+        setBusy(false);
+        onBusyChange?.(false);
+      }
     }
   }
   const senderFields =
@@ -110,7 +139,7 @@ export function ProfileEditor({
           <label key={key}>
             {label}
             <input
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               maxLength={maxLength}
               value={sender[key]}
               onChange={(event) => {
@@ -128,7 +157,7 @@ export function ProfileEditor({
     ) : null;
   if (onboarding) {
     return (
-      <form onSubmit={save} className="profile-form">
+      <form onSubmit={save} onChangeCapture={changed} className="profile-form">
         {error && (
           <div role="alert" className="notice error">
             <Icon name="info" />
@@ -140,7 +169,7 @@ export function ProfileEditor({
             Business name
             <input
               required
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               maxLength={200}
               value={name}
               onChange={(e) => {
@@ -154,7 +183,7 @@ export function ProfileEditor({
             What does your business do?
             <textarea
               required
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -168,7 +197,7 @@ export function ProfileEditor({
           <label>
             Your ideal customers
             <textarea
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={values.industries}
               onChange={(e) => {
                 setValues({ ...values, industries: e.target.value });
@@ -189,7 +218,7 @@ export function ProfileEditor({
               <label key={key}>
                 {label}
                 <textarea
-                  disabled={busy || !isAdmin}
+                  disabled={!isAdmin}
                   value={values[key]}
                   onChange={(e) => {
                     setValues({ ...values, [key]: e.target.value });
@@ -211,7 +240,7 @@ export function ProfileEditor({
         {isAdmin && (
           <button
             className="btn primary business-onboarding-save"
-            disabled={busy || !isAdmin}
+            disabled={!isAdmin}
             type="submit"
           >
             {busy ? (
@@ -236,7 +265,7 @@ export function ProfileEditor({
     );
   }
   return (
-    <form onSubmit={save} className="profile-form">
+    <form onSubmit={save} onChangeCapture={changed} className="profile-form">
       <div className="section-heading">
         <div>
           {!onboarding && <span className="eyebrow">YOUR NORTH STAR</span>}
@@ -279,7 +308,7 @@ export function ProfileEditor({
           Your company name
           <input
             required
-            disabled={busy || !isAdmin}
+            disabled={!isAdmin}
             maxLength={200}
             value={name}
             onChange={(e) => {
@@ -293,7 +322,7 @@ export function ProfileEditor({
           What do you help customers do?
           <textarea
             required
-            disabled={busy || !isAdmin}
+            disabled={!isAdmin}
             value={description}
             onChange={(e) => {
               setDescription(e.target.value);
@@ -308,7 +337,7 @@ export function ProfileEditor({
           <label key={key}>
             {label}
             <textarea
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={values[key]}
               onChange={(e) => {
                 setValues({ ...values, [key]: e.target.value });
@@ -342,11 +371,7 @@ export function ProfileEditor({
           <Icon name="shield" size={16} /> Your profile guides scoring across
           new campaigns
         </p>
-        <button
-          className="btn primary"
-          disabled={busy || !isAdmin}
-          type="submit"
-        >
+        <button className="btn primary" disabled={!isAdmin} type="submit">
           {busy ? (
             <>
               <span className="spinner" />

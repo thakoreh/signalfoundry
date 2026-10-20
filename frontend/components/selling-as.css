@@ -1,0 +1,29 @@
+.selling-as {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px 16px;
+  margin: 0 0 20px;
+  border: 1px solid #d9e1d9;
+  border-radius: 12px;
+  background: #fff;
+  color: #183c2d;
+  overflow-wrap: anywhere;
+}
+.selling-as small {
+  display: block;
+  margin-top: 4px;
+}
+.selling-as button {
+  min-height: 44px;
+  white-space: normal;
+}
+.business-onboarding [hidden] {
+  display: none !important;
+}
+.business-onboarding-details > .btn {
+  min-height: 44px;
+  margin-bottom: 16px;
+}

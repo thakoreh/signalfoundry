@@ -7,6 +7,7 @@ import type { Profile, WorkspaceData } from "@/lib/types";
 import { PRODUCT_NAME } from "@/lib/product";
 import { Icon } from "./icons";
 import { ProfileEditor } from "./profile-editor";
+import { SellingAs } from "./selling-as";
 import { SignalBrand } from "./signal-brand";
 import { BillingPanel } from "./billing-panel";
 import { useWorkspaceSession } from "./workspace-session";
@@ -88,6 +89,7 @@ export function BusinessOnboarding({
         id="business-setup"
         className={`business-onboarding-main${billing ? " business-onboarding-main--customers" : ""}`}
       >
+        {profile && <SellingAs profile={profile} />}
         {billing ? (
           <>
             <button
