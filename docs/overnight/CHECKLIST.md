@@ -1,5 +1,10 @@
 # Source-backed release acceptance map
 
+## Current S2 integrated overlay (supersedes older pending seam notes)
+- Built + locally integrated tested: additive saved sender name/company/address/contact, legacy profile safe opening and omitted-field preservation; saved Selling as/inline repair/Back; deterministic exact footer admission/tamper denial; sender-change stale approval invalidation; immutable sent history; validated exact Copy bytes with no send event. S1/S2A/S2B prerequisite reviews accepted; S2 independent review NEXT, not accepted.
+- Real Next/FastAPI/fresh SQLite installed Chrome155 FULL flow1440/390/320 PASS, actual viewport logged (s2-final-width-*); old screenshot-loop partial coverage superseded. Source60/component82/backend152/typecheck/lint PASS. See PROGRESS and pilot S2_REVIEW_HANDOFF.md for exact-head CI, evidence and limitations.
+- NEXT REQUIRED P0: recipient publication/source/no-solicitation/CASL basis, role relevance and region admission remain UNMET. Sender footer is not compliance. Full RC/whole journey/cost/hosted/transport remain incomplete. Mailto absent; Copy path verified; no live sending permission. Historical baseline rows below are not current source claims.
+
 S2B review round1: independent delayed initial profile-load draft-loss defect reproduced RED, minimal stable same-session outreach identity repair GREEN. Source60/component82/type/lint and fresh Chrome155 delayed message+inbound/profile-return plus desktop1440/390/320/Back controls PASS. Existing true scope-switch guards retained. Independent round2/exact-head CI next; NOT S2/full-RC acceptance. See PROGRESS and s2b-hydration artifacts.
 
 Latest S2B verification: source60/component81/backend150/type/lint PASS; mocked-identity lifecycle matrix and409 explicit-discard/fresh-revision retry covered. Fresh isolated Chrome155 styled1440/390/320 plus actual Back cancel/discard/nested single prompt/clean Forward PASS. Component/API fixtures, not full Next/backend/auth integration. Independent S2B review NEXT; original S2 and entire RC remain incomplete. See newest PROGRESS entry; older overlays/rows below are historical evidence, not current acceptance.
