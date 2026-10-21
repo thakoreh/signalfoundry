@@ -319,6 +319,16 @@ def domain_target(domain):
     return 'domain:' + host.rstrip('.').lower().removeprefix('www.')
 
 
+def invalidate_bounced_address(thread, address):
+    address = address.lower()
+    if address and address not in thread.invalid_recipient_emails:
+        if len(thread.invalid_recipient_emails) >= 10:
+            raise OutreachError('This conversation has reached its invalid-address allowance.', 429)
+        thread.invalid_recipient_emails.append(address)
+    if thread.recipient.lower() == address:
+        thread.recipient_status = 'invalid'
+
+
 def request_hash(operation, body):
     return hashlib.sha256(json.dumps([operation, body.model_dump()], sort_keys=True).encode()).hexdigest()
 
@@ -370,12 +380,14 @@ class OutreachStore:
             candidate = OutreachThread.model_validate_json(row['data'])
             if candidate.id == thread.id or domain_target(candidate.domain) != domain_target(thread.domain):
                 continue
-            if candidate.paused or candidate.suppressed or candidate.cold_followups_stopped:
+            # Cancelled followups are a historical fact, not permission for
+            # multiple resumed cold threads to escape company ownership.
+            if candidate.paused or candidate.suppressed:
                 continue
             if any(message.direction == 'inbound' for message in candidate.messages):
                 continue
             candidates.append((candidate.created_at, candidate.id))
-        if not thread.paused and not thread.suppressed and not thread.cold_followups_stopped \
+        if not thread.paused and not thread.suppressed \
                 and not any(message.direction == 'inbound' for message in thread.messages):
             candidates.append((thread.created_at, thread.id))
         return min(candidates)[1] if candidates else None
@@ -611,10 +623,7 @@ class OutreachStore:
                 state = 'opt_out' if opt_out else ('source_question' if source_question(body.body) else body.reply_state)
                 state = dated_reply_state(state, body)
                 if state == 'bounce':
-                    address = thread.recipient.lower()
-                    if address and address not in thread.invalid_recipient_emails:
-                        thread.invalid_recipient_emails.append(address)
-                    thread.recipient_status = 'invalid'
+                    invalidate_bounced_address(thread, thread.recipient)
                 if state in ('not_now', 'auto_reply'):
                     thread.revisit_at, thread.revisit_timezone = body.revisit_at, body.revisit_timezone
                 else:
@@ -632,6 +641,8 @@ class OutreachStore:
                     raise OutreachError('Paste a reply before reviewing its classification.')
                 state = 'source_question' if source_question(latest.body) else body.reply_state
                 state = dated_reply_state(state, body)
+                if state == 'bounce':
+                    invalidate_bounced_address(thread, latest.recipient)
                 latest.reply_state, thread.reply_state, thread.approval = state, state, None
                 thread.cold_followups_stopped = True
                 if state in ('not_now', 'auto_reply'):

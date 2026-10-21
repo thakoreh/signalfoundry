@@ -2,6 +2,10 @@
 
 ## Continuation run — Windows baseline and policy adjudication
 
+### Safety regression checkpoint
+
+Read-only independent baseline adjudication: 7 control groups PASS, 2 distinct defects FAIL. The original single explicit resume/new approval is permitted; no permanent lock added. Added three permanent regressions and observed RED (2 actionable owners, missing bounce invalidity, missing original bounced recipient after draft edit). Fixed ownership independently of cancelled-followup status and unified bounced-address invalidation. Outreach suite now 34 PASS (3.668s); independent fixed-head recheck pending. See docs/continuation/COMPANY_RESUME_ADJUDICATION.md; original raw review remains intact.
+
 Fetched origin and inspected branch, PR7 and worktrees before edits. Remote handoff is 0c1418d; origin/main remains cfd22af. Original owner checkout stays on main with its generated next-env.d.ts edit preserved. New isolated continuation worktree tracks the existing release-candidate branch; read-only policy reviewer uses a detached immutable worktree. No owner .env, databases, browser profiles, ports or services copied/reused.
 
 Baseline outreach tests exposed missing IANA data on Windows (TZPATH empty, tzdata absent): 1 failure + 1 error in valid Toronto-date cases. Pinned first-party tzdata 2026.5 in requirements and lockfile, Apache-2.0, maintained by Python/CPython contributors. [Python recommends this fallback for Windows](https://docs.python.org/3.14/library/zoneinfo.html#data-sources); [release/license/provenance](https://pypi.org/project/tzdata/2026.5/). Installed lockfile into a new isolated .venv, not the owner's environment. Full backend now 167 PASS (14.091s). Focused outreach/Next-up component baseline 45 PASS. No date acceptance tests weakened.

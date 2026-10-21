@@ -505,6 +505,62 @@ class OutreachTest(unittest.TestCase):
             self.assertEqual(client.get(f"/api/outreach/{thread['id']}").status_code, 403)
             self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': 'public_start_123'}).status_code, 403)
 
+    def sibling(self, label):
+        search, _ = self.repo.create_customer_search(self.key(), 'Property management')
+        account = qualify_customer(DEMO_PROFILE, Page('https://business.com/' + label,
+            label + ' Property Management', 'Property management services.', 'Property management services for businesses.'),
+            target='property management', geography='', search_id=search.id)
+        search.status, search.accounts = 'complete', [account]
+        self.repo.save_customer_search(search)
+        thread = self.repo.start_outreach(StartOutreach(search_id=search.id, account_ids=[account.id], idempotency_key=self.key()))['threads'][0]
+        thread = self.edit(thread, recipient=label + '@business.com', subject='A specific introduction', body='Could we discuss operations?' + thread.sender_footer)
+        return self.basis(thread)
+
+    def test_explicit_company_choice_requires_new_approval_and_keeps_one_resumed_cold_owner(self):
+        owner = self.ready()
+        siblings = [self.sibling('second'), self.sibling('third')]
+        owner = self.repo.mutate_outreach(owner.id, 'reply', PasteReply(**self.fields(owner), body='Interested, please explain.', reply_state='interested'))
+        resumed = []
+        for sibling in siblings:
+            sibling = self.repo.outreach_thread(sibling.id)
+            self.assertTrue(sibling.paused)
+            sibling = self.repo.mutate_outreach(sibling.id, 'pause', PauseRequest(**self.fields(sibling), paused=False))
+            self.assertIsNone(sibling.approval)
+            self.assertFalse(sibling.ready_for_manual_action)
+            self.assertTrue(sibling.cold_followups_stopped)
+            resumed.append((sibling, RevisionRequest(**self.fields(sibling))))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(lambda item: self.repo.mutate_outreach(item[0].id, 'approve', item[1]), resumed))
+        views = [self.repo.outreach_thread(sibling.id) for sibling in siblings]
+        self.assertEqual(sum(thread.ready_for_manual_action for thread in views), 1)
+        self.assertEqual(sum(bool(thread.approval) for thread in views), 1)
+        self.assertEqual(len(self.repo.outreach_thread(owner.id).messages), 1)
+
+    def test_deferred_bounce_classification_invalidates_address_after_correction_resume_and_replay(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Delivery failed permanently.', reply_state='awaiting_review'))
+        bounce = CorrectReply(**self.fields(thread), reply_state='bounce')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', bounce)
+        self.assertEqual(thread.recipient_status, 'invalid')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+        thread = self.repo.mutate_outreach(thread.id, 'pause', PauseRequest(**self.fields(thread), paused=False))
+        thread = self.edit(thread, body='A manual answer' + thread.sender_footer)
+        replay = self.repo.mutate_outreach(thread.id, 'reply-state', bounce)
+        self.assertEqual(replay.recipient_status, 'invalid')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_deferred_bounce_keeps_actual_inbound_recipient_when_draft_address_changed(self):
+        thread = self.ready()
+        original = thread.recipient
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Delivery failed.', reply_state='awaiting_review'))
+        thread = self.edit(thread, recipient='new@business.com')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='bounce'))
+        self.assertIn(original, thread.invalid_recipient_emails)
+        self.assertNotIn('new@business.com', thread.invalid_recipient_emails)
+        thread = self.edit(thread, recipient=original)
+        self.assertEqual(thread.recipient_status, 'invalid')
+
 
 if __name__ == '__main__':
     unittest.main()
