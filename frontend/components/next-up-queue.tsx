@@ -13,6 +13,8 @@ const actionLabels: Record<NextUpItem["action"], string> = {
   report_meeting: "Report what happened after the meeting",
   manual_send: "Copy and record the approved message",
   review_followup: "Check for a reply and review the due reminder",
+  review_message: "Review the saved message for approval",
+  plan_followup: "Choose a review date for your saved reminder",
 };
 
 export function NextUpQueue() {

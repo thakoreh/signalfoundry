@@ -9,7 +9,7 @@ def project_insights(threads, excluded_ids, canonical, current):
     for thread in threads:
         company = companies.setdefault(canonical(thread.domain), [])
         company.append(thread)
-        if thread.body and not thread.approval and not thread.paused and not thread.suppressed:
+        if thread.body and not thread.approval and not thread.paused and not thread.suppressed and not thread.manual_action_block and not thread.company_conflict:
             approvals += 1
         dates = []
         if thread.next_followup_at and not thread.paused and not thread.suppressed:

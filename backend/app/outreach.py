@@ -300,6 +300,13 @@ class ConversationMessage(StrictModel):
     contact_basis_snapshot: ContactBasis | None = None
 
 
+class SourceFact(StrictModel):
+    id: str
+    excerpt: str
+    url: str
+    retrieved_at: str
+
+
 class OutreachThread(StrictModel):
     id: str
     search_id: str
@@ -312,6 +319,7 @@ class OutreachThread(StrictModel):
     referrer_message_id: str | None = None
     referrer_name: str = ''
     referral_completed_message_ids: list[str] = Field(default_factory=list, max_length=50)
+    source_facts: list[SourceFact] = Field(default_factory=list, max_length=5)
     outbound_purpose: Literal['initial', 'answer', 'cold_followup', 'meeting_confirmation'] = 'initial'
     next_followup_at: str | None = None
     followup_timezone: str | None = None
@@ -560,14 +568,20 @@ class OutreachStore:
                 priority, action, reason = 2, 'review_followup', 'Any reply since your last send? Check your inbox, then review this due reminder. Nothing sends automatically.'
             elif inbound and thread.reply_state == 'referral' and thread.messages[latest_inbound].id in thread.referral_completed_message_ids:
                 continue
-            elif inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'not_interested', 'opt_out', 'source_question', 'auto_reply', 'bounce', 'referral'):
+            elif inbound and thread.reply_state in ('not_interested', 'opt_out', 'source_question', 'bounce'):
+                continue
+            elif inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'auto_reply', 'referral'):
                 priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
-            elif inbound and thread.reply_state in ('interested', 'question') and latest_outbound > latest_inbound:
+            elif inbound and thread.reply_state in ('interested', 'question') and latest_outbound > latest_inbound and not thread.body:
                 continue
             elif inbound and thread.reply_state in ('interested', 'question'):
                 priority, action, reason = 1, 'answer_reply', 'Write and review a human answer using saved facts.'
             elif thread.approval and thread.ready_for_manual_action:
                 priority, action, reason = 3, 'manual_send', 'Copy or send the exact approved message, then record what happened.'
+            elif thread.body and not inbound and latest_outbound >= 0 and not thread.next_followup_at and cold_followups_sent(thread) < 2 and thread.meeting_state == 'not_recorded' and not blocked(thread):
+                priority, action, reason = 4, 'plan_followup', 'Choose a confirmed review date for your saved reminder; it is not enrolled automatically.'
+            elif thread.body and not thread.approval and not thread.next_followup_at and not thread.manual_action_block and not blocked(thread):
+                priority, action, reason = 4, 'review_message', 'Review the saved introduction, sender details and recipient basis before exact approval.'
             else:
                 continue
             ranked.append((priority, thread.updated_at, thread, action, reason))
@@ -608,7 +622,7 @@ class OutreachStore:
         return project_insights(threads, excluded, domain_target, now())
 
     def start(self, body: StartOutreach):
-        from .customers import CustomerSearch, customer_is_qualified
+        from .customers import CustomerSearch, customer_is_qualified, contact_priority
         from .customer_drafts import draft_cache_key
         from .models import Workspace
         with self.repo.connect() as db:
@@ -640,12 +654,15 @@ class OutreachStore:
                 timestamp = now()
                 thread = OutreachThread(id=new_id('outreach'), search_id=body.search_id, account_id=account.id,
                                         company_name=account.name, domain=account.domain, created_at=timestamp, updated_at=timestamp)
-                contacts = sorted((c for c in account.contacts if c.email), key=lambda c: c.verification_status != 'verified')
+                thread.source_facts = [SourceFact(id=e.id, excerpt=e.excerpt[:900], url=e.url, retrieved_at=e.retrieved_at)
+                                       for e in account.evidence if not e.is_demo and e.kind in ('company', 'fit')][:5]
+                contacts = sorted((c for c in account.contacts if c.email), key=contact_priority, reverse=True)
                 if contacts:
                     try:
                         valid = EditDraft(expected_revision=1, idempotency_key='initial_contact', recipient=contacts[0].email,
                                           subject='', body='', booking_link='')
                         thread.recipient = valid.recipient
+                        thread.recipient_name = contacts[0].name or ''
                         thread.recipient_status = 'verified' if contacts[0].verification_status == 'verified' else 'published_unverified'
                     except ValueError:
                         pass
@@ -703,6 +720,7 @@ class OutreachStore:
                 company_name=parent.company_name, domain=parent.domain, recipient=body.recipient, recipient_name=body.contact_name,
                 recipient_status='user_entered', referrer_thread_id=parent.id, referrer_message_id=latest.id,
                 referrer_name=body.referrer_name, created_at=stamp, updated_at=stamp)
+            child.source_facts = [fact.model_copy(deep=True) for fact in parent.source_facts]
             if self._cold_company_owner(db, child) not in (None, child.id):
                 child.paused, child.cold_followups_stopped = True, True
             child = self._view(db, child)
@@ -778,6 +796,7 @@ class OutreachStore:
                 changed = any(getattr(thread, name) != getattr(body, name) for name in ('recipient', 'subject', 'body', 'booking_link'))
                 if thread.recipient != body.recipient:
                     thread.recipient_status = 'user_entered' if body.recipient else 'missing'
+                    thread.recipient_name = ''
                     thread.contact_basis = None
                     thread.next_followup_at = thread.followup_timezone = None
                     thread.outbound_purpose = 'answer' if any(m.direction == 'inbound' for m in thread.messages) else 'initial'

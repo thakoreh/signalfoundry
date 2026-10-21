@@ -14,7 +14,7 @@ export type NextUpItem = {
   thread_id: string;
   search_id: string;
   company_name: string;
-  action: "review_reply" | "answer_reply" | "report_meeting" | "manual_send" | "review_followup";
+  action: "review_reply" | "answer_reply" | "report_meeting" | "manual_send" | "review_followup" | "review_message" | "plan_followup";
   reason: string;
   reply_state: ReplyState;
   meeting_state: OutreachThread["meeting_state"];
@@ -70,6 +70,7 @@ export type OutreachThread = {
   referrer_message_id?: string | null;
   referrer_name?: string;
   referral_completed_message_ids?: string[];
+  source_facts?: { id: string; excerpt: string; url: string; retrieved_at: string }[];
   outbound_purpose?: "initial" | "answer" | "cold_followup" | "meeting_confirmation";
   next_followup_at?: string | null;
   followup_timezone?: string | null;
@@ -77,6 +78,8 @@ export type OutreachThread = {
   manual_action_block?: string | null;
   meeting_at?: string | null;
   meeting_timezone?: string | null;
+  revisit_at?: string | null;
+  revisit_timezone?: string | null;
   subject: string;
   body: string;
   booking_link: string;

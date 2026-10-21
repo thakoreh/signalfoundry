@@ -30,6 +30,7 @@ class LocalJourneyTest(unittest.TestCase):
 
     def test_referral_is_fresh_contact_with_credit_basis_and_idempotency(self):
         parent = self.referral_parent()
+        self.assertTrue(parent.source_facts, 'Real saved public excerpts travel with the company context')
         original_message = parent.messages[-1].model_dump()
         body = self.referral_body(parent)
         with TestClient(create_app(self.path, testing=True)) as client:
@@ -45,6 +46,7 @@ class LocalJourneyTest(unittest.TestCase):
             self.assertIsNone(child['contact_basis'])
             self.assertIsNone(child['approval'])
             self.assertFalse(child['ready_for_manual_action'])
+            self.assertEqual(child['source_facts'], [fact.model_dump() for fact in parent.source_facts])
             self.assertEqual(client.post(f'/api/outreach/{parent.id}/referrals', json=body).json()['id'], child['id'])
             listed = client.get('/api/outreach', params={'search_id': parent.search_id}).json()['threads']
             self.assertEqual({t['id'] for t in listed}, {parent.id, child['id']})
@@ -228,6 +230,31 @@ class LocalJourneyTest(unittest.TestCase):
             result = self.repo.outreach_insights()
             self.assertEqual(result['funnel']['companies'], 0)
             self.assertEqual(result['excluded_example_companies'], 1)
+
+    def test_pending_approval_returns_but_terminal_reply_work_does_not_repeat_forever(self):
+        thread = self.ready()
+        thread = self.edit(thread, body='A newly saved introduction.' + thread.sender_footer)
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'review_message')
+        for state in ('not_interested', 'bounce', 'source_question', 'opt_out'):
+            thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='A manually classified terminal reply.', reply_state=state))
+            self.assertEqual(self.repo.outreach_next_up()['items'], [])
+
+    def test_prepared_contact_prefers_individual_address_and_offer_edits_invalidate_approval(self):
+        from app.models import Contact
+        self.account.contacts = [Contact(name=None, role='Team', email='info@business.com', verification_status='verified', source_url='https://business.com/contact', note='Fictional provider fixture'),
+                                 Contact(name='Alex Fixture', role='Operations', email='alex@business.com', verification_status='unverified', source_url='https://business.com/team', note='Fictional published fixture')]
+        self.search.accounts = [self.account]
+        self.repo.save_customer_search(self.search)
+        thread = self.start()
+        self.assertEqual(thread.recipient, 'alex@business.com')
+        self.assertEqual(thread.recipient_status, 'published_unverified')
+        self.assertEqual(thread.recipient_name, 'Alex Fixture')
+        thread = self.ready()
+        before = thread.revision
+        profile = self.repo.workspace().profile.model_copy(update={'description': 'A changed fictional offering'})
+        self.repo.save_profile(profile)
+        self.assertIsNone(self.repo.outreach_thread(thread.id).approval)
+        self.assertGreater(self.repo.outreach_thread(thread.id).revision, before)
 
     def test_due_followup_queue_is_read_only_and_changed_recipient_cannot_inherit_sequence(self):
         thread = self.report_initial()

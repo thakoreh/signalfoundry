@@ -18,6 +18,8 @@ import {
 } from "./customer-result-view";
 import {
   hasContactEmail,
+  contactPriority,
+  isSharedInbox,
   orderCustomerAccounts,
   publicSourceUrl,
   searchInProgress,
@@ -187,8 +189,7 @@ function CustomerResult({
     .filter((contact) => contact.email?.trim())
     .sort(
       (left, right) =>
-        Number(right.verification_status === "verified") -
-        Number(left.verification_status === "verified"),
+        contactPriority(right) - contactPriority(left),
     );
   const primaryContact = contacts[0];
   const citedSources = original
@@ -372,6 +373,12 @@ function CustomerResult({
           {primaryContact ? (
             <span title={primaryContact.email || undefined}>
               {primaryContact.email}
+              <small className="customer-contact-kind">
+                {isSharedInbox(primaryContact.email) && "Shared inbox · "}
+                {primaryContact.source_url && publicSourceUrl(primaryContact.source_url)
+                  ? <a href={publicSourceUrl(primaryContact.source_url)!} title={`Contact observed ${account.researched_at || "at an unknown time"}`} target="_blank" rel="noreferrer">Source · {account.researched_at?.slice(0, 10) || "date unknown"}</a>
+                  : "Source unknown"}
+              </small>
             </span>
           ) : (
             <span className="customer-lead-no-email">No email available</span>

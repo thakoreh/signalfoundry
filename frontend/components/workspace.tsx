@@ -12,6 +12,7 @@ import {
 import { BusinessOnboarding } from "./business-onboarding";
 import { NextUpQueue } from "./next-up-queue";
 import { OutreachInsights } from "./outreach-insights";
+import { SavedOutreach } from "./saved-outreach";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -170,9 +171,17 @@ export default function Workspace({
         }}
         organizationControl={organizationControl}
         userControl={userControl}
+        home={workspace?.profile && !setup ? <>
+          <div className="workspace-return-heading">
+            <div><h1>Pick up where you left off.</h1><p>Review what needs you, then come back to your saved conversations.</p></div>
+            <Link className="btn primary" href="/workspace/customers">Find customers</Link>
+            <Link className="btn" href="/workspace/setup">Edit business</Link>
+          </div>
+          <NextUpQueue />
+          <SavedOutreach />
+          <OutreachInsights />
+        </> : undefined}
       />
-      {workspace?.profile && <NextUpQueue />}
-      {workspace?.profile && <OutreachInsights />}
     </>
   );
 }

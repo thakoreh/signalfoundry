@@ -232,8 +232,7 @@ class Repository:
                     for name in ('sender_name', 'mailing_address', 'sender_contact')
                     if name not in profile.model_fields_set})
             workspace.name = profile.company_name
-            if workspace.profile and any(getattr(workspace.profile, name) != getattr(profile, name)
-                    for name in ('company_name', 'sender_name', 'mailing_address', 'sender_contact')):
+            if workspace.profile and workspace.profile != profile:
                 # Invalidate pending approvals, never rewrite immutable sent messages.
                 from .outreach import OutreachThread
                 for row in db.execute('SELECT id,data FROM outreach_threads WHERE tenant_id=?', (self.tenant_id,)).fetchall():

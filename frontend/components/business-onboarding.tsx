@@ -28,6 +28,7 @@ export function BusinessOnboarding({
   organizationControl,
   userControl,
   initialManual = false,
+  home,
 }: {
   website: string;
   setWebsite: (value: string) => void;
@@ -43,6 +44,7 @@ export function BusinessOnboarding({
   organizationControl?: React.ReactNode;
   userControl?: React.ReactNode;
   initialManual?: boolean;
+  home?: React.ReactNode;
 }) {
   const [manual, setManual] = useState(initialManual);
   const router = useRouter();
@@ -87,7 +89,7 @@ export function BusinessOnboarding({
   return (
     <div className="business-onboarding">
       <a className="skip-link" href="#business-setup">
-        Skip to business setup
+        {home ? "Skip to your next action" : "Skip to business setup"}
       </a>
       <header className="business-onboarding-header">
         <Link
@@ -116,7 +118,7 @@ export function BusinessOnboarding({
 
       <main
         id="business-setup"
-        className={`business-onboarding-main${billing ? " business-onboarding-main--customers" : ""}`}
+        className={`business-onboarding-main${billing || home ? " business-onboarding-main--customers" : ""}`}
       >
         {profile && <SellingAs profile={profile} />}
         {billing ? (
@@ -130,7 +132,7 @@ export function BusinessOnboarding({
             </button>
             <BillingPanel />
           </>
-        ) : (
+        ) : home ? home : (
           <>
             <div
               key={reviewing ? "review" : manual ? "manual" : "website"}

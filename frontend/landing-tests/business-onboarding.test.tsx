@@ -131,3 +131,16 @@ it("surfaces the saved next step before optional targeting and sender details", 
   expect(summary.compareDocumentPosition(sender) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(summary.querySelector('button[type="submit"]')?.textContent).toContain("Find customers");
 });
+
+it("keeps the brand and saved seller above returning work without repeating setup fields", async () => {
+  await act(async () => root.render(<BusinessOnboarding website="https://saved.example" setWebsite={vi.fn()}
+    analyze={vi.fn()} analyzing={false} loading={false} error="" profile={profile} review
+    changeWebsite={vi.fn()} onSaved={vi.fn()} home={<section><h1>Next up fixture</h1></section>} />));
+  const header = container.querySelector("header")!;
+  const heading = container.querySelector("h1")!;
+  expect(header.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  expect(container.textContent).toContain("Saved business");
+  expect(heading.textContent).toBe("Next up fixture");
+  expect(container.querySelector("input")).toBeNull();
+  expect(container.querySelector("main")?.className).toContain("--customers");
+});

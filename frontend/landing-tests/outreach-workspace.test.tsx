@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OutreachWorkspace } from "../components/outreach-workspace";
 import { PrepareOutreach } from "../components/prepare-outreach";
 import type { OutreachThread } from "../lib/outreach";
+import { requestEmailApp } from "../lib/manual-email";
 const { api, session } = vi.hoisted(() => ({
   api: vi.fn(),
   session: { mode: "local-demo" },
@@ -15,6 +16,7 @@ vi.mock("../components/workspace-session", () => ({
 // Activity has its own read-only component contract tests. Keep these transport
 // races scoped to the exact conversation request, not a sibling summary fetch.
 vi.mock("../components/outreach-insights", () => ({ OutreachInsights: () => null }));
+vi.mock("../lib/manual-email", async importOriginal => ({ ...await importOriginal<typeof import("../lib/manual-email")>(), requestEmailApp: vi.fn() }));
 let container: HTMLDivElement, root: Root, thread: OutreachThread;
 const fixture = (): OutreachThread => ({
   id: "thread_a",
@@ -281,6 +283,46 @@ it("records actual text separately when manually sent with changes", async () =>
     actual_subject: "My actual subject",
     actual_body: "My actual message",
   });
+});
+it("revalidates before an email app request and records nothing until the explicit report", async () => {
+  await mount();
+  await click("Approve exact message");
+  await click("Open in email app");
+  expect(requestEmailApp).toHaveBeenCalledWith(expect.stringContaining("mailto:hello@example.org?subject="));
+  expect(thread.messages).toHaveLength(0);
+  expect(container.textContent).toContain("Opening it is not sending");
+  await click("Not sent yet");
+  expect(thread.messages).toHaveLength(0);
+  await click("Copy approved message");
+  await click("Sent as approved");
+  expect(thread.messages).toHaveLength(1);
+});
+it("falls back to exact Copy for a long email link without opening an email app", async () => {
+  thread.body = "A fictional long message. ".repeat(100);
+  vi.mocked(requestEmailApp).mockClear();
+  await mount();
+  await click("Approve exact message");
+  await click("Open in email app");
+  expect(requestEmailApp).not.toHaveBeenCalled();
+  expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(thread.body));
+  expect(thread.messages).toHaveLength(0);
+});
+it("cannot open the email app after edits invalidate a delayed readiness response", async () => {
+  vi.mocked(requestEmailApp).mockClear();
+  const original = api.getMockImplementation()!;
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementation((path: string, options?: RequestInit) => path === "/outreach/thread_a"
+    ? new Promise<OutreachThread>(resolve => { finish = resolve; }) : original(path, options));
+  await mount();
+  await click("Approve exact message");
+  const snapshot = structuredClone(thread);
+  await click("Open in email app");
+  await change("Message", "Keep this newer private text.");
+  await act(async () => finish(snapshot));
+  expect(requestEmailApp).not.toHaveBeenCalled();
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(field("Message").value).toBe("Keep this newer private text.");
+  expect(thread.messages).toHaveLength(0);
 });
 it("restores the saved footer without losing edits and copies only revalidated approved bytes", async () => {
   const footer =
@@ -734,6 +776,8 @@ describe("persisted manual outreach journey", () => {
     await change("Followup date and time with numeric offset", "2026-11-05T10:00:00-05:00");
     await change("Followup IANA timezone", "America/Toronto");
     await click("Meetings");
+    expect(field("Meeting date and time with numeric offset").value).toBe("");
+    expect(field("Meeting IANA timezone").value).toBe("");
     await click("Review");
     expect(field("Followup date and time with numeric offset").value).toBe("2026-11-05T10:00:00-05:00");
     expect(api.mock.calls.some(([path]) => path.endsWith("/followups"))).toBe(false);

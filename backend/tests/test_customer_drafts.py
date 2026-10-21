@@ -91,7 +91,9 @@ class DraftProviderTests(unittest.TestCase):
         facts = draft_facts(DEMO_PROFILE, self.account)
         bad = [dict(content(self.account), evidence_ids=['unknown']),
                dict(content(self.account), extra='not allowed'),
-               dict(content(self.account), subject='Subject\nInjected header')]
+               dict(content(self.account), subject='Subject\nInjected header'),
+               dict(content(self.account), subject='Re: invented previous conversation'),
+               dict(content(self.account), subject='Fwd: fake familiarity')]
         for value in ('Visit example.dev', 'Call tel:+14165551234', 'Call +1 (416) 555-1234',
                       'Reply info@business.com', 'Visit https://business.com', 'Results improve 77%'):
             bad.append(dict(content(self.account), body=value))

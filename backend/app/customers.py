@@ -154,6 +154,19 @@ def _provider_json_transport(provider: str, endpoint: str, params: dict, *, cred
         raise ProviderError(f'{provider.title()} could not be reached or returned an unreadable response.') from None
 
 
+SHARED_INBOXES = {'info', 'hello', 'support', 'sales', 'contact', 'office', 'admin', 'billing', 'team', 'enquiries', 'inquiries'}
+
+
+def shared_inbox(email):
+    return bool(email and email.strip().split('@', 1)[0].lower().split('+', 1)[0] in SHARED_INBOXES)
+
+
+def contact_priority(contact):
+    if not contact.email or not contact.email.strip():
+        return 0
+    return (0 if shared_inbox(contact.email) else 2) + (2 if contact.verification_status == 'verified' else 1)
+
+
 _DIRECTORIES = ('linkedin.com', 'facebook.com', 'instagram.com', 'youtube.com', 'twitter.com', 'x.com',
                 'google.com', 'bing.com', 'reddit.com', 'wikipedia.org', 'yelp.com', 'g2.com',
                 'capterra.com', 'clutch.co', 'crunchbase.com', 'apollo.io', 'hunter.io', 'indeed.com')

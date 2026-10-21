@@ -91,7 +91,9 @@ Use only the supplied offering and cited prospect facts. Do not invent people, c
 buying intent, results, statistics, testimonials, prior relationships, or product capabilities.
 Explain a possible benefit conditionally, not a guaranteed outcome. No links, addresses, phone
 numbers, tracking, attachments or sending. Use a generic greeting, no invented recipient name.
-Keep body under 130 words. Include one gentle question. Return exactly this JSON structure:
+Default to roughly 50–125 words: one specific verifiable observation, one plain line
+on the seller's offering, and one low-pressure interest question. No flattery opener,
+fake familiarity, Re:/Fwd: subject, invented urgency or connections. Return exactly this JSON structure:
 {"subject":"Short relevant subject","body":"Plain text introduction","evidence_ids":["supplied evidence id"]}
 Every prospect-specific assertion must be supported by one of the returned evidence IDs.
 If the evidence is insufficient, return an empty body rather than guessing."""
@@ -106,6 +108,8 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
     if not set(content.evidence_ids).issubset(known) or len(set(content.evidence_ids)) != len(content.evidence_ids):
         raise DraftError('AI returned an unsupported source reference. No message was sent.')
     text = content.subject + '\n' + content.body
+    if re.match(r'^\s*(?:re|fw|fwd)\s*:', content.subject, re.I):
+        raise DraftError('AI invented an existing email thread. Review a fresh subject instead.')
     # Prevent generated contact details / destinations. Citation links come only
     # from the stored evidence, independently of model output.
     if re.search(r'\b[a-z][a-z0-9+.-]*://|\b(?:tel|mailto|data|javascript):|www\.|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:[a-z0-9-]+\.)+[a-z]{2,63}\b|\+?\d[\d(). -]{6,}\d', text, re.I):

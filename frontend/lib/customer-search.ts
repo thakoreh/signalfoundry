@@ -33,15 +33,11 @@ export const searchInProgress = (search: CustomerSearchRun | null) =>
   Boolean(search && ["queued", "running"].includes(search.status));
 export const hasContactEmail = (account: Account) =>
   account.contacts.some((contact) => Boolean(contact.email?.trim()));
+export const isSharedInbox = (email?: string | null) => !!email && ["info", "hello", "support", "sales", "contact", "office", "admin", "billing", "team", "enquiries", "inquiries"].includes(email.trim().split("@")[0].toLowerCase().split("+")[0]);
+export const contactPriority = (contact: Account["contacts"][number]) => !contact.email?.trim() ? 0
+  : (isSharedInbox(contact.email) ? 0 : 2) + (contact.verification_status === "verified" ? 2 : 1);
 export const customerContactRank = (account: Account) =>
-  account.contacts.some(
-    (contact) =>
-      contact.email?.trim() && contact.verification_status === "verified",
-  )
-    ? 2
-    : hasContactEmail(account)
-      ? 1
-      : 0;
+  Math.max(0, ...account.contacts.map(contactPriority));
 
 /** Verified, published unverified, and absent emails stay distinct; no status is upgraded. */
 export function orderCustomerAccounts(
