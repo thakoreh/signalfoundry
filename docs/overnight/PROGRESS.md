@@ -1,5 +1,11 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Application source freeze —8ccf104, incomplete verdict
+
+Reran checks with the exact Git SHA printed first: backend210 PASS22.866s; frontend66 Node/116 component21files/76 Convex/typecheck/lint PASS; webpack production build PASS; actual HTTP journey/seed1/launcher3/preflight5/packaging1/worker HTTP smoke PASS. Source-checks/container-checks/GitGuardian all PASS on8ccf104 in run39692903599. Latest fetch keeps origin/main cfd22af; writer checkout clean, owner main checkout still only its original frontend/next-env.d.ts edit. No owner data/env/ports/browser changes. No live or paid calls, sends, connections, deploys, merge/main push/settings changes.
+
+Independent final8ccf104 small-boundary recheck: eight fictional/mock controls plus two original API regressions PASS for off switches, preview denial, saved-data retention, seeder existing-file/exclusive-create safety and launcher admission/owned Windows cleanup. No remaining P0/P1 within that scope; not full runtime/production acceptance. Reports preserve prior findings and limits. Final release handoff/status explicitly remain INCOMPLETE: no new full Chrome journey, actual historical spend/prices unknown, hosted/reply-AI/mailbox/calendar/privacy/operations and cumulative reviewability remain unmet as mapped. Fresh browser inventory again exposes only protected Hiren Chrome and forbidden in-app browser; isolated-method request remains unanswered. Final report/manifest-only push must receive its own required check readback in the PR; this app-head result is not borrowed as its CI.
+
 ## Consolidated local setup and final verification pass
 
 Latest independent3befd3d fixture-isolation review:5 mocked failed-child/nonce/listener/environment controls PASS, no remaining P0/P1 in that scope. Earlier monetary, lifecycle and review-repair reports are copied verbatim into continuation/reports with limits/index. STATUS.md/CHECKLIST/continuation prompts now map actual built/tested/blocked/deferred work rather than repeating the c929-only pending backlog. Historical reports remain labelled and retained.

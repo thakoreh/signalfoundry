@@ -4,6 +4,8 @@
 
 Current continuation overlay: local referrals, bounded followups, timed meetings, activity/next-batch, monetary admission, returning workspace/mailto and logical local data controls have since been implemented/tested. The remaining work is not the original c929-only backlog. Start with the current matrix in STATUS.md and latest PROGRESS.md. Consolidated setup/off switches are LOCAL_SETUP.md, monetary setup is MONETARY_SAFEGUARDS.md, and closure/restore limits are LOCAL_DATA_OPERATIONS.md. New complete Chrome journey verification remains pending; no production acceptance is implied.
 
+Read RELEASE_HANDOFF.md first for the current verdict, human inputs, exact tested source/checks and remaining acceptance limits.
+
 ## Start here
 
 1. [NEXT_AGENT_PROMPT.md](NEXT_AGENT_PROMPT.md): copy/paste instructions for the next coding agent.

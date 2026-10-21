@@ -8,6 +8,8 @@ The remaining human inputs are: an isolated Chrome testing method/profile (the c
 
 Branch remains `codex/clientrove-release-candidate`, draft [PR7](https://github.com/thakoreh/signalfoundry/pull/7), based on main`cfd22af0e693a4854e3e2c46e034ccf5a39127f3`. Handoff`0c1418d` was continued, never replaced by a fresh main baseline. The exact final docs/source/check head is the current Git/PR head; later docs-only commits must not borrow old CI. Product checkpoints are organized below; final check readback belongs in PROGRESS.md and the PR guide.
 
+Latest application source:8ccf104be6f329dec5f142a968feeed90ea9ece4, backend210/component116/Node66/Convex76/type/lint/build and required GitHub checks PASS. See RELEASE_HANDOFF.md for exact scope/commands and remaining decisions; a later report-only head needs its own CI.
+
 ## Canonical journey: source and actual evidence
 
 | Step / priority | Current implementation and source | Evidence state and remaining acceptance |

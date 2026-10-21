@@ -1,7 +1,14 @@
 {
-  "application_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
-  "scope": "Portable continuation context, historical evidence and fictional queue screenshots; no runtime/customer data. Hashes exclude this manifest.",
+  "application_checkpoint": "8ccf104be6f329dec5f142a968feeed90ea9ece4",
+  "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
+  "scope": "Current continuation handoff and scoped reviews plus labelled historical evidence; no runtime/customer data or new complete Chrome acceptance.",
+  "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
   "files": [
+    {
+      "path": "COMPANY_RESUME_ADJUDICATION.md",
+      "bytes": 2772,
+      "sha256": "b943b1ee131ed9fef2bc71d0f0076c6ebe5bb0c8b233a0a21b3ccbdf12e0a103"
+    },
     {
       "path": "DATE_REVIEW_ADJUDICATION.md",
       "bytes": 1380,
@@ -13,9 +20,14 @@
       "sha256": "b2c0d75e77fae6dc5370abeedf23ecab4b031d2c7088e114866e47f943b9b1d2"
     },
     {
+      "path": "LOCAL_DATA_OPERATIONS.md",
+      "bytes": 4262,
+      "sha256": "81c49ed3c85954b1d99a49654f5c9774cd133b17669ee5dc7c1b0145c7cad977"
+    },
+    {
       "path": "LOCAL_DECISIONS.md",
-      "bytes": 7305,
-      "sha256": "3518dd1882fd120f2fe143e8fbf16ff07a608804cc45d088ebcf10d84d256d7f"
+      "bytes": 7812,
+      "sha256": "fe48fbee1255cf7861d4e8a48c88d47c4aabec9cb8284a30776425b2cb533042"
     },
     {
       "path": "LOCAL_LOOP_CONTRACT.md",
@@ -23,9 +35,19 @@
       "sha256": "623a0f6ea1b3059c7177739cc6970bf1e4c26edf53001198a2a641af5d09217d"
     },
     {
+      "path": "LOCAL_SETUP.md",
+      "bytes": 8623,
+      "sha256": "cc51b86d3c9fd42411769f9bfff7518e7686e6619af8005111bb37a0ad9ed5be"
+    },
+    {
+      "path": "MONETARY_SAFEGUARDS.md",
+      "bytes": 7273,
+      "sha256": "5c9d25fb09c21c98546049364938dab3a6670c02656014f04ebcd51c0d1d0797"
+    },
+    {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 11251,
-      "sha256": "dd13e482b1d09130a9453cacb249f1b6c497817f09389ea48de97cd2d9e6f3d8"
+      "bytes": 12198,
+      "sha256": "2ef2d61a801c06810bd83ce4a3287fe7010b304966b47c928aaf923b7756316b"
     },
     {
       "path": "OWNER_CONTRACT.md",
@@ -34,13 +56,18 @@
     },
     {
       "path": "README.md",
-      "bytes": 6758,
-      "sha256": "d17e2523d1650d2297299facdada5fed825f73055f6eece5688e9aa4206bd203"
+      "bytes": 7525,
+      "sha256": "f1fe223c522f7ed81c71cb655163caab17bd62a00daf15342289271e489e7418"
+    },
+    {
+      "path": "RELEASE_HANDOFF.md",
+      "bytes": 7726,
+      "sha256": "2cb2cfda41162802cead2ab3a79636965c8e09a047e0aa14021837cb0a852ba7"
     },
     {
       "path": "STATUS.md",
-      "bytes": 7783,
-      "sha256": "e7b90d96528c2a9df0c4ea7d99f610ddf8479881a954c341e0dbe9966af5e5cd"
+      "bytes": 18612,
+      "sha256": "93196bea262fedd58e946e789a123c8baeb1ebbfe861892bb7c456cb0ec730e3"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -93,6 +120,16 @@
       "sha256": "a82450a3b95e5520ba274b6a6c953d0f205c1533d90b872c96b622c3c36742c2"
     },
     {
+      "path": "reports/CONTINUATION_EVIDENCE.md",
+      "bytes": 1876,
+      "sha256": "cb2f397268e75921ea02806026d2d2ce2fe2e03b1eaa148529aa2cfe61d877d4"
+    },
+    {
+      "path": "reports/COST_REVIEW_ca43048.md",
+      "bytes": 3082,
+      "sha256": "19d94ed175bf06a82df0f9e3ec278eb0acff1683f01ff6a260b7d87cacefa81a"
+    },
+    {
       "path": "reports/DATE_REVIEW_320edf3.md",
       "bytes": 4320,
       "sha256": "8a70680651f6d9e4e779fdb7e70590b9ea4ab9e73657acabbe941b15e676c83a"
@@ -106,6 +143,11 @@
       "path": "reports/FRONTEND_REVIEW_c929cba.md",
       "bytes": 3269,
       "sha256": "e6aa0d29b3c7b88c2e920e116d7882bda95008e28e3444af3e6940030b78af27"
+    },
+    {
+      "path": "reports/LIFECYCLE_REVIEW_dbdac05.md",
+      "bytes": 5564,
+      "sha256": "e941e6934f0f7e72871b5e39fce4465378bb293d1d894b084382ae3f74d93b99"
     },
     {
       "path": "reports/S1_REVIEW_5106da3.md",
@@ -131,6 +173,41 @@
       "path": "reports/SAFETY_REVIEW_eef5ddf.md",
       "bytes": 3843,
       "sha256": "7d06c9c91ca1068624a09b363c5b98d930a9c4eee5b0e4670a7f2c55d41e3cdf"
+    },
+    {
+      "path": "reports/SECURITY_REVIEW_3befd3d.md",
+      "bytes": 3273,
+      "sha256": "6b41a6c93b6f0feb40a88c183d64f638c615dff1321fc0d559f407e29387b623"
+    },
+    {
+      "path": "reports/SECURITY_REVIEW_58bd82b.md",
+      "bytes": 3365,
+      "sha256": "bc24829c85cfab6b99539dd6cdb5f59a42bc7cc4aaf6d2fa209583e7a2f70099"
+    },
+    {
+      "path": "reports/SECURITY_REVIEW_8ccf104.md",
+      "bytes": 6202,
+      "sha256": "519309a6f4cc9111cc2fd862c8c7602c7a5d1e36e0846c12f5c77d47713e53ef"
+    },
+    {
+      "path": "reports/SECURITY_REVIEW_ab04a85.md",
+      "bytes": 6857,
+      "sha256": "c9b740dce63cc597c8d9d8225976114891471d01a11623f3b357e5f0babd9b38"
+    },
+    {
+      "path": "reports/SECURITY_REVIEW_ce37b6c.md",
+      "bytes": 5297,
+      "sha256": "37bd42549a640e5e36ff7fae4fa76316e73331b9c2f96ac0ebea68a706db6cd6"
+    },
+    {
+      "path": "reports/UX_SPEC_REVIEW_ab04a85.md",
+      "bytes": 7341,
+      "sha256": "b530e34dc08e1c24839c1d2e07c571d000fc0f81fd90d7948bf9e151ea6cef7e"
+    },
+    {
+      "path": "reports/UX_SPEC_REVIEW_ce37b6c.md",
+      "bytes": 9425,
+      "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ]
 }
