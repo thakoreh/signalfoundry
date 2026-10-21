@@ -43,6 +43,7 @@ export function OutreachWorkspace({
   const basisGeneration = useRef(0);
   const [incoming, setIncoming] = useState<Record<string, string>>({});
   const [replySelections, setReplySelections] = useState<Record<string, string>>({});
+  const [referrals, setReferrals] = useState<Record<string, { recipient: string; contact_name: string; referrer_name: string }>>({});
   const [revisitAtDrafts, setRevisitAtDrafts] = useState<Record<string, string>>({});
   const [revisitZoneDrafts, setRevisitZoneDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -133,6 +134,7 @@ export function OutreachWorkspace({
     Object.keys(bases).length > 0 ||
     Object.keys(drafts).length > 0 ||
       Object.values(incoming).some(Boolean) ||
+      Object.keys(referrals).length > 0 ||
       !!changedSent,
   );
   const replyPermitsAction =
@@ -229,9 +231,16 @@ export function OutreachWorkspace({
         },
       );
       if (signal.aborted) return;
-      setThreads((current) =>
-        current.map((item) => (item.id === updated.id ? updated : item)),
-      );
+      if (action === "referrals") {
+        const saved = await api<{ threads: OutreachThread[] }>(`/outreach?search_id=${encodeURIComponent(searchId)}`, { signal });
+        if (signal.aborted) return;
+        setThreads(saved.threads);
+        setActive(updated.id);
+        setStep("Review");
+        setReferrals((current) => { const next = { ...current }; delete next[thread.id]; return next; });
+      } else {
+        setThreads((current) => current.map((item) => item.id === updated.id ? updated : item));
+      }
       if (["draft", "sent", "replies"].includes(action))
         setDrafts((current) => {
           const next = { ...current };
@@ -248,7 +257,9 @@ export function OutreachWorkspace({
         setReplySelections((current) => { const next = { ...current }; delete next[updated.id]; return next; });
       if (action === "sent") setChangedSent(null);
       setNotice(
-        action === "sent"
+        action === "referrals"
+          ? "New referred contact saved. Review its own contact basis and message before fresh approval."
+          : action === "sent"
           ? "Recorded as sent externally. Clientrove did not send this message."
           : action === "approve"
             ? "This exact message is approved for your manual action."
@@ -438,12 +449,13 @@ export function OutreachWorkspace({
               setBases({});
               setDrafts({});
               setIncoming({});
+              setReferrals({});
               setLoading(true);
               setError("");
               setReload((value) => value + 1);
             }}
           >
-            {dirty || basisDirty || Object.values(incoming).some(Boolean) || changedSent
+            {dirty || basisDirty || Object.values(incoming).some(Boolean) || Object.keys(referrals).length > 0 || changedSent
               ? "Reload saved version (discard edits)"
               : "Reload saved outreach"}
           </button>
@@ -516,6 +528,7 @@ export function OutreachWorkspace({
                 <div>
                   <h2 id="outreach-company">{thread.company_name}</h2>
                   <p>{thread.domain}</p>
+                  {thread.referrer_name && <p>Referred by {thread.referrer_name} · new contact, verification not inherited</p>}
                 </div>
                 <button
                   type="button"
@@ -642,6 +655,21 @@ export function OutreachWorkspace({
                           )}
                         </div>
                       ))}
+                      {thread.reply_state === "referral" && !thread.suppressed && (
+                        <section className="outreach-referral" aria-label="Referred contact">
+                          <h3>Add the referred contact</h3>
+                          <p>The original thread stays intact. This is your explicit choice to review a new contact at this company; its own basis and approval are required.</p>
+                          {([['recipient', 'Referred email'], ['contact_name', 'Referred name · optional'], ['referrer_name', 'Person who referred you']] as const).map(([name, label]) => (
+                            <label key={name}>{label}<input type={name === 'recipient' ? 'email' : 'text'} disabled={!!busy} maxLength={name === 'recipient' ? 320 : 160}
+                              value={referrals[thread.id]?.[name] || ''} onChange={(event) => setReferrals(current => ({ ...current,
+                                [thread.id]: { ...(current[thread.id] || { recipient: '', contact_name: '', referrer_name: '' }), [name]: event.target.value } }))} /></label>
+                          ))}
+                          <button type="button" className="btn" disabled={!!busy || dirty || !referrals[thread.id]?.recipient.trim() || !referrals[thread.id]?.referrer_name.trim()}
+                            onClick={() => void mutate("referrals", "POST", { ...referrals[thread.id], referrer_message_id: thread.messages.findLast(message => message.direction === 'inbound')?.id })}>
+                            Add referred contact
+                          </button>
+                        </section>
+                      )}
                       <label>
                         Paste a received reply
                         <textarea

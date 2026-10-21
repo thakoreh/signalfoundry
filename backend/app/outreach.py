@@ -191,6 +191,23 @@ class SentRequest(RevisionRequest):
     actual_body: Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)] = ''
 
 
+class ReferralRequest(RevisionRequest):
+    recipient: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=320)]
+    contact_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)] = ''
+    referrer_name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=160)]
+    referrer_message_id: Identifier
+
+    @field_validator('recipient')
+    @classmethod
+    def referral_email(cls, value):
+        return EditDraft.email(value)
+
+    @field_validator('contact_name', 'referrer_name')
+    @classmethod
+    def single_line(cls, value):
+        return EditDraft.one_line(value)
+
+
 class PasteReply(DatedReply):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=6000)]
     reply_state: ReplyState = 'awaiting_review'
@@ -238,6 +255,11 @@ class OutreachThread(StrictModel):
     company_name: str
     domain: str
     recipient: str = ''
+    recipient_name: str = ''
+    referrer_thread_id: str | None = None
+    referrer_message_id: str | None = None
+    referrer_name: str = ''
+    referral_completed_message_ids: list[str] = Field(default_factory=list, max_length=50)
     recipient_status: Literal['missing', 'verified', 'published_unverified', 'user_entered', 'invalid'] = 'missing'
     invalid_recipient_emails: list[str] = Field(default_factory=list, max_length=10)
     subject: str = ''
@@ -438,7 +460,7 @@ class OutreachStore:
     def list(self, search_id=None):
         with self.repo.connect() as db:
             if search_id:
-                rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=? AND search_id=? ORDER BY rowid LIMIT 5',
+                rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=? AND search_id=? ORDER BY rowid LIMIT 100',
                                   (self.tenant, search_id)).fetchall()
             else:
                 rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=? ORDER BY rowid DESC LIMIT 100', (self.tenant,)).fetchall()
@@ -463,6 +485,8 @@ class OutreachStore:
             latest_outbound = max(outbound_indexes, default=-1)
             inbound = latest_inbound >= 0
             if thread.reply_state in ('not_now', 'auto_reply') and thread.revisit_at and not thread.review_due:
+                continue
+            if inbound and thread.reply_state == 'referral' and thread.messages[latest_inbound].id in thread.referral_completed_message_ids:
                 continue
             if inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'not_interested', 'opt_out', 'source_question', 'auto_reply', 'bounce', 'referral'):
                 priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
@@ -551,7 +575,55 @@ class OutreachStore:
             self._record(db, 'start', body, threads)
             return {'threads': threads}
 
+    def referral(self, thread_id, body: ReferralRequest):
+        """Create a distinct, unverified contact from a manually reviewed reply."""
+        with self.repo.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            operation = 'referral:' + thread_id
+            replay = self._replay(db, operation, body)
+            if replay is not None:
+                return replay[0]
+            parent = self._get(db, thread_id)
+            if parent.revision != body.expected_revision:
+                raise OutreachError('This conversation changed. Refresh before adding the referred contact.')
+            latest = next((m for m in reversed(parent.messages) if m.direction == 'inbound'), None)
+            if parent.suppressed or not latest or latest.id != body.referrer_message_id or parent.reply_state != 'referral':
+                raise OutreachError('Review a current referral reply before adding its contact. Suppression remains in effect.')
+            if body.recipient.lower() == parent.recipient.lower():
+                raise OutreachError('A referral must identify a different contact. The original history is preserved.')
+            rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=?', (self.tenant,)).fetchall()
+            if len(rows) >= 100:
+                raise OutreachError('This local workspace is limited to 100 conversations.', 429)
+            for row in rows:
+                existing = OutreachThread.model_validate_json(row['data'])
+                if body.recipient.lower() in {address.lower() for address in existing.invalid_recipient_emails}:
+                    raise OutreachError('This address was recorded as bounced. Use a different contact.')
+                if domain_target(existing.domain) == domain_target(parent.domain) and existing.recipient.lower() == body.recipient.lower():
+                    raise OutreachError('This company contact already has a conversation. Reopen its saved thread.')
+            suppression = db.execute('SELECT 1 FROM outreach_suppressions WHERE tenant_id=? AND target IN (?,?) LIMIT 1',
+                (self.tenant, domain_target(parent.domain), 'email:' + body.recipient.lower())).fetchone()
+            if suppression:
+                raise OutreachError('This company or address is suppressed. A referral cannot remove an opt-out.')
+            stamp = now()
+            child = OutreachThread(id=new_id('outreach'), search_id=parent.search_id, account_id=new_id('referral'),
+                company_name=parent.company_name, domain=parent.domain, recipient=body.recipient, recipient_name=body.contact_name,
+                recipient_status='user_entered', referrer_thread_id=parent.id, referrer_message_id=latest.id,
+                referrer_name=body.referrer_name, created_at=stamp, updated_at=stamp)
+            if self._cold_company_owner(db, child) not in (None, child.id):
+                child.paused, child.cold_followups_stopped = True, True
+            child = self._view(db, child)
+            db.execute('INSERT INTO outreach_threads VALUES (?,?,?,?,?)',
+                (self.tenant, child.id, child.search_id, child.account_id, child.model_dump_json()))
+            if latest.id not in parent.referral_completed_message_ids:
+                parent.referral_completed_message_ids.append(latest.id)
+            parent.approval, parent.revision, parent.updated_at = None, parent.revision + 1, stamp
+            self._save(db, parent)
+            self._record(db, operation, body, [child])
+            return child
+
     def mutate(self, thread_id, operation, body):
+        if operation == 'referral':
+            return self.referral(thread_id, body)
         with self.repo.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             operation_key = operation + ':' + thread_id
@@ -728,6 +800,10 @@ def outreach_router(repository, *, blocked_preview=False):
     @router.post('/{thread_id}/replies', response_model=OutreachThread)
     def reply(thread_id: str, body: PasteReply):
         return call(service().mutate_outreach, thread_id, 'reply', body)
+
+    @router.post('/{thread_id}/referrals', response_model=OutreachThread)
+    def referral(thread_id: str, body: ReferralRequest):
+        return call(service().mutate_outreach, thread_id, 'referral', body)
 
     @router.patch('/{thread_id}/reply-state', response_model=OutreachThread)
     def state(thread_id: str, body: CorrectReply):

@@ -56,6 +56,11 @@ export type OutreachThread = {
   domain: string;
   recipient: string;
   recipient_status: string;
+  recipient_name?: string;
+  referrer_thread_id?: string | null;
+  referrer_message_id?: string | null;
+  referrer_name?: string;
+  referral_completed_message_ids?: string[];
   subject: string;
   body: string;
   booking_link: string;

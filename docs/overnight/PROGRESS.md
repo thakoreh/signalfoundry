@@ -4,6 +4,12 @@
 
 ### Safety regression checkpoint
 
+Independent immutable c887f76 recheck: ten adversarial controls PASS and 34 outreach tests PASS, including the changed-draft-address bounce case. Scoped policy adjudication is closed; no permanent company lock introduced. See the adjudication document for the exact acceptance boundary.
+
+### Referral slice
+
+New revision/idempotent POST /outreach/{thread}/referrals creates a separate same-company contact linked to the actual latest referral message and manually supplied credit. It preserves the original recipient/history, inherits no verification/basis/approval, rechecks suppression/bounced addresses/company ownership, and rejects duplicate company/email contacts. Referral drafts remain per-thread through view switches; explicit creation opens the new contact for its own review. Search thread listing is bounded at the existing 100-conversation workspace cap so new referrals cannot disappear behind the five initial-lead limit. Three API tests were RED on absent endpoint, then combined outreach/journey suite 37 PASS. Focused outreach UI suite 44 PASS; typecheck and lint PASS. Browser integration is still pending; no whole-journey PASS claimed.
+
 Read-only independent baseline adjudication: 7 control groups PASS, 2 distinct defects FAIL. The original single explicit resume/new approval is permitted; no permanent lock added. Added three permanent regressions and observed RED (2 actionable owners, missing bounce invalidity, missing original bounced recipient after draft edit). Fixed ownership independently of cancelled-followup status and unified bounced-address invalidation. Outreach suite now 34 PASS (3.668s); independent fixed-head recheck pending. See docs/continuation/COMPANY_RESUME_ADJUDICATION.md; original raw review remains intact.
 
 Fetched origin and inspected branch, PR7 and worktrees before edits. Remote handoff is 0c1418d; origin/main remains cfd22af. Original owner checkout stays on main with its generated next-env.d.ts edit preserved. New isolated continuation worktree tracks the existing release-candidate branch; read-only policy reviewer uses a detached immutable worktree. No owner .env, databases, browser profiles, ports or services copied/reused.

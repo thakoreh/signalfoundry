@@ -501,6 +501,39 @@ describe("pending Copy intent", () => {
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }
+it("creates a separate referred contact only on explicit action and preserves its parent", async () => {
+  thread.reply_state = "referral";
+  thread.messages = [{ id: "referral_inbound", direction: "inbound", recipient: thread.recipient,
+    subject: thread.subject, body: "Please contact Jordan in operations.", source: "user_reported", reply_state: "referral", created_at: "2026-10-21" }];
+  const parent = structuredClone(thread);
+  const child: OutreachThread = { ...fixture(), id: "referred_contact", recipient: "jordan@example.org", recipient_status: "user_entered",
+    referrer_name: "Casey Fixture", referrer_thread_id: parent.id, referrer_message_id: "referral_inbound", body: "", messages: [] };
+  let created = false;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/referrals")) {
+      expect(JSON.parse(String(options.body))).toMatchObject({ recipient: child.recipient, referrer_name: "Casey Fixture",
+        referrer_message_id: "referral_inbound", expected_revision: parent.revision });
+      created = true;
+      return structuredClone(child);
+    }
+    if (path.startsWith("/outreach?")) return { threads: created ? [parent, child] : [parent] };
+    throw new Error("Unexpected provider or mutation request");
+  });
+  await mount();
+  await click("Conversations");
+  await change("Referred email", child.recipient);
+  await change("Person who referred you", "Casey Fixture");
+  await click("Review");
+  await click("Conversations");
+  expect(field("Referred email").value).toBe(child.recipient);
+  expect(created).toBe(false);
+  await click("Add referred contact");
+  expect(field("Recipient").value).toBe(child.recipient);
+  expect(container.textContent).toContain("Referred by Casey Fixture");
+  expect(container.textContent).toContain("Review its own contact basis");
+  expect(parent.messages).toHaveLength(1);
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   session.mode = "local-demo";
