@@ -10,6 +10,7 @@ import {
   type BusinessIntake,
 } from "@/lib/business-intake";
 import { BusinessOnboarding } from "./business-onboarding";
+import { NextUpQueue } from "./next-up-queue";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -148,25 +149,28 @@ export default function Workspace({
     );
   }
   return (
-    <BusinessOnboarding
-      key={initialManual ? "manual-intake" : "website-intake"}
-      initialManual={initialManual}
-      website={website}
-      setWebsite={setWebsite}
-      analyze={analyze}
-      analyzing={analyzing}
-      loading={loading}
-      error={error}
-      profile={workspace?.profile || null}
-      readOnly={!isAdmin}
-      review={review}
-      changeWebsite={() => setReview(false)}
-      onSaved={(updated) => {
-        setWorkspace(updated);
-        setReview(true);
-      }}
-      organizationControl={organizationControl}
-      userControl={userControl}
-    />
+    <>
+      <BusinessOnboarding
+        key={initialManual ? "manual-intake" : "website-intake"}
+        initialManual={initialManual}
+        website={website}
+        setWebsite={setWebsite}
+        analyze={analyze}
+        analyzing={analyzing}
+        loading={loading}
+        error={error}
+        profile={workspace?.profile || null}
+        readOnly={!isAdmin}
+        review={review}
+        changeWebsite={() => setReview(false)}
+        onSaved={(updated) => {
+          setWorkspace(updated);
+          setReview(true);
+        }}
+        organizationControl={organizationControl}
+        userControl={userControl}
+      />
+      {workspace?.profile && <NextUpQueue />}
+    </>
   );
 }

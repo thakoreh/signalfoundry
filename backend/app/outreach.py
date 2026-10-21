@@ -13,7 +13,7 @@ from urllib.parse import urlsplit
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, HTTPException
-from pydantic import Field, StringConstraints, field_validator
+from pydantic import Field, StringConstraints, field_validator, model_validator
 
 from .models import EmptyRequest, StrictModel, Workspace
 from .primitives import new_id, now
@@ -62,7 +62,7 @@ class DatedReply(RevisionRequest):
         timestamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
         if timestamp.tzinfo is None or timestamp.utcoffset() is None:
             raise ValueError('Revisit time must include a timezone')
-        return timestamp.astimezone(timezone.utc).isoformat()
+        return timestamp.isoformat()
 
     @field_validator('revisit_timezone')
     @classmethod
@@ -73,6 +73,25 @@ class DatedReply(RevisionRequest):
             except (ZoneInfoNotFoundError, ValueError):
                 raise ValueError('Use an IANA timezone for the revisit date') from None
         return value or None
+
+    @model_validator(mode='after')
+    def roundtrip_revisit_wall_time(self):
+        if not self.revisit_at or not self.revisit_timezone:
+            return self
+        timestamp = datetime.fromisoformat(self.revisit_at.replace('Z', '+00:00'))
+        zone = ZoneInfo(self.revisit_timezone)
+        local_wall = timestamp.replace(tzinfo=None)
+        valid_offsets = set()
+        for fold in (0, 1):
+            candidate = local_wall.replace(tzinfo=zone, fold=fold)
+            if candidate.astimezone(timezone.utc).astimezone(zone).replace(tzinfo=None) == local_wall:
+                valid_offsets.add(candidate.utcoffset())
+        if not valid_offsets:
+            raise ValueError('Revisit time does not exist in the selected timezone')
+        if timestamp.utcoffset() not in valid_offsets:
+            raise ValueError('Revisit time offset does not match the selected timezone')
+        self.revisit_at = timestamp.astimezone(timezone.utc).isoformat()
+        return self
 
 
 class EditDraft(RevisionRequest):
@@ -234,6 +253,7 @@ class OutreachThread(StrictModel):
     revisit_at: str | None = None
     revisit_timezone: str | None = None
     review_due: bool = False
+    company_conflict: bool = False
     revision: int = 1
     approval: Approval | None = None
     ready_for_manual_action: bool = False
@@ -262,11 +282,18 @@ def contact_basis_ready(thread: OutreachThread) -> bool:
 
 def blocked(thread: OutreachThread) -> bool:
     has_reply = any(m.direction == 'inbound' for m in thread.messages)
-    return thread.suppressed or thread.paused or thread.recipient_status == 'invalid' or (has_reply and thread.reply_state not in ('interested', 'question'))
+    return (thread.suppressed or thread.paused or thread.company_conflict or thread.recipient_status == 'invalid'
+            or (has_reply and thread.reply_state not in ('interested', 'question')))
 
 
 def source_question(body: str) -> bool:
     return bool(re.search(r'\b(where|how) did you get my (email|address)|how did you find me|source of (your|the) (email|information)', body, re.I))
+
+
+def dated_reply_state(state, body):
+    if state in ('not_now', 'auto_reply') and bool(body.revisit_at) != bool(body.revisit_timezone):
+        return 'awaiting_review'
+    return state
 
 
 def sender_footer(profile) -> str:
@@ -314,6 +341,10 @@ class OutreachStore:
         if thread.revisit_at and thread.reply_state in ('not_now', 'auto_reply'):
             revisit = datetime.fromisoformat(thread.revisit_at.replace('Z', '+00:00'))
             thread.review_due = revisit <= datetime.now(timezone.utc)
+        owner = self._cold_company_owner(db, thread)
+        thread.company_conflict = bool(owner and owner != thread.id)
+        if thread.company_conflict:
+            thread.approval = None
         if blocked(thread) or not contact_basis_ready(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
             thread.approval = None
         thread.ready_for_manual_action = bool(not blocked(thread) and thread.recipient and thread.subject and thread.body and
@@ -330,6 +361,24 @@ class OutreachStore:
         thread = self._view(db, thread)
         db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?', (thread.model_dump_json(), self.tenant, thread.id))
         return thread
+
+    def _cold_company_owner(self, db, thread):
+        """Return the deterministic oldest active cold thread for this company."""
+        candidates = []
+        rows = db.execute('SELECT id,data FROM outreach_threads WHERE tenant_id=?', (self.tenant,)).fetchall()
+        for row in rows:
+            candidate = OutreachThread.model_validate_json(row['data'])
+            if candidate.id == thread.id or domain_target(candidate.domain) != domain_target(thread.domain):
+                continue
+            if candidate.paused or candidate.suppressed or candidate.cold_followups_stopped:
+                continue
+            if any(message.direction == 'inbound' for message in candidate.messages):
+                continue
+            candidates.append((candidate.created_at, candidate.id))
+        if not thread.paused and not thread.suppressed and not thread.cold_followups_stopped \
+                and not any(message.direction == 'inbound' for message in thread.messages):
+            candidates.append((thread.created_at, thread.id))
+        return min(candidates)[1] if candidates else None
 
     def _pause_company_siblings(self, db, thread):
         """Pause same-tenant/domain outreach without touching other tenants."""
@@ -396,11 +445,17 @@ class OutreachStore:
             threads = [self._view(db, OutreachThread.model_validate_json(row['data'])) for row in rows]
         ranked = []
         for thread in threads:
-            inbound = any(message.direction == 'inbound' for message in thread.messages)
+            inbound_indexes = [index for index, message in enumerate(thread.messages) if message.direction == 'inbound']
+            outbound_indexes = [index for index, message in enumerate(thread.messages) if message.direction == 'outbound']
+            latest_inbound = max(inbound_indexes, default=-1)
+            latest_outbound = max(outbound_indexes, default=-1)
+            inbound = latest_inbound >= 0
             if thread.reply_state in ('not_now', 'auto_reply') and thread.revisit_at and not thread.review_due:
                 continue
             if inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'not_interested', 'opt_out', 'source_question', 'auto_reply', 'bounce', 'referral'):
                 priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
+            elif inbound and thread.reply_state in ('interested', 'question') and latest_outbound > latest_inbound:
+                continue
             elif inbound and thread.reply_state in ('interested', 'question'):
                 priority, action, reason = 1, 'answer_reply', 'Write and review a human answer using saved facts.'
             elif thread.meeting_state == 'booked_reported':
@@ -412,7 +467,7 @@ class OutreachStore:
             ranked.append((priority, thread.updated_at, thread, action, reason))
         ranked.sort(key=lambda item: (item[0], item[1]), reverse=False)
         return {'items': [
-            {'thread_id': thread.id, 'company_name': thread.company_name, 'action': action,
+            {'thread_id': thread.id, 'search_id': thread.search_id, 'company_name': thread.company_name, 'action': action,
              'reason': reason, 'reply_state': thread.reply_state,
              'meeting_state': thread.meeting_state, 'updated_at': thread.updated_at}
             for _, _, thread, action, reason in ranked[:limit]
@@ -474,6 +529,9 @@ class OutreachStore:
                             thread.subject, thread.body = saved['subject'], saved['body']
                     except ValueError:
                         pass
+                if self._cold_company_owner(db, thread) not in (None, thread.id):
+                    thread.paused = True
+                    thread.cold_followups_stopped = True
                 thread = self._view(db, thread)
                 db.execute('INSERT INTO outreach_threads VALUES (?,?,?,?,?)',
                            (self.tenant, thread.id, thread.search_id, thread.account_id, thread.model_dump_json()))
@@ -504,6 +562,15 @@ class OutreachStore:
             elif operation == 'contact-basis':
                 thread.contact_basis, thread.approval = body.contact_basis, None
             elif operation == 'approve':
+                owner = self._cold_company_owner(db, thread)
+                if owner not in (None, thread.id):
+                    thread.paused = True
+                    thread.cold_followups_stopped = True
+                    thread.approval = None
+                    thread.revision, thread.updated_at = next_revision, now()
+                    thread = self._save(db, thread)
+                    self._record(db, operation_key, body, [thread])
+                    return thread
                 if not thread.sender_footer:
                     raise OutreachError('Save your sender name, company, mailing address and reachable contact in Edit business before approval.')
                 if not any(m.direction == 'inbound' and m.reply_state in ('interested', 'question') for m in thread.messages) and (thread.booking_link or re.search(r'https?://(?:www\.)?(?:calendly\.com|cal\.com|calendar\.[^/\s?#]+)(?=[/?#\s]|$)', thread.subject + '\n' + thread.body, re.I)):
@@ -542,6 +609,7 @@ class OutreachStore:
                 # classification was accidentally left on an affirmative value.
                 opt_out = re.search(r'\b(unsubscribe|remove me|do not contact|don.t contact|stop emailing|opt[ -]?out)\b', body.body, re.I)
                 state = 'opt_out' if opt_out else ('source_question' if source_question(body.body) else body.reply_state)
+                state = dated_reply_state(state, body)
                 if state == 'bounce':
                     address = thread.recipient.lower()
                     if address and address not in thread.invalid_recipient_emails:
@@ -563,6 +631,7 @@ class OutreachStore:
                 if latest is None:
                     raise OutreachError('Paste a reply before reviewing its classification.')
                 state = 'source_question' if source_question(latest.body) else body.reply_state
+                state = dated_reply_state(state, body)
                 latest.reply_state, thread.reply_state, thread.approval = state, state, None
                 thread.cold_followups_stopped = True
                 if state in ('not_now', 'auto_reply'):

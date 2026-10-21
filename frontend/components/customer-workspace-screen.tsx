@@ -17,11 +17,13 @@ import "./business-onboarding.css";
 
 export function CustomerWorkspaceScreen({
   searchId,
+  initialThreadId,
   organizationControl,
   userControl,
   outreach = false,
 }: {
   searchId?: string;
+  initialThreadId?: string;
   organizationControl?: React.ReactNode;
   userControl?: React.ReactNode;
   outreach?: boolean;
@@ -109,6 +111,7 @@ export function CustomerWorkspaceScreen({
               // hydration is not a scope switch and must not destroy drafts.
               key={`${mode}:${searchId}`}
               searchId={searchId}
+              initialThreadId={initialThreadId}
               profile={workspace?.profile || null}
               profileRefresh={profileRefresh}
               suspended={editing}

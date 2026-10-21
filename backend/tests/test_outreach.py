@@ -381,6 +381,56 @@ class OutreachTest(unittest.TestCase):
         with self.repo.connect() as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0], request_count)
 
+    def test_next_up_removes_interested_work_after_recorded_answer_but_not_after_new_inbound(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='I am interested', reply_state='interested'))
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'answer_reply')
+        thread = self.edit(thread, body='Here is the reviewed answer.' + thread.sender_footer)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
+        self.assertEqual(self.repo.outreach_next_up()['items'], [])
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='A new question', reply_state='question'))
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'answer_reply')
+
+    def test_same_company_cold_owner_is_atomic_and_loser_cannot_approve(self):
+        owner = self.ready()
+        second_search, _ = self.repo.create_customer_search('second_search', 'Property management')
+        second_account = qualify_customer(DEMO_PROFILE,
+            Page('https://business.com/team', 'Business Property Team', 'Property management services.', 'Property management services for businesses.'),
+            target='property management', geography='', search_id=second_search.id)
+        second_search.accounts, second_search.status = [second_account], 'complete'
+        self.repo.save_customer_search(second_search)
+        loser = self.repo.start_outreach(StartOutreach(
+            search_id=second_search.id, account_ids=[second_account.id], idempotency_key=self.key()))['threads'][0]
+        self.assertTrue(loser.paused)
+        self.assertFalse(owner.paused)
+        loser = self.repo.mutate_outreach(loser.id, 'pause', PauseRequest(**self.fields(loser), paused=False))
+        loser = self.edit(loser, recipient='team@business.com', subject='A second introduction', body='Hello, could we discuss a possible fit?')
+        loser = self.edit(loser, body=loser.body + loser.sender_footer)
+        loser = self.basis(loser)
+        claimed = self.repo.mutate_outreach(loser.id, 'approve', RevisionRequest(**self.fields(loser)))
+        self.assertTrue(claimed.paused)
+        self.assertIsNone(claimed.approval)
+        self.assertFalse(claimed.ready_for_manual_action)
+        self.assertTrue(self.repo.outreach_thread(owner.id).ready_for_manual_action)
+
+    def test_revisit_wall_time_rejects_gaps_preserves_both_folds_and_repairs_incomplete_pairs(self):
+        with self.assertRaisesRegex(ValueError, 'does not exist|offset'):
+            PasteReply(**self.fields(self.start()), body='Back later', reply_state='not_now',
+                        revisit_at='2026-03-08T02:30:00-05:00', revisit_timezone='America/Toronto')
+        for offset in ('-04:00', '-05:00'):
+            parsed = PasteReply(**self.fields(self.start()), body='Back later', reply_state='not_now',
+                                 revisit_at=f'2026-11-01T01:30:00{offset}', revisit_timezone='America/Toronto')
+            self.assertIsNotNone(parsed.revisit_at)
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Out of office', reply_state='auto_reply', revisit_timezone='America/Toronto'))
+        self.assertEqual(thread.reply_state, 'awaiting_review')
+        self.assertIsNone(thread.revisit_at)
+        self.assertEqual(thread.messages[-1].body, 'Out of office')
+
     def test_not_now_and_auto_reply_dates_are_stored_explicitly_and_only_due_work_reaches_next_up(self):
         thread = self.ready()
         future = '2099-01-02T12:00:00-05:00'

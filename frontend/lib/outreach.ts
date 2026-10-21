@@ -10,6 +10,17 @@ export type ReplyState =
   | "source_question"
   | "auto_reply"
   | "bounce";
+export type NextUpItem = {
+  thread_id: string;
+  search_id: string;
+  company_name: string;
+  action: "review_reply" | "answer_reply" | "report_meeting" | "manual_send";
+  reason: string;
+  reply_state: ReplyState;
+  meeting_state: OutreachThread["meeting_state"];
+  updated_at: string;
+};
+export type NextUpResponse = { items: NextUpItem[] };
 export type OutreachMessage = {
   id: string;
   direction: "outbound" | "inbound";

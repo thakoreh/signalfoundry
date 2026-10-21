@@ -23,11 +23,13 @@ import "./outreach-workspace.css";
 type Step = "Review" | "Conversations" | "Meetings";
 export function OutreachWorkspace({
   searchId,
+  initialThreadId,
   profile,
   profileRefresh = 0,
   suspended = false,
 }: {
   searchId: string;
+  initialThreadId?: string;
   profile?: Profile | null;
   profileRefresh?: number;
   suspended?: boolean;
@@ -40,6 +42,9 @@ export function OutreachWorkspace({
   const [bases, setBases] = useState<Record<string, ContactBasis>>({});
   const basisGeneration = useRef(0);
   const [incoming, setIncoming] = useState<Record<string, string>>({});
+  const [replySelections, setReplySelections] = useState<Record<string, string>>({});
+  const [revisitAtDrafts, setRevisitAtDrafts] = useState<Record<string, string>>({});
+  const [revisitZoneDrafts, setRevisitZoneDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -95,9 +100,11 @@ export function OutreachWorkspace({
           return next;
         });
         setActive((current) =>
-          data.threads.some((t) => t.id === current)
-            ? current
-            : data.threads[0]?.id || "",
+          initialThreadId && data.threads.some((t) => t.id === initialThreadId)
+            ? initialThreadId
+            : data.threads.some((t) => t.id === current)
+              ? current
+              : data.threads[0]?.id || "",
         );
       })
       .catch((cause) => {
@@ -107,7 +114,7 @@ export function OutreachWorkspace({
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [api, mode, searchId, reload, profileRefresh, suspended]);
+  }, [api, mode, searchId, reload, profileRefresh, suspended, initialThreadId]);
   const thread = threads.find((item) => item.id === active);
   const draft = thread ? drafts[thread.id] || threadDraft(thread) : null;
   const dirty = Boolean(
@@ -237,6 +244,8 @@ export function OutreachWorkspace({
         setBases((current) => { const next = { ...current }; delete next[updated.id]; return next; });
       if (action === "replies")
         setIncoming((current) => ({ ...current, [thread.id]: "" }));
+      if (action === "reply-state")
+        setReplySelections((current) => { const next = { ...current }; delete next[updated.id]; return next; });
       if (action === "sent") setChangedSent(null);
       setNotice(
         action === "sent"
@@ -671,16 +680,20 @@ export function OutreachWorkspace({
                       {thread.messages.some(
                         (message) => message.direction === "inbound",
                       ) && (
+                        <>
                         <label>
                           Review reply status
                           <select
-                            value={thread.reply_state || "awaiting_review"}
+                            value={replySelections[thread.id] || thread.reply_state || "awaiting_review"}
                             disabled={!!busy}
-                            onChange={(event) =>
-                              void mutate("reply-state", "PATCH", {
-                                reply_state: event.target.value,
-                              })
-                            }
+                            onChange={(event) => {
+                              const value = event.target.value;
+                              if (value === "not_now" || value === "auto_reply") {
+                                setReplySelections((current) => ({ ...current, [thread.id]: value }));
+                              } else {
+                                void mutate("reply-state", "PATCH", { reply_state: value });
+                              }
+                            }}
                           >
                             {Object.entries(replyLabels).map(
                               ([value, label]) => (
@@ -691,6 +704,22 @@ export function OutreachWorkspace({
                             )}
                           </select>
                         </label>
+                        {(replySelections[thread.id] === "not_now" || replySelections[thread.id] === "auto_reply") && (
+                          <section className="outreach-revisit-controls" aria-label="Revisit date controls">
+                            <label>
+                              Return date and time (include numeric offset)
+                              <input type="datetime-local" step="60" value={revisitAtDrafts[thread.id] || ""} onChange={(event) => setRevisitAtDrafts((current) => ({ ...current, [thread.id]: event.target.value }))} />
+                            </label>
+                            <label>
+                              IANA timezone
+                              <input placeholder="America/Toronto" value={revisitZoneDrafts[thread.id] || ""} onChange={(event) => setRevisitZoneDrafts((current) => ({ ...current, [thread.id]: event.target.value }))} />
+                            </label>
+                            <button className="btn" type="button" disabled={!!busy} onClick={() => void mutate("reply-state", "PATCH", { reply_state: replySelections[thread.id], revisit_at: revisitAtDrafts[thread.id] ? new Date(revisitAtDrafts[thread.id]).toISOString() : null, revisit_timezone: revisitZoneDrafts[thread.id] || null })}>
+                              Save reply review
+                            </button>
+                          </section>
+                        )}
+                        </>
                       )}
                       <h3>Write your reply</h3>
                       <p>
