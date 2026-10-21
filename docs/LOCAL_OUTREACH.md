@@ -1,5 +1,7 @@
 # Persistent local outreach review
 
+Current continuation: the local flow now includes fresh referral contacts, bounded dated manual followups, timed meeting/confirmation reports, Next up/saved return, a reported-company activity summary, exact mailto handoff and logical local data controls. See [current status](continuation/STATUS.md) for built/tested versus remaining work, and [consolidated setup](continuation/LOCAL_SETUP.md) for off switches. Original route descriptions below may cover only the earlier subset. Hosted/inbox/send/calendar and AI replies remain unavailable; no connected capability is implied.
+
 This is a real SQLite-backed private local workflow. It does not connect an inbox,
 send mail, detect replies, create calendar events, or assert that a meeting or sale
 actually happened. SaaS must fail closed until it has tenant-authenticated hosted

@@ -2,6 +2,8 @@
 
 You are taking over SignalFoundry (some source/UI still says ClientRove). Finish the existing app, not another plan, prototype or replacement. The original whole-app goal is INCOMPLETE. A previous one-hour completion target was missed; it is historical, not a new deadline or permission to weaken acceptance.
 
+CURRENT OVERLAY: source has advanced beyond the original c929 handoff. Read the top of STATUS.md/PROGRESS.md and inspect actual HEAD before using the historical backlog below. Literal company policy is adjudicated in COMPANY_RESUME_ADJUDICATION.md; fresh founder resume+approval is permitted, while actual dual ownership/bounce defects were fixed and independently tested. Local referrals, max-two dated followups, timed meetings, funnel/next-batch, returning work, mailto and monetary admission are implemented; local export/logical closure/quarantined restore also exist. Do not rebuild them or repeat old unresolved findings without new evidence. Full rendered Chrome acceptance, hosted parity, live providers/history, reply AI/mailbox/calendar and remaining release work are still unaccepted. Setup/off switches are LOCAL_SETUP.md. The actual owner preview/profile/data remain protected; no new browser method is authorized by this document.
+
 ## Repository and first actions
 
 - Repository: https://github.com/thakoreh/signalfoundry

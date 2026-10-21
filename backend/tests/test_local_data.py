@@ -51,6 +51,15 @@ class LocalDataTest(unittest.TestCase):
         with patch.dict('os.environ', {'SIGNALFOUNDRY_PUBLIC_ACCESS': 'true'}), TestClient(create_app(self.path, testing=True)) as client:
             self.assertEqual(client.get('/api/privacy/export').status_code, 403)
 
+    def test_local_off_switches_deny_actions_without_deleting_saved_records(self):
+        with patch.dict('os.environ', {'CLIENTROVE_LOCAL_OUTREACH_ENABLED': 'false', 'CLIENTROVE_LOCAL_EXPORT_ENABLED': 'false'}), TestClient(create_app(self.path, testing=True)) as client:
+            self.assertEqual(client.get('/api/outreach').status_code, 403)
+            self.assertEqual(client.get('/api/privacy/export').status_code, 403)
+            self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': ['fictional_account'], 'idempotency_key': 'fictional_off_key'}).status_code, 403)
+            self.assertEqual(client.get('/api/workspace').status_code, 200)
+        self.assertIsNotNone(self.repo.customer_search(self.search.id))
+        self.assertFalse(self.repo.closed())
+
     def test_erase_closes_stale_writers_and_retains_stop_and_financial_authority(self):
         with self.repo.connect() as db:
             db.execute("INSERT INTO cost_policies VALUES ('tenant','local-demo','2026-10',25000000,123,'2026-10-01T00:00:00Z','fictional statement',1,'{}')")

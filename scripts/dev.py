@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import shutil
 import signal
+import socket
 import subprocess
 import sys
 import time
@@ -31,7 +32,10 @@ def stop(process: subprocess.Popen) -> None:
         if os.name == 'posix':
             os.killpg(process.pid, signal.SIGTERM)
         else:
-            process.terminate()
+            # Windows venv Python can launch a redirector child. Terminate only
+            # this explicitly created tree, so it cannot retain a test server.
+            subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
         process.wait(timeout=5)
     except subprocess.TimeoutExpired:
         if os.name == 'posix':
@@ -43,12 +47,30 @@ def stop(process: subprocess.Popen) -> None:
         pass
 
 
+def require_free_ports(*ports):
+    if len(set(ports)) != len(ports):
+        raise ValueError('The API and browser need different ports')
+    listeners = []
+    try:
+        for number in ports:
+            listener = socket.socket()
+            listeners.append(listener)
+            if os.name == 'nt': listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            try:
+                listener.bind(('127.0.0.1', number))
+            except OSError:
+                raise ValueError('A requested local port is already occupied. Keep the existing preview running and choose separate allowed ports.') from None
+    finally:
+        for listener in listeners: listener.close()
+
+
 def main() -> int:
     node = shutil.which('node')
     next_bin = ROOT / 'frontend/node_modules/next/dist/bin/next'
     if not node or not next_bin.is_file():
         raise SystemExit('Run ./scripts/setup.sh first; Node.js and frontend dependencies are required')
     api_port, ui_port = port('BACKEND_PORT', 8000), port('FRONTEND_PORT', 3000)
+    require_free_ports(api_port, ui_port)
     env = {**os.environ, 'API_BASE_URL': f'http://127.0.0.1:{api_port}', 'NEXT_TELEMETRY_DISABLED': '1',
            'SIGNALFOUNDRY_MODE': 'local-demo', 'NEXT_PUBLIC_SIGNALFOUNDRY_MODE': 'local-demo'}
     processes: list[subprocess.Popen] = []

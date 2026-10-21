@@ -947,7 +947,7 @@ def outreach_router(repository, *, blocked_preview=False):
 
     def service():
         if blocked_preview:
-            raise HTTPException(403, 'Conversation review requires a private local workspace. It is unavailable in this public preview.')
+            raise HTTPException(403, 'Conversation review is disabled in this deployment. Your saved research remains available.')
         return repository()
 
     def call(method, *args):

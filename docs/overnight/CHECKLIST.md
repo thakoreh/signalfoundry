@@ -1,5 +1,9 @@
 # Source-backed release acceptance map
 
+## Current continuation matrix
+
+The authoritative current14-step and cross-cutting P0/P1 built/tested/blocked/deferred map is `docs/continuation/STATUS.md`. It supersedes the historical c929/S3-only pending rows below. Local referrals, bounded followups, timed meetings, company activity/next batch, returning work/mailto, monetary admission and logical data/restore controls now exist with scoped local tests/reviews. Full fresh Chrome journey, physical-device/screen-reader, hosted parity, live account/history/pricing/provider/billing, reply-AI/mailbox/calendar and production operations acceptance remain incomplete. Read latest `PROGRESS.md` and actual Git/PR HEAD; no old check or screenshot certifies the new whole product.
+
 ## CURRENT S3 implementation-ready engineering handoff — not self-approval/full-release readiness
 
 Source checkpoint `944c8002911b423c782efaeb4cd9d1097d728f54` is the exact tested S3 code checkpoint. It keeps the existing additive contact-basis v1 safety contract and adds a narrow recipient-refresh race repair: local basis overlays survive ordinary refreshes only when their `published_email` still matches the refreshed thread recipient; a recipient changed outside the editor clears the stale overlay. The RED regression and GREEN fix are recorded in `PROGRESS.md`.

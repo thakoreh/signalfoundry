@@ -1,5 +1,7 @@
 # Clientrove: from prospects to qualified conversations
 
+Current implementation note: the historical research below predates the local monetary ledger and expanded manual day-two journey. [Current status](continuation/STATUS.md) supersedes its old implementation-gap statements. The ceiling is still not spending permission; historical account usage/current real prices are unaccepted and live operation remains blocked.
+
 October 19, 2026. This research reflects the user's clarified goal: lead discovery is the first stage of a product that helps founders run outbound, handle conversations, qualify interest, and arrange meetings. It supersedes treating a list/draft/export workflow as the complete intended product. The agreed early-testing ceiling is **US$25 total per month, including existing DeepSeek search and model usage**. DeepSeek is already configured and should be reused by default. This is a planning constraint; there is no implemented global spend ledger or verified provider-account hard cap. No messages were sent, accounts connected, ads launched, purchases made, provider calls run, or app code changed for this research.
 
 ## Opinion and recommended position

@@ -154,8 +154,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
 
     @app.get('/api/privacy/export')
     def privacy_export():
-        if configured_origin or public_access:
-            raise HTTPException(403, 'Local workspace export is unavailable on a public preview.')
+        if configured_origin or public_access or os.environ.get('CLIENTROVE_LOCAL_EXPORT_ENABLED', 'true') != 'true':
+            raise HTTPException(403, 'Local workspace export is disabled for this deployment.')
         try:
             snapshot = export_tenant(repository())
         except ValueError as error:
@@ -379,7 +379,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
                         headers={'Content-Disposition': f'attachment; filename="signalfoundry-{campaign_id}.csv"'})
 
     from .outreach import outreach_router
-    app.include_router(outreach_router(repository, blocked_preview=bool(configured_origin or public_access)))
+    app.include_router(outreach_router(repository, blocked_preview=bool(configured_origin or public_access or
+        os.environ.get('CLIENTROVE_LOCAL_OUTREACH_ENABLED', 'true') != 'true')))
     return app
 
 

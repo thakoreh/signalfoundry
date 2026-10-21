@@ -1,5 +1,7 @@
 # Historical local implementation decisions
 
+Current implementation/status supersedes the original pending-work/deadline wording below. See STATUS.md, COMPANY_RESUME_ADJUDICATION.md, MONETARY_SAFEGUARDS.md, LOCAL_DATA_OPERATIONS.md and LOCAL_SETUP.md. The approved minimal contracts below now have local referral/followup/meeting/funnel implementations and scoped tests/reviews; no hosted/connected or full rendered acceptance is claimed. Monetary prices/history remain unaccepted. Never restart the old worker hierarchy or retry an expired deadline.
+
 The old clock/worker orchestration is historical, not an instruction to start or restart anything. See NEXT_AGENT_PROMPT.md for current continuation instructions. Date ambiguity is clarified by DATE_REVIEW_ADJUDICATION.md.
 
 ## Approved minimal local contracts

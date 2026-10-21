@@ -1,4 +1,61 @@
-# SignalFoundry fixed-hour checkpoint report
+# Current continuation status — October21,2026
+
+## Verdict and owner decisions
+
+**INCOMPLETE — a substantially extended local candidate, not accepted as a verified release candidate or production-ready product.** No staging or production verification is claimed. The original fixed-hour report below is historical and does not describe current implementation.
+
+The remaining human inputs are: an isolated Chrome testing method/profile (the connected tool exposes only the owner's personal profile, which must not be reused); actual historical DeepSeek/account billing evidence, current accepted prices and separate spending authorization before paid work; later explicit account/provider/mailbox/calendar/billing test credentials and authority if connected operation is wanted. No Ads budget is allocated. No real provider operation, outreach, connection, purchase, deployment, merge or main push was performed. No owner data was read or modified. Unknown historical usage remains **unknown**, not zero.
+
+Branch remains `codex/clientrove-release-candidate`, draft [PR7](https://github.com/thakoreh/signalfoundry/pull/7), based on main`cfd22af0e693a4854e3e2c46e034ccf5a39127f3`. Handoff`0c1418d` was continued, never replaced by a fresh main baseline. The exact final docs/source/check head is the current Git/PR head; later docs-only commits must not borrow old CI. Product checkpoints are organized below; final check readback belongs in PROGRESS.md and the PR guide.
+
+## Canonical journey: source and actual evidence
+
+| Step / priority | Current implementation and source | Evidence state and remaining acceptance |
+|---|---|---|
+|1 Landing / P0|Existing website-first landing, fictional examples, manual-versus-planned journey in landing-page/intake.|Locally tested existing foundation; new complete14-step Chrome screenshots and conversion/user validation **blocked/pending**. No new testimonials or outcome claims.|
+|2 Signup / P0|Existing per-tab website intake, auth/organization REST boundary; no analysis on signup.|Node/component/Convex offline tests. Real Clerk/organization/billing test-mode **blocked** by account/authorization; not verified live.|
+|3 Confirm once / P0|Saved seller/offer/target context, manual alternative, sender/footer repair. Any saved profile change invalidates pending approvals.|Backend/component locally tested. Owner's saved profile preserved. No real website/provider verification in this run.|
+|4 Discovery / P0|Default/max5; existing saved progress/results; new durable global+tenant admission before paid HTTP.|Backend and monetary adversarial tests locally tested. Live discovery **blocked** by unknown historical exposure/pricing/authorization. Quotas are not claimed as dollars.|
+|5 Contacts / P0|Dense desktop/reachable phone actions preserved; individual-style addresses above labelled shared inboxes; status/source/research date; selected CSV; company flags.|Node/component locally tested; published addresses stay unverified. Accuracy benchmark and new rendered phone layouts **pending**. Generic fit and Research details panels stay removed.|
+|6 Draft/approve/report / P0|Exact sender/footer/basis admission, immutable approval identity; fresh Copy/mailto preflight, long-link Copy fallback; approved versus changed actual snapshots; immediate post-action report. Saved company excerpts support literal wording review.|Backend/component/race tests and actual HTTP manual-report path locally tested. Copy/Open never implies send. Claims need human review; labels do not verify facts/consent. No mail app or real recipient was contacted.|
+|7 Departure / P0|Read-only saved approvals and future followup/snooze/meeting dates in OutreachInsights.|Backend/component locally tested. GET never schedules or generates. New Chrome walkthrough **pending**.|
+|8 Next up / P0|Returning saved-profile home, one primary action/thread; completed stop tasks removed; pending saved approval/planning surfaced. Recent work has search and Show all up to existing100-thread cap.|Backend/component locally tested. No repeated setup form on return. Day-two rendered busy-founder task timing **pending**.|
+|9 Replies/referrals / P0|All specified manual types, date repair/snooze, bounce invalidity, sticky source-question/opt-out, company pause; fresh separate referral linked to actual inbound and manually entered referrer credit.|Backend/component plus real HTTP OOO/referral/sticky stop path locally tested. No automatic inbox detection or consent/identity inference.|
+|10 Answer / P0/P1|Saved actual offer facts beside chronological conversation; manual answer remains editable, must be saved/approved/reported. Answer tasks open Conversations.|Locally tested manual flow. AI reply copilot remains **unbuilt/deferred**; reviewed contract exists but no priced, consent-disclosed/verified implementation. Route stays closed.|
+|11 Followups / P0|Durable max2 after explicit reported initial send; at least3weekdays apart; original recipient; date+IANA; fresh due approval; every inbound permanently cancels cold sequence.|Backend timing/DST/idempotency/max-bound tests and real HTTP early-denial/OOO-stop locally tested. Nothing auto-sends or consumes allowance when merely copied/opened.|
+|12 Meetings/customer / P0|Timed manual booking, recipient/version-bound one confirmation per booking version, preserved reschedule audit; after-time held/no-show/cancelled; won/lost separately reported.|Backend/component and real HTTP past-time attendance→separate won report locally tested. Calendar-confirmed bookings/delivery **blocked**; link≠booking, meeting≠sale.|
+|13 Funnel / P0|Read-only all-time unique canonical-company independent counts; classified human replies only, demo/unknown provenance excluded; reported outcome truth.|Backend/component/HTTP locally tested. This is local activity, not revenue, acquisition attribution or proof of demand. Privacy-safe marketing analytics **unbuilt/deferred**.|
+|14 Next batch / P0|Reuse saved profile; contacted/suppressed/paused company markers; next-five link.|Locally tested projection. No auto-research or larger result allowance. Full rendered return→next-batch path **pending**.|
+
+## Cross-cutting P0/P1 map
+
+| Requirement | Current state |
+|---|---|
+|Company policy discrepancy|**Locally tested and independently scoped pass.** Explicit founder resume plus fresh approval is allowed; no automatic stale approval/suppression restoration or two active cold owners. Read COMPANY_RESUME_ADJUDICATION.md; raw old finding preserved.|
+|Monetary admission / tenant / restart / receipts / kill|**Built + locally tested**, independent13-control scoped pass atca43048; later closure guard tested. Integer micro-USD, both caps, reserve-before-dispatch, one in-flight, credential/payload/version/period binding, uncertain/overbound stop, immutable audit and legacy migration. **Live operation blocked**: no accepted real history/rates/policy or spend. One DB authority, not global across copies/external account activity.|
+|Privacy export / deletion|**Built + locally tested locally.** Tenant snapshot attachment; explicit offline logical erase-and-close; SQL stale-writer guards; retain minimal suppression/financial/closure facts. No secure disk wipe, external-copy deletion, hosted deletion or finalized retention policy claimed.|
+|Backup / restore / rollback|**Built + locally tested local drill.** WAL-consistent new backup, integrity/hash; staged+atomic quarantined restore with no activation command, current authority untouched. Independent crash/race controls pass at58bd82b. Production recovery reconciliation/retention remains **unbuilt/blocked**; never overwrite newer suppression or monetary history.|
+|Auth / roles / organization races|Existing adapter/Convex boundaries **locally tested** with offline fixtures. Hosted outreach parity **unbuilt/deferred**, adapter disabled. Real auth/billing account tests **blocked**. No local SQLite auth claim.|
+|Mailbox / OAuth / outbox / replies / calendar|**Unbuilt/deferred**, live operation **blocked** by provider/ownership/authorization. No new service/account/queue purchased or connected. Current app is manual-assisted. Do not relabel the manual loop as connected automation.|
+|Compliance / deliverability|Current primary FTC/CRTC/CASL guidance reviewed; identity/address/ad identification/opt-out and manual role/source/notice/US-Canada basis gates locally tested. No legal clearance/verified consent. No pixels/link rewriting. Connected daily ramps/authentication checks/bounce-complaint transport stop **unbuilt**, transport remains closed.|
+|Worker / packaging / operations|Existing isolated worker boundary/preflight/packaging checks retained; worker no-context paid transport denied. Windows packaging made native. Docker daemon unavailable locally; exact-head Ubuntu container/source CI required. Alerts/production operations and rollback deployment drill **unbuilt/blocked**, no external notifications configured.|
+|Accessibility / UX / final acceptance|Automated component/keyboard/race foundation passes; fresh full-journey Chrome1440/390/320,200%zoom/reduced-motion/long-content/error screenshots **pending**. Personal profile must not be reused. Physical phone/screen reader **not tested**. Independent source/component reviews are not rendered UX or GitHub approval.|
+|Solo review / release|PR7 stays draft because full acceptance is unmet. Review by seam using checkpoints and risk order; large cumulative PR is not asserted to fit one hour. No force push, main/settings change, merge or owner approval substituted by AI.|
+
+## Checkpoints and reviewability
+
+- c887f76: company ownership/deferred-bounce safety and literal policy adjudication.
+- 5449692: separate referral contacts and actual referrer linkage.
+- 0ddc7ee/dbdac05: bounded followups/timed meetings, confirmation repairs, honest activity/next-batch.
+- e1be614 throughca43048: durable monetary admission, receipt/credential/migration review repairs, portable packaging.
+- ab04a85/ce37b6c: returning workspace, contact rank, exact mailto/changed-send binding, claim review, independent-review repairs, local data controls.
+- 58bd82b/3befd3d: atomic quarantined restore and actual HTTP fixture with retained socket ownership.
+
+Final verification and remaining platform gates are recorded at the top of `docs/overnight/PROGRESS.md`. Setup/off switches: LOCAL_SETUP.md; monetary owner steps: MONETARY_SAFEGUARDS.md; data closure/restore: LOCAL_DATA_OPERATIONS.md. Preserve old snapshots below as history, not current capability claims.
+
+---
+
+# Historical fixed-hour checkpoint report
 
 ## Verdict
 

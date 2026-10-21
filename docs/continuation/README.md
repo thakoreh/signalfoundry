@@ -2,6 +2,8 @@
 
 **Verdict: INCOMPLETE. Continue the existing app; do not rebuild or describe it as finished.** This bundle makes the project handoff independent of the previous AI's private memory, local chat history, gateway, and task board.
 
+Current continuation overlay: local referrals, bounded followups, timed meetings, activity/next-batch, monetary admission, returning workspace/mailto and logical local data controls have since been implemented/tested. The remaining work is not the original c929-only backlog. Start with the current matrix in STATUS.md and latest PROGRESS.md. Consolidated setup/off switches are LOCAL_SETUP.md, monetary setup is MONETARY_SAFEGUARDS.md, and closure/restore limits are LOCAL_DATA_OPERATIONS.md. New complete Chrome journey verification remains pending; no production acceptance is implied.
+
 ## Start here
 
 1. [NEXT_AGENT_PROMPT.md](NEXT_AGENT_PROMPT.md): copy/paste instructions for the next coding agent.
@@ -16,7 +18,7 @@
 
 - Repository: thakoreh/signalfoundry.
 - Continue `codex/clientrove-release-candidate`, existing draft PR7. PR5 and its branch are finished history.
-- Last **application-code** checkpoint: `c929cbaf0019909ff21bce3633f25842cf67c281`. This handoff is a later documentation-only commit, not another implemented application feature.
+- Original portable handoff application checkpoint: `c929cbaf0019909ff21bce3633f25842cf67c281`. Current continuation code is in later commits on the SAME branch; inspect Git/PR HEAD and STATUS.md. Do not reset to this historical SHA.
 - Verified origin/main at handoff preparation: `cfd22af0e693a4854e3e2c46e034ccf5a39127f3`. Fetch again; preserve dirty work and merge newer origin/main normally if needed, never rebase/force pushed history.
 - c929cba required CI run39540683162 passed source-checks/container-checks/GitGuardian. A later documentation head needs its own CI; never claim that an old head's checks belong to the latest one.
 - No merge, approval, deploy, real send, purchase or provider connection was performed. Existing authorized work is preserved in Git, not just this bundle.
@@ -43,6 +45,6 @@ Historical `<LOCAL_HOME>` / `<HISTORICAL_LOCAL_ARTIFACT_ROOT>` paths in reports 
 
 ## Remaining release work at this checkpoint
 
-Local referral contacts, bounded dated cold followups, departure summary, timed meetings/confirmation/outcome prompts, company funnel and contacted/suppressed next batch; monetary admission/history reconciliation; hosted auth/tenant parity and gated provider prerequisites; privacy/export/delete, isolated backup/restore/operations; final integrated14-journey security/UX/browser/accessibility testing, consolidated setup/off switches and solo-maintainer reviewability. Detailed status and exact constraints are in the linked contract/prompt.
+The current local implementation covers the referral/followup/meeting/funnel and monetary admission seams with scoped offline reviews. Outstanding are live history/pricing/authority, fresh full Chrome/mobile/accessibility acceptance, hosted auth/outreach/privacy parity, reply-AI/mailbox/outbox/calendar and real billing/provider prerequisites, production operations/recovery/retention and whole-product acceptance. Do not label unbuilt code as merely an account-input gate. Detailed built/tested/blocked/deferred mapping is STATUS.md.
 
 The previous one-hour target expired on2026-10-21; it is not a new countdown. Do not mark complete at a clock boundary. Continue useful safe code/tests, prove the actual journey, and report unfinished or genuinely gated work honestly.
