@@ -110,7 +110,14 @@ export function OutreachWorkspace({
   const dirty = Boolean(
     thread && draft && !sameOutreachDraft(draft, threadDraft(thread)),
   );
-  const basis = thread ? bases[thread.id] || thread.contact_basis || emptyContactBasis(thread.recipient) : null;
+  const recipientChanged = Boolean(
+    thread && draft && draft.recipient !== thread.recipient,
+  );
+  const basis = thread
+    ? recipientChanged
+      ? emptyContactBasis(draft?.recipient || "")
+      : bases[thread.id] || thread.contact_basis || emptyContactBasis(thread.recipient)
+    : null;
   const basisDirty = Boolean(thread && bases[thread.id]);
   useUnsavedChanges(
     Object.keys(bases).length > 0 ||
@@ -135,12 +142,11 @@ export function OutreachWorkspace({
       draft?.body.trim() &&
       !draft.body.endsWith(thread.sender_footer),
   );
-  const savedRecipientEvidence =
-    thread && draft?.recipient === thread.recipient
-      ? thread.contact_basis
-      : null;
+  const savedRecipientEvidence = !recipientChanged
+    ? thread?.contact_basis
+    : null;
   const recipientStatus =
-    draft && thread && draft.recipient !== thread.recipient
+    recipientChanged
       ? "edited recipient · verification not established"
       : thread?.recipient_status === "verified"
         ? "provider reports verified"
@@ -751,7 +757,7 @@ export function OutreachWorkspace({
                     </label>
                   </div>
                   {basis && <ContactBasisEditor value={basis} disabled={!!busy && busy !== "contact-basis"}
-                    dirty={basisDirty} recipientChanged={draft.recipient !== thread.recipient}
+                    dirty={basisDirty} recipientChanged={recipientChanged}
                     onChange={(value) => { cancelCopy(); basisGeneration.current++; setBases(current => ({ ...current, [thread.id]: value })); setNotice(""); }}
                     onSave={() => void mutate("contact-basis", "PUT", { contact_basis: normalizeContactBasisForApi(basis) })} />}
                   {step === "Review" && !thread.messages.length && (

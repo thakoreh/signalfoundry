@@ -144,6 +144,31 @@ it("clears local basis when a refreshed recipient no longer has the saved eviden
   expect(container.textContent).not.toContain("Private stale role");
 });
 
+it("hides old recipient evidence immediately during an unsaved recipient edit", async () => {
+  thread.contact_basis = {
+    version: 1,
+    basis_type: "conspicuous_publication",
+    published_email: "hello@example.org",
+    source_url: "https://example.org/team",
+    captured_at: "2026-01-01T12:00:00Z",
+    publisher_attribution: "recipient",
+    notice_status: "clear",
+    recipient_role: "Operations lead",
+    message_relevance: "A specific role-relevant reason.",
+    recipient_country: "CA",
+    recipient_timezone: null,
+  };
+  await mount();
+  await change("Recipient", "new@example.org");
+  expect(container.querySelector('a[href="https://example.org/team"]')).toBeNull();
+  expect(field("Publication source URL").value).toBe("");
+  expect(field("Observation time (with timezone)").value).toBe("");
+  expect(container.textContent).toContain("Evidence for: new@example.org");
+  expect(container.textContent).toContain("Recipient change is unsaved. Old evidence is hidden");
+  expect(button("Approve exact message").disabled).toBe(true);
+  expect(button("Copy approved message").disabled).toBe(true);
+});
+
 it("keeps newer evidence typed during a delayed save and denies late Copy after evidence typing", async () => {
   await mount();
   await click("Approve exact message");

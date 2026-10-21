@@ -471,7 +471,33 @@
     font-size: 16px;
   }
   .business-onboarding-details {
-    padding: 24px 21px;
+    padding: 12px 16px;
+  }
+  .business-onboarding-detail-fields {
+    gap: 12px;
+  }
+  .business-onboarding-detail-fields label {
+    gap: 5px;
+  }
+  .business-onboarding-detail-fields input,
+  .business-onboarding-detail-fields textarea {
+    padding: 7px 12px;
+    line-height: 1.35;
+  }
+  .business-onboarding-detail-fields input {
+    min-height: 44px;
+  }
+  .business-onboarding-detail-fields textarea {
+    min-height: 0;
+  }
+  .business-onboarding-next-step {
+    gap: 4px;
+    margin-top: 8px;
+    padding: 6px 12px;
+  }
+  .business-onboarding-next-step p {
+    margin-top: 2px;
+    line-height: 1.35;
   }
   .business-onboarding-next-step {
     grid-template-columns: 1fr;
@@ -498,7 +524,7 @@
     gap: 8px;
   }
   .business-onboarding-main {
-    margin-top: 28px;
+    margin-top: 16px;
   }
   .business-onboarding-intro h1 {
     letter-spacing: -1.3px;
