@@ -95,6 +95,17 @@ class CostLedger:
             db.execute('BEGIN IMMEDIATE')
             if 'resolution_lock' not in {row['name'] for row in db.execute('PRAGMA table_info(paid_attempts)')}:
                 db.execute('ALTER TABLE paid_attempts ADD COLUMN resolution_lock INTEGER NOT NULL DEFAULT 0')
+                # Old rows did not distinguish crash uncertainty from receipt
+                # conflicts. Never invent that lost provenance on upgrade.
+                for row in db.execute('SELECT tenant,attempt,status,usage FROM paid_attempts').fetchall():
+                    try:
+                        usage = json.loads(row['usage']) if row['usage'] else {}
+                        operator = isinstance(usage, dict) and 'operator_reference' in usage
+                    except (ValueError, TypeError):
+                        operator = True
+                    if row['status'] == 'uncertain' or operator:
+                        db.execute('UPDATE paid_attempts SET resolution_lock=1 WHERE tenant=? AND attempt=?',
+                                   (row['tenant'], row['attempt']))
 
     def configure_scope(self, scope, scope_id, *, historical, cutoff, reference, cap=CEILING, enabled=False, catalog=None, period=None):
         """Trusted offline operator setup only. Never seed with an assumed zero.

@@ -20,6 +20,25 @@ from tests.test_customer_drafts import qualified
 
 
 class CostAdmissionTests(unittest.TestCase):
+    def test_upgrade_locks_legacy_uncertainty_and_operator_receipts_without_rewriting_amounts(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Repository(Path(temp) / 'legacy-fixture.sqlite3')
+            with repo.connect() as db:
+                db.execute('CREATE TABLE paid_attempts (tenant TEXT,attempt TEXT,operation TEXT,fingerprint TEXT,period TEXT,reserved INTEGER,actual INTEGER,status TEXT,quote TEXT,usage TEXT,created_at TEXT,finished_at TEXT,PRIMARY KEY(tenant,attempt))')
+                for attempt, actual, state, usage in [('overbound', 5354, 'uncertain', {'operator_reference': 'fictional-billing-receipt'}),
+                                                       ('resolved', 20, 'settled', {'operator_reference': 'fictional-resolved-receipt'}),
+                                                       ('unknown_legacy', None, 'uncertain', None)]:
+                    db.execute('INSERT INTO paid_attempts VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+                               ('fixture', attempt, 'deepseek:intro', 'fixture-fingerprint', '2026-10', 5000, actual, state,
+                                json.dumps(quote_call('deepseek:intro', {'model': 'deepseek-flash', 'max_tokens': 600}, CATALOG['deepseek:intro'])),
+                                json.dumps(usage) if usage else None, '2026-10-01T12:00:00+00:00', None))
+            ledger = CostLedger(repo)
+            for attempt in ('overbound', 'resolved', 'unknown_legacy'):
+                with self.assertRaisesRegex(CostDenied, 'operator reconciliation'):
+                    ledger.settle('fixture', attempt, {'usage': {'prompt_tokens': 10, 'completion_tokens': 5}})
+            with repo.connect() as db:
+                self.assertEqual(db.execute("SELECT actual,status,resolution_lock FROM paid_attempts WHERE attempt='overbound'").fetchone()[:], (5354, 'uncertain', 1))
+
     def test_default_unknown_history_missing_context_and_legacy_live_transport_dispatch_nothing(self):
         with tempfile.TemporaryDirectory() as temp:
             ledger = CostLedger(Repository(Path(temp) / 'fictional.sqlite3'))

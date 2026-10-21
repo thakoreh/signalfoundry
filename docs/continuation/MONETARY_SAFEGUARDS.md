@@ -10,6 +10,8 @@ Each attempt has an immutable tenant/logical-operation/input fingerprint, price 
 
 Every actual transport also binds the captured credential fingerprint to its reconciled catalog entry. Changing the key cannot silently inherit a different provider account's history. The captured key is used for that same dispatched request; it is never stored in the ledger or printed. Conflict/over-bound receipts and operator-reconciled attempts have a durable resolution lock: an old lower usage response cannot erase them. Only explicit operator reconciliation can resolve such a stop. Ordinary original in-flight receipts may still settle recoverable crash uncertainty once.
 
+The additive upgrade also locks prior operator receipts and legacy uncertain rows. Earlier versions did not record why an attempt became uncertain, so the migration does not invent recoverable transport provenance. These legacy rows need explicit billing reconciliation; their old amounts, usage and status are preserved. Newly recorded transport uncertainty retains its distinct recoverable state.
+
 The local global scope covers every tenant/process using **this one database**, not independent copies or external use of the same provider account. Separate hosted/stateless workers have no authoritative context and are denied at transport. Live Jev remains denied; deterministic rules and network-free MockTransport tests remain. Hosted paid parity is not implemented and must stay disabled. Do not give real keys to unguarded old deployments or fixtures.
 
 ## Operator steps, after separate owner authorization
