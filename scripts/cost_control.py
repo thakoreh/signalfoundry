@@ -1,11 +1,12 @@
 """Local operator monetary controls. Never contacts a provider or reads keys."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'backend'))
-from app.cost_admission import CostDenied, CostLedger
+from app.cost_admission import CostDenied, CostLedger, digest
 from app.store import Repository
 
 
@@ -16,6 +17,9 @@ def main():
     sub = parser.add_subparsers(dest='action', required=True)
     sub.add_parser('status')
     sub.add_parser('stop')
+    fingerprint = sub.add_parser('fingerprint')
+    fingerprint.add_argument('--provider', choices=['deepseek', 'brave', 'hunter'], required=True)
+    fingerprint.add_argument('--owner-authorized', required=True, action='store_true')
     configure = sub.add_parser('configure')
     configure.add_argument('--policy', required=True, type=Path, help='Private JSON with explicit global and tenant policies')
     authorize = sub.add_parser('authorize')
@@ -30,6 +34,13 @@ def main():
     args = parser.parse_args()
     if not args.db.is_file():
         parser.error('Use an existing database; this command will not create a new budget authority.')
+    if args.action == 'fingerprint':
+        variable = {'deepseek': 'DEEPSEEK_API_KEY', 'brave': 'BRAVE_SEARCH_API_KEY', 'hunter': 'HUNTER_API_KEY'}[args.provider]
+        key = os.environ.get(variable, '').strip()
+        if not key:
+            parser.error('The selected provider credential is not configured in this local shell.')
+        print(json.dumps({'billing_identity': digest(key)}))
+        return 0
     ledger = CostLedger(Repository(args.db, args.tenant))
     try:
         if args.action == 'stop':

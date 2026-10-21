@@ -85,6 +85,14 @@ class CostAdmissionTests(unittest.TestCase):
         dispatch.assert_not_called()
         context.run('deepseek:search', {'query': 'fixture'}, lambda: {'results': []})
 
+    def test_rotated_or_unbound_provider_key_does_not_inherit_reconciled_history(self):
+        context = cost_context(self, keys={'DEEPSEEK_API_KEY': 'fictional-original'})
+        with patch.dict(os.environ, {'DEEPSEEK_API_KEY': 'fictional-replacement'}), patch('httpx.Client', side_effect=AssertionError('No transport')):
+            with self.assertRaisesRegex(ProviderError, 'credential'):
+                provider_json('deepseek', 'search', {'query': 'fixture', 'count': 1, 'need_content': False}, cost=context)
+        with context.ledger.repo.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM paid_attempts').fetchone()[0], 0)
+
     def test_late_receipt_settles_original_period_once_and_conflict_stops_every_tenant(self):
         context = cost_context(self)
         payload = {'model': 'deepseek-flash', 'max_tokens': 600, 'messages': []}
@@ -100,6 +108,8 @@ class CostAdmissionTests(unittest.TestCase):
             self.assertEqual((row['status'], row['actual']), ('settled', 40))
         with self.assertRaises(CostDenied):
             context.ledger.settle(context.tenant, 'late', {'usage': {'prompt_tokens': 30, 'completion_tokens': 10}})
+        with self.assertRaisesRegex(CostDenied, 'operator reconciliation'):
+            context.ledger.settle(context.tenant, 'late', receipt)
         with self.assertRaisesRegex(CostDenied, 'Uncertain'):
             context.child('next').run('deepseek:search', {}, Mock())
 
@@ -140,7 +150,7 @@ class CostAdmissionTests(unittest.TestCase):
         dispatch.assert_not_called()
 
     def test_accepted_usage_settles_before_model_content_failure_and_is_not_refunded(self):
-        context = cost_context(self)
+        context = cost_context(self, keys={'DEEPSEEK_API_KEY': 'fictional-only'})
         raw = {'usage': {'prompt_tokens': 100, 'completion_tokens': 20, 'total_tokens': 120},
                'choices': [{'finish_reason': 'stop', 'message': {'content': '{"fabricated":"invalid"}'}}]}
         transport = httpx.MockTransport(lambda request: httpx.Response(200, json=raw))
@@ -186,13 +196,15 @@ class CostAdmissionTests(unittest.TestCase):
         ledger.authorize('global', 'all', 'fictional-owner-authorization')
         self.assertEqual(ledger.status(context.tenant)['status'], 'admission_required')
         ledger.reconcile(context.tenant, 'interrupted', 101, 'fictional-over-bound-receipt')
+        with self.assertRaisesRegex(CostDenied, 'operator reconciliation'):
+            ledger.settle(context.tenant, 'interrupted', {'results': []})
         self.assertEqual(ledger.status(context.tenant)['status'], 'blocked')
         with ledger.repo.connect() as db:
             self.assertEqual(db.execute('SELECT actual FROM paid_attempts').fetchone()[0], 101)
             self.assertGreaterEqual(db.execute('SELECT COUNT(*) FROM monetary_audit').fetchone()[0], 6)
 
     def test_hunter_lookup_and_verifier_have_separate_durable_admissions(self):
-        context = cost_context(self)
+        context = cost_context(self, keys={'HUNTER_API_KEY': 'fictional-only'})
         calls = []
         def dispatch(request):
             calls.append(request.url.path)

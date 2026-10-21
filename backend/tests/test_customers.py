@@ -289,7 +289,7 @@ class DiscoveryTests(unittest.TestCase):
             return httpx.Response(302, headers={'location': 'https://evil.com/?key=secret'}, text='secret body')
         with patch.dict(os.environ, ENV):
             with self.assertRaises(ProviderError) as error:
-                provider_json('deepseek', 'search', {'query': 'accounting firms', 'count': 5, 'need_content': False}, cost=cost_context(self), transport=httpx.MockTransport(handler))
+                provider_json('deepseek', 'search', {'query': 'accounting firms', 'count': 5, 'need_content': False}, cost=cost_context(self, keys=ENV), transport=httpx.MockTransport(handler))
         self.assertEqual(len(observed), 1)
         self.assertEqual(observed[0].method, 'POST')
         self.assertNotIn('secret', str(error.exception))
@@ -298,7 +298,7 @@ class DiscoveryTests(unittest.TestCase):
     def test_hunter_http_logging_cannot_emit_key_bearing_url(self):
         with patch.dict(os.environ, {**ENV, 'HUNTER_API_KEY': 'test-only-private-value'}), \
              self.assertNoLogs('httpx', level='INFO'):
-            self.assertEqual(provider_json('hunter', 'domain-search', {'domain': 'business.com', 'limit': 1}, cost=cost_context(self),
+            self.assertEqual(provider_json('hunter', 'domain-search', {'domain': 'business.com', 'limit': 1}, cost=cost_context(self, keys={'HUNTER_API_KEY': 'test-only-private-value'}),
                 transport=httpx.MockTransport(lambda request: httpx.Response(200, json={'data': {}}))), {'data': {}})
 
     def test_malformed_results_do_not_masquerade_as_empty_success(self):

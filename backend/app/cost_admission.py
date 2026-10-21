@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS paid_attempts (
  tenant TEXT NOT NULL, attempt TEXT NOT NULL, operation TEXT NOT NULL, fingerprint TEXT NOT NULL,
  period TEXT NOT NULL, reserved INTEGER NOT NULL, actual INTEGER, status TEXT NOT NULL,
  quote TEXT NOT NULL, usage TEXT, created_at TEXT NOT NULL, finished_at TEXT,
+ resolution_lock INTEGER NOT NULL DEFAULT 0,
  PRIMARY KEY(tenant,attempt)
 );
 CREATE INDEX IF NOT EXISTS paid_exposure ON paid_attempts(period,status,tenant);
@@ -91,6 +92,9 @@ class CostLedger:
         self.repo = repository
         with self.repo.connect() as db:
             db.executescript(SCHEMA)
+            db.execute('BEGIN IMMEDIATE')
+            if 'resolution_lock' not in {row['name'] for row in db.execute('PRAGMA table_info(paid_attempts)')}:
+                db.execute('ALTER TABLE paid_attempts ADD COLUMN resolution_lock INTEGER NOT NULL DEFAULT 0')
 
     def configure_scope(self, scope, scope_id, *, historical, cutoff, reference, cap=CEILING, enabled=False, catalog=None, period=None):
         """Trusted offline operator setup only. Never seed with an assumed zero.
@@ -168,10 +172,10 @@ class CostLedger:
                 'tenant_ledger_exposure_micro_usd': exposure,
                 'detail': 'Every request still needs atomic price/cap admission.' if ready else 'Paid work is blocked until history, pricing and owner authorization are reconciled. Saved work and manual outreach remain available.'}
 
-    def reserve(self, tenant, attempt, operation, payload):
+    def reserve(self, tenant, attempt, operation, payload, *, billing_identity=None):
         created = utc_now()
         period = created[:7]
-        fingerprint = digest([operation, payload])
+        fingerprint = digest([operation, payload, billing_identity])
         with self.repo.connect() as db:
             db.execute('BEGIN IMMEDIATE')
             prior = db.execute('SELECT fingerprint FROM paid_attempts WHERE tenant=? AND attempt=?', (tenant, attempt)).fetchone()
@@ -189,6 +193,8 @@ class CostLedger:
                 policies.append(row)
             catalog = json.loads(policies[0]['catalog'])
             quote = quote_call(operation, payload, catalog.get(operation))
+            if billing_identity is not None and quote['spec'].get('billing_identity') != billing_identity:
+                raise CostDenied('The configured provider credential is not bound to this reconciled billing policy.')
             for row in policies:
                 tenant_clause, args = (' AND tenant=?', (period, tenant)) if row['scope'] == 'tenant' else ('', (period,))
                 spent = db.execute('SELECT COALESCE(SUM(COALESCE(actual,reserved)),0) FROM paid_attempts WHERE period=?' + tenant_clause, args).fetchone()[0]
@@ -198,7 +204,7 @@ class CostLedger:
                 raise CostDenied('The monetary audit allowance is full. Preserve and review its history before continuing.')
             # One shared in-flight call. A failed settlement write cannot leave
             # a dispatching row that permits other processes to keep spending.
-            db.execute('INSERT INTO paid_attempts VALUES (?,?,?,?,?,?,NULL,?,?,NULL,?,NULL)',
+            db.execute('INSERT INTO paid_attempts(tenant,attempt,operation,fingerprint,period,reserved,actual,status,quote,usage,created_at,finished_at) VALUES (?,?,?,?,?,?,NULL,?,?,NULL,?,NULL)',
                        (tenant, attempt, operation, fingerprint, period, quote['hold'], 'dispatching', json.dumps(quote), created))
         return quote
 
@@ -213,6 +219,8 @@ class CostLedger:
             row = db.execute('SELECT * FROM paid_attempts WHERE tenant=? AND attempt=?', (tenant, attempt)).fetchone()
             if not row:
                 raise CostDenied('Paid attempt not found.')
+            if row['resolution_lock']:
+                raise CostDenied('This receipt needs explicit operator reconciliation; a late response cannot replace it.')
             try:
                 quote = json.loads(row['quote'])
                 amount, usage = actual_cost(quote, raw)
@@ -226,7 +234,7 @@ class CostLedger:
                            (amount, json.dumps(usage, sort_keys=True), utc_now(), tenant, attempt))
             except CostDenied as error:
                 failure = error
-                db.execute("UPDATE paid_attempts SET status='uncertain' WHERE tenant=? AND attempt=?", (tenant, attempt))
+                db.execute("UPDATE paid_attempts SET status='uncertain',resolution_lock=1 WHERE tenant=? AND attempt=?", (tenant, attempt))
         if failure:
             raise failure
 
@@ -243,13 +251,13 @@ class CostLedger:
             # Over-bound receipts remain a global stop, with the observed amount
             # retained rather than clamped to the reservation or monthly cap.
             state = 'uncertain' if actual_micro_usd > row['reserved'] else 'settled'
-            db.execute('UPDATE paid_attempts SET actual=?,status=?,usage=?,finished_at=? WHERE tenant=? AND attempt=?',
+            db.execute('UPDATE paid_attempts SET actual=?,status=?,usage=?,finished_at=?,resolution_lock=1 WHERE tenant=? AND attempt=?',
                        (actual_micro_usd, state, json.dumps({'operator_reference': reference}), utc_now(), tenant, attempt))
             db.execute('INSERT INTO monetary_audit(at,kind,scope,reference) VALUES (?,?,?,?)',
                        (utc_now(), 'receipt_reconciled', 'tenant:' + tenant + ':' + attempt, reference))
 
-    def run(self, tenant, attempt, operation, payload, dispatch):
-        self.reserve(tenant, attempt, operation, payload)
+    def run(self, tenant, attempt, operation, payload, dispatch, *, billing_identity=None):
+        self.reserve(tenant, attempt, operation, payload, billing_identity=billing_identity)
         try:
             result = dispatch()
             self.settle(tenant, attempt, result)
@@ -265,15 +273,15 @@ class CostContext:
     tenant: str
     logical_attempt: str
 
-    def run(self, operation, payload, dispatch):
+    def run(self, operation, payload, dispatch, *, billing_identity=None):
         attempt = digest([self.logical_attempt, operation])
-        return self.ledger.run(self.tenant, attempt, operation, payload, dispatch)
+        return self.ledger.run(self.tenant, attempt, operation, payload, dispatch, billing_identity=billing_identity)
 
     def child(self, unit):
         return CostContext(self.ledger, self.tenant, digest([self.logical_attempt, unit]))
 
 
-def paid_call(context, operation, payload, dispatch):
+def paid_call(context, operation, payload, dispatch, *, billing_identity=None):
     if not isinstance(context, CostContext):
         raise CostDenied('Paid dispatch has no authoritative tenant monetary admission context.')
-    return context.run(operation, payload, dispatch)
+    return context.run(operation, payload, dispatch, billing_identity=billing_identity)

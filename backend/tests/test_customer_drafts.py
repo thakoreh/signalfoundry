@@ -67,7 +67,7 @@ class DraftProviderTests(unittest.TestCase):
             self.assertNotIn(self.env['DEEPSEEK_API_KEY'], request.content.decode())
             return httpx.Response(200, json={'usage': {'prompt_tokens': 100, 'completion_tokens': 20, 'total_tokens': 120}, 'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(content(self.account))}}]})
         with patch.dict(os.environ, self.env):
-            result = generate_customer_draft(self.body, transport=httpx.MockTransport(respond), cost=cost_context(self))
+            result = generate_customer_draft(self.body, transport=httpx.MockTransport(respond), cost=cost_context(self, keys=self.env))
         self.assertEqual(len(calls), 1)
         self.assertEqual(str(calls[0].url), 'https://api.deepseek.com/chat/completions')
         self.assertEqual(result.generation_engine, 'deepseek')
@@ -83,7 +83,7 @@ class DraftProviderTests(unittest.TestCase):
             call = Mock(return_value=response)
             with self.subTest(status=response.status_code), patch.dict(os.environ, self.env):
                 with self.assertRaises(DraftError) as raised:
-                    generate_customer_draft(self.body, transport=httpx.MockTransport(call), cost=cost_context(self))
+                    generate_customer_draft(self.body, transport=httpx.MockTransport(call), cost=cost_context(self, keys=self.env))
                 self.assertNotIn(self.env['DEEPSEEK_API_KEY'], str(raised.exception))
                 self.assertEqual(call.call_count, 1)
 

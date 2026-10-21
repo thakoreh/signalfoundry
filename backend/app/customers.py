@@ -91,7 +91,7 @@ def engine_status() -> dict:
 
 
 def provider_json(provider: str, endpoint: str, params: dict, *, cost=None, transport=None) -> dict:
-    from .cost_admission import paid_call, CostDenied
+    from .cost_admission import paid_call, CostDenied, digest
     if transport is not None and not isinstance(transport, httpx.MockTransport):
         raise ProviderError('Only an offline mock transport may be injected.')
     operation = provider + ':' + endpoint
@@ -100,12 +100,18 @@ def provider_json(provider: str, endpoint: str, params: dict, *, cost=None, tran
     if provider == 'hunter' and cost:
         cost = cost.child(params.get('domain') or params.get('email'))
     try:
-        return paid_call(cost, operation, params, lambda: _provider_json_transport(provider, endpoint, params, transport=transport))
+        if cost is None:
+            raise CostDenied('Paid dispatch has no authoritative tenant monetary admission context.')
+        credential = os.environ.get({'deepseek': 'DEEPSEEK_API_KEY', 'brave': 'BRAVE_SEARCH_API_KEY', 'hunter': 'HUNTER_API_KEY'}[provider], '').strip()
+        if not credential:
+            raise CostDenied('The admitted provider credential is missing.')
+        return paid_call(cost, operation, params, lambda: _provider_json_transport(provider, endpoint, params, credential=credential, transport=transport),
+                         billing_identity=digest(credential))
     except CostDenied as error:
         raise ProviderError(str(error)) from None
 
 
-def _provider_json_transport(provider: str, endpoint: str, params: dict, *, transport=None) -> dict:
+def _provider_json_transport(provider: str, endpoint: str, params: dict, *, credential, transport=None) -> dict:
     """Only fixed provider endpoints; no env proxies, redirects, or response-body errors."""
     method, request_options = 'GET', {'params': params}
     if provider == 'deepseek' and endpoint == 'search':
@@ -113,14 +119,14 @@ def _provider_json_transport(provider: str, endpoint: str, params: dict, *, tran
         query, count = params.get('query'), params.get('count')
         if not isinstance(query, str) or not query.strip() or len(query) > 128 or type(count) is not int or not 1 <= count <= 20 or params.get('need_content') is not False:
             raise ProviderError('The planned customer search is invalid.')
-        headers = {'Authorization': 'Bearer ' + os.environ['DEEPSEEK_API_KEY'], 'Content-Type': 'application/json'}
+        headers = {'Authorization': 'Bearer ' + credential, 'Content-Type': 'application/json'}
         method, request_options = 'POST', {'json': params}
     elif provider == 'brave' and endpoint == 'search':
         url = 'https://api.search.brave.com/res/v1/web/search'
-        headers = {'X-Subscription-Token': os.environ['BRAVE_SEARCH_API_KEY']}
+        headers = {'X-Subscription-Token': credential}
     elif provider == 'hunter' and endpoint in ('domain-search', 'email-verifier'):
         url = f'https://api.hunter.io/v2/{endpoint}'
-        params = {**params, 'api_key': os.environ['HUNTER_API_KEY']}
+        params = {**params, 'api_key': credential}
         request_options = {'params': params}
         headers = {}
     else:

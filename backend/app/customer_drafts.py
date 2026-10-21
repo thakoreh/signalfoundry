@@ -120,11 +120,12 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
 
 
 def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> CustomerDraft:
-    from .cost_admission import paid_call, CostDenied
+    from .cost_admission import paid_call, CostDenied, digest
     if transport is not None and not isinstance(transport, httpx.MockTransport):
         raise DraftError('Only an offline mock transport may be injected.')
     if draft_status()['status'] != 'ready':
         raise DraftError('AI message drafting is not connected yet.')
+    credential = os.environ.get('DEEPSEEK_API_KEY', '').strip()
     facts = draft_facts(body.profile, body.account)
     payload = {'model': MODEL, 'thinking': {'type': 'disabled'}, 'max_tokens': 600,
                'temperature': 0.3, 'stream': False, 'response_format': {'type': 'json_object'},
@@ -134,7 +135,7 @@ def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> C
     def dispatch():
         with httpx.Client(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(20.0, connect=5.0), transport=transport) as client:
             with client.stream('POST', 'https://api.deepseek.com/chat/completions',
-                               headers={'Authorization': 'Bearer ' + os.environ['DEEPSEEK_API_KEY'].strip(), 'Content-Type': 'application/json'},
+                               headers={'Authorization': 'Bearer ' + credential, 'Content-Type': 'application/json'},
                                json=payload) as response:
                 if response.status_code != 200 or 'application/json' not in response.headers.get('content-type', ''):
                     raise DraftError('AI drafting is temporarily unavailable. No automatic retry was made.')
@@ -146,7 +147,7 @@ def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> C
                     chunks.append(chunk)
         return json.loads(b''.join(chunks))
     try:
-        raw = paid_call(cost, 'deepseek:intro', payload, dispatch)
+        raw = paid_call(cost, 'deepseek:intro', payload, dispatch, billing_identity=digest(credential))
         choice = raw['choices'][0]
         if choice.get('finish_reason') != 'stop':
             raise DraftError('AI drafting did not finish cleanly. No automatic retry was made.')

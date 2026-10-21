@@ -49,7 +49,7 @@ class ProductionSourceChecks(unittest.TestCase):
         self.assertIn('CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED: ${CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED:-false}', compose)
 
     def test_worker_imports_cannot_reach_demo_persistence(self):
-        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', 'customers', 'customer_drafts', '__init__'}
+        allowed = {'worker', 'worker_config', 'primitives', 'models', 'fixtures', 'research', 'safety', 'jev', 'customers', 'customer_drafts', 'cost_admission', '__init__'}
         dockerfile = (ROOT / 'deploy/worker.Dockerfile').read_text(encoding='utf-8')
         for name in allowed:
             self.assertIn(f'backend/app/{name}.py', dockerfile, f'Worker image omits required module {name}')
