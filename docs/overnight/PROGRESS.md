@@ -1,5 +1,9 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## HTTP fixture ownership repair
+
+Independent58bd82b review passes all nine restore-crash/race controls, but caught a distinct isolation defect in the new HTTP harness: releasing a chosen free port before child bind could accept another service's health response if the child failed, then attempt fictional writes. A mocked failed-child/foreign-service probe reproduced the attempted write without touching a real service. Root changed the harness to multiprocessing spawn with the actual bound/listening socket passed through Python's built-in handle transfer; the parent retains it through teardown (Windows exclusive address ownership too). The child receives only the explicit nonsecret environment, and responses must attest the fresh runtime fixture nonce. Every request checks the owned child is alive. No port release/rebind occurs. Actual HTTP journey rerun PASS with zero paid attempts. This fixes the harness rather than weakening mutation assertions. New independent immutable recheck follows; prior test outcomes remain bounded, not proof of rendered browser acceptance.
+
 ## Restore interruption repair and actual HTTP journey
 
 Independent ce37b6c security review cleared both prior manual-handoff/source findings but reproduced a new restore crash window: normal backup was published at the final destination before quarantine was committed. Root repaired publication: stage privately on the same filesystem, commit quarantine/disabled policies/uncertain holds, close SQLite, then atomically hard-link to a NEW final path. Existing targets are never overwritten or deleted on a race. An abrupt os._exit73 at the pre-quarantine boundary now leaves the requested final path absent. Local-data9 tests PASS, including financial-hold preservation, other-tenant independence, old raw writer rejection, and the actual process-exit test. Immutable review of the repair follows.

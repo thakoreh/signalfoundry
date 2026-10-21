@@ -6,10 +6,11 @@ All company/contact/profile values below are fictional isolated test data.
 """
 from __future__ import annotations
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import socket
-import subprocess
+import secrets
 import sys
 import tempfile
 import time
@@ -20,6 +21,24 @@ from uuid import uuid4
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'backend'))
+
+
+def serve_fixture(listener, env, log_path, nonce):
+    # This runs in a new spawn process, before importing any app/provider code.
+    from contextlib import redirect_stdout, redirect_stderr
+    os.environ.clear()
+    os.environ.update(env)
+    with open(log_path, 'w', encoding='utf-8') as logs, redirect_stdout(logs), redirect_stderr(logs):
+        import uvicorn
+        from app.main import create_app
+        app = create_app(env['SIGNALFOUNDRY_DB_PATH'])
+        @app.middleware('http')
+        async def fixture_identity(request, call_next):
+            response = await call_next(request)
+            response.headers['X-Clientrove-Fixture'] = nonce
+            return response
+        server = uvicorn.Server(uvicorn.Config(app, host='127.0.0.1', port=0, access_log=False, proxy_headers=False, log_level='warning'))
+        server.run(sockets=[listener])
 
 
 def run():
@@ -40,8 +59,6 @@ def run():
                            for index, domain in enumerate(('alpha.example.org', 'bravo.example.org'))]
         search.status, search.stage = 'complete', 'Fictional fixture complete'
         repo.save_customer_search(search)
-        with socket.socket() as sock:
-            sock.bind(('127.0.0.1', 0)); port = sock.getsockname()[1]
         # Deliberately exclude owner provider/auth/billing variables and proxies.
         env = {key: os.environ[key] for key in ('PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'LANG') if key in os.environ}
         env.update(PYTHONPATH=str(ROOT / 'backend'), PYTHONDONTWRITEBYTECODE='1',
@@ -49,11 +66,20 @@ def run():
                    CLIENTROVE_DEEPSEEK_ENABLED='false', CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED='false',
                    CLIENTROVE_HUNTER_ENABLED='false', CLIENTROVE_BRAVE_SEARCH_ENABLED='false')
         opener = build_opener(ProxyHandler({}))
-        with tempfile.TemporaryFile() as logs:
-            process = subprocess.Popen([sys.executable, '-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', str(port),
-                                        '--no-access-log', '--no-proxy-headers'], env=env, cwd=ROOT / 'backend', stdout=logs, stderr=logs)
+        # Keep ownership from allocation through teardown. Never release a random
+        # port and then risk sending fixture writes to a different local app.
+        with socket.socket() as listener:
+            if os.name == 'nt': listener.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+            listener.bind(('127.0.0.1', 0)); listener.listen(128)
+            port = listener.getsockname()[1]
+            nonce = secrets.token_urlsafe(32)
+            process = multiprocessing.get_context('spawn').Process(target=serve_fixture,
+                args=(listener, env, str(Path(folder) / 'fixture-api.log'), nonce))
+            process.start()
             try:
                 def request(method, route, body=None, expected=200):
+                    if not process.is_alive():
+                        raise RuntimeError('The owned fixture process stopped; no request was sent.')
                     headers = {'Content-Type': 'application/json'}
                     req = Request(f'http://127.0.0.1:{port}/api{route}', method=method, headers=headers,
                                   data=json.dumps(body).encode() if body is not None else None)
@@ -62,6 +88,8 @@ def run():
                     except HTTPError as error:
                         response = error
                     with response:
+                        if response.headers.get('X-Clientrove-Fixture') != nonce:
+                            raise RuntimeError('The endpoint is not the owned fixture. No further request will be made.')
                         assert response.status == expected, f'{method} {route}: expected {expected}, received {response.status}'
                         return json.load(response)
 
@@ -69,8 +97,8 @@ def run():
                 while True:
                     try:
                         request('GET', '/health'); break
-                    except URLError:
-                        if process.poll() is not None or time.monotonic() >= deadline:
+                    except (URLError, TimeoutError):
+                        if not process.is_alive() or time.monotonic() >= deadline:
                             raise RuntimeError('Isolated fixture API failed to start; no private configuration was used.')
                         time.sleep(0.05)
                 def fields(thread):
@@ -138,11 +166,11 @@ def run():
                 print('PASS: real loopback HTTP + isolated SQLite: saved setup, five-result bound, exact approval, distinct actual send, dated followup, OOO cancellation, fresh referral, sticky company opt-out, timed meeting, reported funnel, export and saved return. Zero paid attempts.')
                 print('Not verified: rendered Next/Chrome, real auth, providers, email delivery, calendar, physical phone or accessibility.')
             finally:
-                if process.poll() is None:
-                    if os.name == 'nt':
-                        subprocess.run(['taskkill', '/PID', str(process.pid), '/T', '/F'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
-                    else: process.terminate()
-                    process.wait(timeout=10)
+                if process.is_alive(): process.terminate()
+                process.join(timeout=10)
+                if process.is_alive():
+                    process.kill(); process.join(timeout=5)
+                process.close()
 
 
 if __name__ == '__main__':
