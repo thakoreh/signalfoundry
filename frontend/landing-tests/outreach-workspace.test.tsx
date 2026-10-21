@@ -12,6 +12,9 @@ const { api, session } = vi.hoisted(() => ({
 vi.mock("../components/workspace-session", () => ({
   useWorkspaceSession: () => ({ api, mode: session.mode }),
 }));
+// Activity has its own read-only component contract tests. Keep these transport
+// races scoped to the exact conversation request, not a sibling summary fetch.
+vi.mock("../components/outreach-insights", () => ({ OutreachInsights: () => null }));
 let container: HTMLDivElement, root: Root, thread: OutreachThread;
 const fixture = (): OutreachThread => ({
   id: "thread_a",

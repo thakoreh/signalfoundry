@@ -31,6 +31,7 @@ import { useWorkspaceSession } from "./workspace-session";
 import { Icon } from "./icons";
 import { drawerFocusBoundaryTarget } from "../lib/utils";
 import { PrepareOutreach } from "./prepare-outreach";
+import type { CompanyFlag, OutreachInsights } from "../lib/outreach";
 import "./customer-search.css";
 
 function CustomerDraftDialog({
@@ -154,11 +155,13 @@ function CustomerResult({
   searchId,
   selected,
   toggle,
+  history,
 }: {
   account: Account;
   searchId: string;
   selected: boolean;
   toggle: () => void;
+  history?: CompanyFlag;
 }) {
   const { api } = useWorkspaceSession();
   const [draftOpen, setDraftOpen] = useState(false);
@@ -361,6 +364,9 @@ function CustomerResult({
           ) : (
             <strong title={account.name}>{account.name}</strong>
           )}
+          {history && (history.suppressed || history.contacted || history.paused) && <small className="customer-company-history">
+            {history.suppressed ? "Suppressed · do not contact" : history.contacted ? "Already contacted" : "Outreach paused"}
+          </small>}
         </th>
         <td className="customer-lead-email" role="cell">
           {primaryContact ? (
@@ -567,8 +573,24 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
   const [sort, setSort] = useState<CustomerSort>("contacts");
   const [selection, setSelection] = useState<Set<string>>(new Set());
   const [storageKey, setStorageKey] = useState<string | null>(null);
+  const [companyFlags, setCompanyFlags] = useState<CompanyFlag[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const selectionTouched = useRef(false);
   const selectAll = useRef<HTMLInputElement>(null);
+  const contactHistoryReady = !!search && !searchInProgress(search);
+
+  useEffect(() => {
+    if (mode !== "local-demo" || !contactHistoryReady) return;
+    const scope = new AbortController();
+    api<OutreachInsights>("/outreach/insights", { signal: scope.signal }).then(data => {
+      if (!scope.signal.aborted) {
+        if (!Array.isArray(data?.company_flags)) throw new Error("Prior contact status is unavailable; review saved conversations before outreach.");
+        setCompanyFlags(data.company_flags);
+        setHistoryError("");
+      }
+    }).catch(cause => { if (!scope.signal.aborted) setHistoryError(errorMessage(cause)); });
+    return () => scope.abort();
+  }, [api, mode, searchId, contactHistoryReady]);
 
   useEffect(() => {
     const scope = new AbortController();
@@ -886,6 +908,7 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
                         searchId={searchId}
                         selected={selection.has(account.id)}
                         toggle={() => toggle(account.id)}
+                        history={companyFlags.find(item => item.domain === account.domain.toLowerCase().replace(/\.$/, "").replace(/^www\./, ""))}
                       />
                     ))}
                   </tbody>
@@ -934,6 +957,7 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
         Public sources and available contacts stay attached. An email’s
         verification status doesn’t establish buying intent. Nothing is sent.
       </p>
+      {historyError && <p role="status">{historyError}</p>}
     </section>
   );
 }

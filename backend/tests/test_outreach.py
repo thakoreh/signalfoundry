@@ -75,7 +75,7 @@ class OutreachTest(unittest.TestCase):
 
     def test_footer_is_exact_and_sender_change_invalidates_without_rewriting_history(self):
         profile = self.sender()
-        footer = '\n\n--\nAlex Fixture | ' + profile.company_name + '\n100 Example Street, Toronto ON M5V 1A1\nContact: alex@example.com\nTo opt out, reply "unsubscribe".'
+        footer = '\n\n--\nAlex Fixture | ' + profile.company_name + '\n100 Example Street, Toronto ON M5V 1A1\nContact: alex@example.com\nAdvertisement: business outreach.\nTo opt out, reply "unsubscribe".'
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
         self.assertEqual(thread.sender_footer, footer)
         with self.assertRaisesRegex(OutreachError, 'footer'):

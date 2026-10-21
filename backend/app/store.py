@@ -107,6 +107,10 @@ class Repository:
         from .outreach import OutreachStore
         return OutreachStore(self).next_up()
 
+    def outreach_insights(self):
+        from .outreach import OutreachStore
+        return OutreachStore(self).insights()
+
     def start_outreach(self, body):
         from .outreach import OutreachStore
         return OutreachStore(self).start(body)

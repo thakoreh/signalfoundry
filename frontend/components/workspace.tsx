@@ -11,6 +11,7 @@ import {
 } from "@/lib/business-intake";
 import { BusinessOnboarding } from "./business-onboarding";
 import { NextUpQueue } from "./next-up-queue";
+import { OutreachInsights } from "./outreach-insights";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -171,6 +172,7 @@ export default function Workspace({
         userControl={userControl}
       />
       {workspace?.profile && <NextUpQueue />}
+      {workspace?.profile && <OutreachInsights />}
     </>
   );
 }

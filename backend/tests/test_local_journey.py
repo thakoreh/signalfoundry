@@ -150,6 +150,12 @@ class LocalJourneyTest(unittest.TestCase):
             snapshot = thread.messages[-1].model_dump()
             self.assertEqual(snapshot['outbound_purpose'], 'meeting_confirmation')
             self.assertIsNotNone(snapshot['contact_basis_snapshot'])
+            # Saving the same instant with a new request key is not a new booking.
+            same_booking = {**payload, **self.fields(thread)}
+            response = client.post(f'/api/outreach/{thread.id}/meeting', json=same_booking)
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertEqual(thread.meeting_version, snapshot['meeting_version'])
             # A second confirmation of the same reported booking cannot become actionable.
             confirmation.update(self.fields(thread))
             client.post(f'/api/outreach/{thread.id}/meeting-confirmation', json=confirmation)
@@ -167,6 +173,61 @@ class LocalJourneyTest(unittest.TestCase):
                 meeting_state='attended_reported', sale_state='won_reported'))
             self.assertEqual(thread.messages[-1].model_dump(), snapshot)
             self.assertEqual(thread.sale_state, 'won_reported')
+
+    def test_booking_cannot_move_to_an_edited_recipient_with_fresh_contact_basis(self):
+        thread = self.ready()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            booking = dict(**self.fields(thread), meeting_at='2026-10-22T10:00:00-04:00', meeting_timezone='America/Toronto')
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/meeting', json=booking).status_code, 200)
+            thread = self.edit(self.repo.outreach_thread(thread.id), recipient='different@business.com')
+            thread = self.basis(thread)
+            confirmation = dict(**self.fields(thread), subject='Meeting confirmation', body='Confirming.' + thread.sender_footer)
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/meeting-confirmation', json=confirmation).status_code, 409)
+            self.assertEqual(self.repo.outreach_thread(thread.id).meeting_recipient, 'hello@business.com')
+
+    def test_company_funnel_deduplicates_and_preserves_unknown_outcomes_and_tenant_boundary(self):
+        from app.store import Repository
+        thread = self.ready()
+        self.assertEqual(self.repo.outreach_insights()['funnel']['contacted'], 0, 'Approval is not contact')
+        thread = self.repo.mutate_outreach(thread.id, 'sent', SentRequest(**self.fields(thread)))
+        other = self.sibling('funnel_duplicate')
+        before = self.repo.outreach_insights()
+        self.assertEqual(before['funnel']['companies'], 1)
+        self.assertEqual(before['funnel']['contacted'], 1)
+        self.assertEqual(before['funnel']['customers'], 0)
+        self.assertEqual(len(before['company_flags']), 1)
+        self.assertTrue(before['company_flags'][0]['contacted'])
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Automatic reply', reply_state='auto_reply'))
+        self.assertEqual(self.repo.outreach_insights()['funnel']['replied'], 0)
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+        result = self.repo.outreach_insights()
+        self.assertEqual(result['funnel']['replied'], 1)
+        self.assertEqual(result['funnel']['interested'], 1)
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='opt_out'))
+        result = self.repo.outreach_insights()
+        self.assertEqual(result['funnel']['interested'], 0)
+        self.assertTrue(result['company_flags'][0]['suppressed'])
+        self.assertEqual(Repository(self.path, 'different_tenant').outreach_insights()['funnel']['companies'], 0)
+        self.assertEqual(self.repo.outreach_thread(other.id).meeting_state, 'not_recorded')
+
+    def test_departure_future_dates_are_read_only_and_example_sources_are_excluded(self):
+        thread = self.report_initial()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, patch('app.outreach.now', return_value='2026-10-19T14:00:00Z'), TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            body = dict(**self.fields(thread), scheduled_at='2026-10-22T10:00:00-04:00', scheduled_timezone='America/Toronto', subject='Re: Introduction', body='Reminder' + thread.sender_footer)
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 200)
+            snapshot = self.repo.outreach_thread(thread.id).model_dump()
+            response = client.get('/api/outreach/insights')
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertEqual(response.json()['departure']['upcoming'][0]['at'], '2026-10-22T14:00:00+00:00')
+            self.assertEqual(self.repo.outreach_thread(thread.id).model_dump(), snapshot)
+            search = self.repo.customer_search(self.search.id)
+            search.accounts[0].is_demo = True
+            self.repo.save_customer_search(search)
+            result = self.repo.outreach_insights()
+            self.assertEqual(result['funnel']['companies'], 0)
+            self.assertEqual(result['excluded_example_companies'], 1)
 
     def test_due_followup_queue_is_read_only_and_changed_recipient_cannot_inherit_sequence(self):
         thread = self.report_initial()

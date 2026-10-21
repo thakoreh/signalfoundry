@@ -38,6 +38,8 @@ def manual_action_block(thread, current):
         if datetime.fromisoformat(thread.next_followup_at) > current:
             return 'The confirmed followup is not due yet. Return when it is due and approve it then.'
     elif thread.outbound_purpose == 'meeting_confirmation':
+        if not thread.meeting_recipient or thread.meeting_recipient.lower() != thread.recipient.lower():
+            return 'This booking belongs to a different or unknown recipient. Review the original contact.'
         if thread.meeting_state != 'booked_reported' or not thread.meeting_at:
             return 'A confirmation needs a current timed booking reported by you.'
         if datetime.fromisoformat(thread.meeting_at) <= current:

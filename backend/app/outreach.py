@@ -320,6 +320,7 @@ class OutreachThread(StrictModel):
     meeting_at: str | None = None
     meeting_timezone: str | None = None
     meeting_version: int = 0
+    meeting_recipient: str | None = None
     lifecycle_events: list[dict[str, str]] = Field(default_factory=list, max_length=200)
     recipient_status: Literal['missing', 'verified', 'published_unverified', 'user_entered', 'invalid'] = 'missing'
     invalid_recipient_emails: list[str] = Field(default_factory=list, max_length=10)
@@ -397,7 +398,7 @@ def sender_footer(profile) -> str:
     if not (email or phone or web):
         return ''
     return (f'\n\n--\n{profile.sender_name} | {profile.company_name}\n{profile.mailing_address}\n'
-            f'Contact: {profile.sender_contact}\nTo opt out, reply "unsubscribe".')
+            f'Contact: {profile.sender_contact}\nAdvertisement: business outreach.\nTo opt out, reply "unsubscribe".')
 
 
 def domain_target(domain):
@@ -582,6 +583,30 @@ class OutreachStore:
         with self.repo.connect() as db:
             return self._get(db, thread_id)
 
+    def insights(self):
+        from .customers import CustomerSearch
+        from .outreach_insights import project_insights
+        with self.repo.connect() as db:
+            threads = [self._view(db, OutreachThread.model_validate_json(row['data'])) for row in db.execute(
+                'SELECT data FROM outreach_threads WHERE tenant_id=? ORDER BY rowid', (self.tenant,)).fetchall()]
+            examples = set()
+            known = set()
+            for row in db.execute('SELECT data FROM customer_searches WHERE tenant_id=?', (self.tenant,)).fetchall():
+                search = CustomerSearch.model_validate_json(row['data'])
+                for account in search.accounts:
+                    known.add((search.id, account.id))
+                    if account.is_demo:
+                        examples.add((search.id, account.id))
+            excluded = {thread.id for thread in threads if not thread.referrer_thread_id and (
+                (thread.search_id, thread.account_id) in examples or (thread.search_id, thread.account_id) not in known)}
+            # Referral provenance inherits example exclusion, never verification or permission.
+            for _ in range(len(threads)):
+                inherited = {thread.id for thread in threads if thread.referrer_thread_id in excluded}
+                if inherited <= excluded:
+                    break
+                excluded.update(inherited)
+        return project_insights(threads, excluded, domain_target, now())
+
     def start(self, body: StartOutreach):
         from .customers import CustomerSearch, customer_is_qualified
         from .customer_drafts import draft_cache_key
@@ -706,8 +731,13 @@ class OutreachStore:
             if operation == 'meeting':
                 if len(thread.lifecycle_events) >= 200:
                     raise OutreachError('This conversation has reached its planning-history allowance.', 429)
+                if thread.meeting_recipient and thread.meeting_recipient.lower() != thread.recipient.lower():
+                    raise OutreachError('This booking belongs to the original contact. Use a separate contact thread for a different recipient.')
+                same_booking = bool(thread.meeting_at and datetime.fromisoformat(thread.meeting_at) == datetime.fromisoformat(body.meeting_at))
                 thread.meeting_at, thread.meeting_timezone = body.meeting_at, body.meeting_timezone
-                thread.meeting_version += 1
+                thread.meeting_recipient = thread.recipient
+                if not same_booking:
+                    thread.meeting_version += 1
                 thread.meeting_state, thread.approval = 'booked_reported', None
                 thread.next_followup_at = thread.followup_timezone = None
                 thread.cold_followups_stopped = True
@@ -717,6 +747,8 @@ class OutreachStore:
             elif operation == 'meeting-confirmation':
                 if thread.meeting_state != 'booked_reported' or not thread.meeting_at or datetime.fromisoformat(thread.meeting_at) <= datetime.now(timezone.utc):
                     raise OutreachError('Report a future timed booking before preparing a confirmation.')
+                if not thread.meeting_recipient or thread.meeting_recipient.lower() != thread.recipient.lower():
+                    raise OutreachError('This booking does not belong to the current recipient. Review the original contact.')
                 thread.outbound_purpose = 'meeting_confirmation'
                 thread.subject, thread.body, thread.booking_link, thread.approval = body.subject, body.body, '', None
             elif operation == 'followup':
@@ -903,6 +935,10 @@ def outreach_router(repository, *, blocked_preview=False):
     @router.get('/next-up')
     def next_up():
         return call(service().outreach_next_up)
+
+    @router.get('/insights')
+    def insights():
+        return call(service().outreach_insights)
 
     @router.post('')
     def start(body: StartOutreach):

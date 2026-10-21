@@ -19,6 +19,7 @@ import { isCustomerMessageDraft } from "./customer-result-view";
 import { useWorkspaceSession } from "./workspace-session";
 import { useUnsavedChanges } from "./use-unsaved-changes";
 import { TimingFields, SavedMeeting, type TimingInput } from "./outreach-timing";
+import { OutreachInsights } from "./outreach-insights";
 import "./outreach-workspace.css";
 
 type Step = "Review" | "Conversations" | "Meetings";
@@ -449,6 +450,7 @@ export function OutreachWorkspace({
           </button>
         ))}
       </nav>
+      <OutreachInsights revision={threads.reduce((total, item) => total + item.revision, 0)} />
       {error && (
         <div className="outreach-feedback" role="alert">
           <p>{error}</p>
@@ -683,6 +685,13 @@ export function OutreachWorkspace({
                               : "Sent externally · recorded by you"}
                           </strong>
                           <p>{message.body}</p>
+                          {message.direction === "outbound" && <details>
+                            <summary>Contact basis saved at approval</summary>
+                            {message.contact_basis_snapshot ? <>
+                              <p>{message.contact_basis_snapshot.source_url} · observed {message.contact_basis_snapshot.captured_at || "time unknown"}</p>
+                              <p>{message.contact_basis_snapshot.recipient_role}: {message.contact_basis_snapshot.message_relevance}</p>
+                            </> : <p>Unknown for this older record. No basis has been backfilled.</p>}
+                          </details>}
                           {message.sent_as === "with_changes" && (
                             <details>
                               <summary>
