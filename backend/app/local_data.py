@@ -7,8 +7,10 @@ from __future__ import annotations
 import hashlib
 import json
 from contextlib import closing
+import os
 from pathlib import Path
 import sqlite3
+import tempfile
 
 from .primitives import now
 
@@ -108,9 +110,14 @@ def restore_quarantined(source, destination):
     Never replaces a live database or claims to reconcile newer suppressions,
     deletions or receipts. There is intentionally no unquarantine command.
     """
-    manifest = backup_database(source, destination)
-    target = Path(destination)
-    try:
+    destination = Path(destination).absolute()
+    if not destination.parent.is_dir() or destination.exists() or destination.is_symlink():
+        raise ValueError('The restore output must be a new file in an existing private directory.')
+    # Never publish an active copy at the requested output, even if the process
+    # dies before quarantine. A hard-link publish is atomic and cannot overwrite.
+    with tempfile.TemporaryDirectory(prefix='.clientrove-restore-', dir=destination.parent) as stage:
+        target = Path(stage) / 'staged.sqlite3'
+        manifest = backup_database(source, target)
         with closing(sqlite3.connect(target)) as db, db:
             db.row_factory = sqlite3.Row
             for table in DATA_TABLES + ('outreach_suppressions',):
@@ -124,7 +131,5 @@ def restore_quarantined(source, destination):
                 db.execute("UPDATE paid_attempts SET status='uncertain' WHERE status='dispatching'")
         manifest['sha256'] = hashlib.sha256(target.read_bytes()).hexdigest()
         manifest['activation'] = 'QUARANTINED restore drill only. App writes and new paid admission denied. No activation command exists.'
+        os.link(target, destination)
         return manifest
-    except BaseException:
-        target.unlink(missing_ok=True)
-        raise

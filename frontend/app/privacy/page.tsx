@@ -51,8 +51,9 @@ export default function PrivacyPage() {
           </p>
           <h2>How to use this preview safely</h2>
           <p>
-            Do not upload confidential, regulated, or personal contact data. Use
-            public company information only. Research output is for review and
+            Use public company information and relevant public professional
+            contact details. Avoid confidential, regulated or unnecessary private
+            personal information when pasting replies. Research output is for review and
             should be checked before it is used elsewhere.
           </p>
           <h2>Optional AI message drafts</h2>

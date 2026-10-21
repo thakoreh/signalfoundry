@@ -2,6 +2,8 @@
 import json
 from pathlib import Path
 import sqlite3
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -132,3 +134,13 @@ class LocalDataTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             restore_quarantined(invalid, destination)
         self.assertFalse(destination.exists())
+
+    def test_abrupt_restore_exit_never_publishes_an_active_final_output(self):
+        destination = self.path.parent / 'interrupted-restore.sqlite3'
+        code = ('import os,sys; from unittest.mock import patch; from app.local_data import restore_quarantined; '
+                'p=patch("app.local_data.install_controls", side_effect=lambda db: os._exit(73)); p.start(); '
+                'restore_quarantined(sys.argv[1],sys.argv[2])')
+        result = subprocess.run([sys.executable, '-c', code, str(self.path), str(destination)], timeout=15, capture_output=True)
+        self.assertEqual(result.returncode, 73)
+        self.assertFalse(destination.exists(), 'Interrupted staging must not publish an active restore')
+        self.assertFalse(self.repo.closed())
