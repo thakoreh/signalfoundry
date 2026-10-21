@@ -50,6 +50,31 @@ class RevisionRequest(StrictModel):
     idempotency_key: Key
 
 
+class DatedReply(RevisionRequest):
+    revisit_at: str | None = None
+    revisit_timezone: str | None = None
+
+    @field_validator('revisit_at')
+    @classmethod
+    def aware_revisit(cls, value):
+        if not value:
+            return None
+        timestamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        if timestamp.tzinfo is None or timestamp.utcoffset() is None:
+            raise ValueError('Revisit time must include a timezone')
+        return timestamp.astimezone(timezone.utc).isoformat()
+
+    @field_validator('revisit_timezone')
+    @classmethod
+    def valid_revisit_timezone(cls, value):
+        if value:
+            try:
+                ZoneInfo(value)
+            except (ZoneInfoNotFoundError, ValueError):
+                raise ValueError('Use an IANA timezone for the revisit date') from None
+        return value or None
+
+
 class EditDraft(RevisionRequest):
     recipient: Annotated[str, StringConstraints(strip_whitespace=True, max_length=320)]
     subject: Annotated[str, StringConstraints(strip_whitespace=True, max_length=160)]
@@ -147,12 +172,12 @@ class SentRequest(RevisionRequest):
     actual_body: Annotated[str, StringConstraints(strip_whitespace=True, max_length=10000)] = ''
 
 
-class PasteReply(RevisionRequest):
+class PasteReply(DatedReply):
     body: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=6000)]
     reply_state: ReplyState = 'awaiting_review'
 
 
-class CorrectReply(RevisionRequest):
+class CorrectReply(DatedReply):
     reply_state: ReplyState
 
 
@@ -206,6 +231,9 @@ class OutreachThread(StrictModel):
     suppressed: bool = False
     suppression_reason: str | None = None
     reply_state: ReplyState = 'awaiting_review'
+    revisit_at: str | None = None
+    revisit_timezone: str | None = None
+    review_due: bool = False
     revision: int = 1
     approval: Approval | None = None
     ready_for_manual_action: bool = False
@@ -282,6 +310,10 @@ class OutreachStore:
             thread.suppressed, thread.suppression_reason = True, suppression['reason']
         if thread.recipient and thread.recipient.lower() in {value.lower() for value in thread.invalid_recipient_emails}:
             thread.recipient_status = 'invalid'
+        thread.review_due = False
+        if thread.revisit_at and thread.reply_state in ('not_now', 'auto_reply'):
+            revisit = datetime.fromisoformat(thread.revisit_at.replace('Z', '+00:00'))
+            thread.review_due = revisit <= datetime.now(timezone.utc)
         if blocked(thread) or not contact_basis_ready(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
             thread.approval = None
         thread.ready_for_manual_action = bool(not blocked(thread) and thread.recipient and thread.subject and thread.body and
@@ -365,6 +397,8 @@ class OutreachStore:
         ranked = []
         for thread in threads:
             inbound = any(message.direction == 'inbound' for message in thread.messages)
+            if thread.reply_state in ('not_now', 'auto_reply') and thread.revisit_at and not thread.review_due:
+                continue
             if inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'not_interested', 'opt_out', 'source_question', 'auto_reply', 'bounce', 'referral'):
                 priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
             elif inbound and thread.reply_state in ('interested', 'question'):
@@ -513,6 +547,10 @@ class OutreachStore:
                     if address and address not in thread.invalid_recipient_emails:
                         thread.invalid_recipient_emails.append(address)
                     thread.recipient_status = 'invalid'
+                if state in ('not_now', 'auto_reply'):
+                    thread.revisit_at, thread.revisit_timezone = body.revisit_at, body.revisit_timezone
+                else:
+                    thread.revisit_at = thread.revisit_timezone = None
                 thread.messages.append(ConversationMessage(id=new_id('msg'), direction='inbound', recipient=thread.recipient,
                     subject=thread.subject, body=body.body, reply_state=state, created_at=now()))
                 thread.reply_state, thread.body, thread.approval = state, '', None
@@ -527,6 +565,10 @@ class OutreachStore:
                 state = 'source_question' if source_question(latest.body) else body.reply_state
                 latest.reply_state, thread.reply_state, thread.approval = state, state, None
                 thread.cold_followups_stopped = True
+                if state in ('not_now', 'auto_reply'):
+                    thread.revisit_at, thread.revisit_timezone = body.revisit_at, body.revisit_timezone
+                else:
+                    thread.revisit_at = thread.revisit_timezone = None
             elif operation == 'pause':
                 thread.paused, thread.approval = body.paused, None
             elif operation == 'outcomes':

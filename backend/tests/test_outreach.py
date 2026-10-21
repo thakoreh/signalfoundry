@@ -381,6 +381,23 @@ class OutreachTest(unittest.TestCase):
         with self.repo.connect() as db:
             self.assertEqual(db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0], request_count)
 
+    def test_not_now_and_auto_reply_dates_are_stored_explicitly_and_only_due_work_reaches_next_up(self):
+        thread = self.ready()
+        future = '2099-01-02T12:00:00-05:00'
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Please check back later', reply_state='not_now',
+            revisit_at=future, revisit_timezone='America/Toronto'))
+        self.assertEqual(thread.revisit_at, '2099-01-02T17:00:00+00:00')
+        self.assertEqual(thread.revisit_timezone, 'America/Toronto')
+        self.assertFalse(thread.review_due)
+        self.assertEqual(self.repo.outreach_next_up()['items'], [])
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(
+            **self.fields(thread), reply_state='auto_reply',
+            revisit_at='2000-01-02T12:00:00-05:00', revisit_timezone='America/Toronto'))
+        self.assertTrue(thread.review_due)
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'review_reply')
+        self.assertEqual(thread.messages[-1].body, 'Please check back later')
+
     def test_sent_snapshot_preserves_exact_approved_link_after_later_edits(self):
         self.sender()
         # Booking invitations require an explicitly reported interested reply.
