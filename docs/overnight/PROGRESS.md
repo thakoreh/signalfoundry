@@ -1,5 +1,9 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Final container-context privacy repair
+
+A last source inspection found Docker's build-context exclusions lagged behind the new private/export/backup/local directories in source packaging. Added matching nested Docker exclusions and CSV exclusion (also Git-ignore CSV). Added an actual Docker-semantics regression to the existing required container smoke entry point: it copies ONLY .dockerignore into a new tiny manufactured context, builds FROM scratch with networknone, exports an unstarted container and asserts all16 private/runtime sentinels absent plus four public-source sentinels present. No real source/data directory becomes that context, no container process or external image pull occurs, and only its uniquely created image/container is cleaned. Local daemon remains unavailable, so this new check is NOT claimed locally executed; required CI must run it. No required job renamed/weakened and no assertion skipped. Application code remains8ccf104; this is packaging/test-only follow-up.
+
 ## Application source freeze —8ccf104, incomplete verdict
 
 Reran checks with the exact Git SHA printed first: backend210 PASS22.866s; frontend66 Node/116 component21files/76 Convex/typecheck/lint PASS; webpack production build PASS; actual HTTP journey/seed1/launcher3/preflight5/packaging1/worker HTTP smoke PASS. Source-checks/container-checks/GitGuardian all PASS on8ccf104 in run39692903599. Latest fetch keeps origin/main cfd22af; writer checkout clean, owner main checkout still only its original frontend/next-env.d.ts edit. No owner data/env/ports/browser changes. No live or paid calls, sends, connections, deploys, merge/main push/settings changes.

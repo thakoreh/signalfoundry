@@ -22,3 +22,8 @@ deploy/secrets
 **/test-results
 **/playwright-report
 **/coverage
+**/.local
+**/private
+**/exports
+**/backups
+**/*.csv

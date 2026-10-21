@@ -17,6 +17,7 @@ backups/
 exports/
 private/
 .local/
+*.csv
 .DS_Store
 
 deploy/secrets/

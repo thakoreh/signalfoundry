@@ -99,4 +99,6 @@ def run():
 
 
 if __name__ == '__main__':
+    from test_container_context_privacy import run as context_privacy
+    context_privacy()
     run()
