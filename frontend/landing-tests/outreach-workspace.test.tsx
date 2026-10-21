@@ -266,7 +266,8 @@ it("labels inbound-only conflict reload as explicit discard", async () => {
   await click("Conversations");
   await change("Paste a received reply", "Private unsaved inbound");
   api.mockRejectedValueOnce(new Error("Request failed (409)."));
-  await click("Approve exact message");
+  expect(button("Approve exact message").disabled).toBe(true);
+  await click("Save received reply");
   expect(button("Reload saved version (discard edits)")).toBeTruthy();
   expect(field("Paste a received reply").value).toBe("Private unsaved inbound");
 });
@@ -414,6 +415,23 @@ it("keeps unknown email provenance unknown and separates approval from reachabil
   );
 });
 describe("pending Copy intent", () => {
+  it.each(["Copy approved message", "Open in email app"])("cancels %s when a received reply is pasted during readiness", async action => {
+    await mount();
+    await click("Approve exact message");
+    await click("Conversations");
+    const snapshot = structuredClone(thread);
+    let finish!: (value: OutreachThread) => void;
+    api.mockImplementationOnce(() => new Promise<OutreachThread>(resolve => { finish = resolve; }));
+    await click(action);
+    await change("Paste a received reply", "Please unsubscribe me");
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(requestEmailApp).not.toHaveBeenCalled();
+    expect(button(action).disabled).toBe(true);
+    expect(button("Approve exact message").disabled).toBe(true);
+    expect(field("Paste a received reply").value).toBe("Please unsubscribe me");
+    expect(thread.messages).toHaveLength(0);
+  });
   async function pendingCopy() {
     await mount();
     await click("Approve exact message");
@@ -786,6 +804,19 @@ describe("persisted manual outreach journey", () => {
     expect(payload).toMatchObject({ scheduled_at: "2026-11-05T10:00:00-05:00", scheduled_timezone: "America/Toronto", body: thread.body });
     expect(button("Approve exact message").disabled).toBe(true);
     expect(thread.messages).toHaveLength(1);
+  });
+  it("cancels cleared meeting date edits without discarding unrelated message text", async () => {
+    await mount();
+    await change("Message", "Keep these private edits");
+    await click("Meetings");
+    await change("Meeting date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Meeting date and time with numeric offset", "");
+    await click("Cancel meeting date edit");
+    await click("Review");
+    expect(field("Message").value).toBe("Keep these private edits");
+    expect(api.mock.calls.some(([path]) => path.endsWith("/meeting"))).toBe(false);
+    await click("Save changes");
+    expect(button("Approve exact message").disabled).toBe(false);
   });
   it("preserves unsaved message edits across navigation and blocks paused actions", async () => {
     await mount();

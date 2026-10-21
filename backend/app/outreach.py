@@ -414,6 +414,16 @@ def domain_target(domain):
     return 'domain:' + host.rstrip('.').lower().removeprefix('www.')
 
 
+def public_source_fact(evidence):
+    if evidence.is_demo or evidence.kind not in ('company', 'fit'):
+        return None
+    try:
+        url = normalize_url(evidence.url)
+    except FetchError:
+        return None
+    return SourceFact(id=evidence.id, excerpt=evidence.excerpt[:900], url=url, retrieved_at=evidence.retrieved_at)
+
+
 def invalidate_bounced_address(thread, address):
     address = address.lower()
     if address and address not in thread.invalid_recipient_emails:
@@ -654,8 +664,7 @@ class OutreachStore:
                 timestamp = now()
                 thread = OutreachThread(id=new_id('outreach'), search_id=body.search_id, account_id=account.id,
                                         company_name=account.name, domain=account.domain, created_at=timestamp, updated_at=timestamp)
-                thread.source_facts = [SourceFact(id=e.id, excerpt=e.excerpt[:900], url=e.url, retrieved_at=e.retrieved_at)
-                                       for e in account.evidence if not e.is_demo and e.kind in ('company', 'fit')][:5]
+                thread.source_facts = [fact for evidence in account.evidence if (fact := public_source_fact(evidence))][:5]
                 contacts = sorted((c for c in account.contacts if c.email), key=contact_priority, reverse=True)
                 if contacts:
                     try:

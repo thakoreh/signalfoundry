@@ -36,3 +36,12 @@ it("shows only an explicitly known timezone and labels working hours as guidance
   await act(async () => root.render(<RecipientTime zone="not/a-zone" />));
   expect(container.textContent).toBe("Recipient timezone needs review.");
 });
+
+it("provides an app path to older saved work even when nothing is due", async () => {
+  api.mockResolvedValue({ threads: Array.from({ length: 11 }, (_, i) => ({ id: `thread_${i}`, search_id: `search_${i}`, company_name: `Fictional ${i}`, recipient: `alex${i}@example.org`, updated_at: `2026-10-${String(i + 1).padStart(2, "0")}` })) });
+  await act(async () => root.render(<SavedOutreach />));
+  expect(container.querySelectorAll("li")).toHaveLength(10);
+  expect(container.querySelector('a[href="/workspace/outreach/search_0?thread=thread_0"]')).toBeNull();
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Show all 11 saved conversations")!.click());
+  expect(container.querySelector('a[href="/workspace/outreach/search_0?thread=thread_0"]')).not.toBeNull();
+});

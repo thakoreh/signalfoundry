@@ -13,6 +13,7 @@ from pathlib import Path
 from .models import Account, Campaign, Profile, Workspace
 from .primitives import new_id, now
 from .customers import CustomerSearch
+from .local_data import WorkspaceClosed, closed, install_controls
 
 
 class Repository:
@@ -56,8 +57,6 @@ class Repository:
               );
               CREATE INDEX IF NOT EXISTS customer_draft_requests_tenant_created ON customer_draft_requests(tenant_id,created_at);
               CREATE INDEX IF NOT EXISTS customer_draft_requests_cached_aliases ON customer_draft_requests(tenant_id,cache_key,charged,created_at);
-              INSERT OR IGNORE INTO customer_draft_requests
-                SELECT tenant_id,request_key,cache_key,created_at,status,1,data FROM customer_drafts;
               CREATE TABLE IF NOT EXISTS outreach_threads (
                 tenant_id TEXT NOT NULL, id TEXT NOT NULL, search_id TEXT NOT NULL,
                 account_id TEXT NOT NULL, data TEXT NOT NULL,
@@ -74,10 +73,15 @@ class Repository:
                 created_at TEXT NOT NULL, PRIMARY KEY(tenant_id,target)
               );
             ''')
+            install_controls(db)
             workspace = Workspace(id=tenant_id, name='Your workspace', website=None,
                                   profile=None, created_at=now())
-            db.execute('INSERT OR IGNORE INTO workspaces VALUES (?,?)',
-                       (tenant_id, workspace.model_dump_json()))
+            if not closed(db, tenant_id):
+                db.execute('''INSERT OR IGNORE INTO customer_draft_requests
+                    SELECT tenant_id,request_key,cache_key,created_at,status,1,data FROM customer_drafts
+                    WHERE tenant_id NOT IN (SELECT scope_id FROM local_controls WHERE name='erased')''')
+                db.execute('INSERT OR IGNORE INTO workspaces VALUES (?,?)',
+                           (tenant_id, workspace.model_dump_json()))
 
     @contextmanager
     def connect(self):
@@ -87,12 +91,22 @@ class Repository:
         try:
             with connection:
                 yield connection
+        except sqlite3.IntegrityError as error:
+            if str(error) == 'local_workspace_closed':
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.') from None
+            raise
         finally:
             connection.close()
+
+    def closed(self):
+        with self.connect() as db:
+            return closed(db, self.tenant_id)
 
     def workspace(self) -> Workspace:
         with self.connect() as db:
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
+        if row is None:
+            raise WorkspaceClosed('This local workspace is closed.')
         return Workspace.model_validate_json(row['data'])
 
     def outreach_threads(self, search_id=None):
@@ -145,6 +159,8 @@ class Repository:
 
     def save_customer_search(self, search: CustomerSearch) -> None:
         with self.connect() as db:
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.')
             db.execute('UPDATE customer_searches SET data=? WHERE tenant_id=? AND id=?', (search.model_dump_json(), self.tenant_id, search.id))
 
     def reserve_customer_draft(self, cache_key: str, request_key: str, *, allow_new=True):
@@ -223,6 +239,8 @@ class Repository:
     def save_profile(self, profile: Profile, website: str | None = None, *, set_website: bool = False) -> Workspace:
         with self.connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.')
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
             workspace = Workspace.model_validate_json(row['data'])
             # Older clients/website analysis do not know sender fields. Omission

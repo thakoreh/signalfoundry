@@ -78,6 +78,17 @@ class LocalJourneyTest(unittest.TestCase):
             self.assertEqual(duplicate.status_code, 409)
         self.assertEqual(len(self.repo.outreach_threads(parent.search_id)['threads']), 2)
 
+    def test_claim_context_does_not_project_private_or_demo_source_links(self):
+        valid = self.account.evidence[0]
+        self.account.evidence += [valid.model_copy(update={'id': 'private_fact', 'url': 'http://127.0.0.1/admin'}),
+                                  valid.model_copy(update={'id': 'example_fact', 'is_demo': True})]
+        self.search.accounts = [self.account]
+        self.repo.save_customer_search(self.search)
+        thread = self.start()
+        self.assertTrue(thread.source_facts)
+        self.assertNotIn('private_fact', [fact.id for fact in thread.source_facts])
+        self.assertNotIn('example_fact', [fact.id for fact in thread.source_facts])
+
     def report_initial(self):
         thread = self.ready()
         with patch('app.outreach.now', return_value='2026-10-19T14:00:00+00:00'):

@@ -144,6 +144,7 @@ export function OutreachWorkspace({
   const basisDirty = Boolean(thread && bases[thread.id]);
   const timingDirty = !!thread && Object.keys(timings).some(key => key.startsWith(thread.id + ":"));
   const pendingReplyReview = !!thread && !!replySelections[thread.id];
+  const incomingDirty = !!thread && !!incoming[thread.id]?.trim();
   useUnsavedChanges(
     Object.keys(bases).length > 0 ||
     Object.keys(drafts).length > 0 ||
@@ -161,7 +162,7 @@ export function OutreachWorkspace({
     thread?.ready_for_manual_action &&
     !dirty &&
     !basisDirty &&
-    !timingDirty && !pendingReplyReview &&
+    !timingDirty && !pendingReplyReview && !incomingDirty &&
     !thread.paused &&
     !thread.suppressed &&
     thread.approval,
@@ -193,6 +194,10 @@ export function OutreachWorkspace({
           ? "This outreach is paused. Resume this outreach only when appropriate."
           : dirty
             ? "Next: save your message edits. Approval stays off until the exact saved version is reviewed."
+            : incomingDirty
+              ? "Next: save and review the received reply. Copy and email handoff stay off while this reply is unsaved."
+            : timingDirty || pendingReplyReview
+              ? "Next: save or cancel the date review before approving or handing off a message."
             : footerMissing
               ? "Next: restore the required sender footer, then save changes before approval."
               : !thread.sender_footer
@@ -599,6 +604,7 @@ export function OutreachWorkspace({
                   <SavedMeeting thread={thread} />
                   <TimingFields kind="Meeting" disabled={!!busy} value={timings[`${thread.id}:meeting`] || { at: "", zone: "" }}
                     onChange={value => { cancelCopy(); setTimings(current => ({ ...current, [`${thread.id}:meeting`]: value })); }} />
+                  {timings[`${thread.id}:meeting`] && <button className="btn" type="button" disabled={!!busy} onClick={() => { cancelCopy(); setTimings(current => { const next = { ...current }; delete next[`${thread.id}:meeting`]; return next; }); }}>Cancel meeting date edit</button>}
                   <button className="btn" type="button" disabled={!!busy || dirty || !timings[`${thread.id}:meeting`]?.at || !timings[`${thread.id}:meeting`]?.zone}
                     onClick={() => void mutate("meeting", "POST", { meeting_at: timings[`${thread.id}:meeting`].at, meeting_timezone: timings[`${thread.id}:meeting`].zone })}>
                     {thread.meeting_at ? "Report a changed meeting time" : "Report a timed booking"}
@@ -676,6 +682,7 @@ export function OutreachWorkspace({
                       {thread.next_followup_at && <p>Next review: {thread.next_followup_at} ({thread.followup_timezone}). Approval is required when due.</p>}
                       <TimingFields kind="Followup" disabled={!!busy} value={timings[`${thread.id}:followup`] || { at: "", zone: "" }}
                         onChange={value => { cancelCopy(); setTimings(current => ({ ...current, [`${thread.id}:followup`]: value })); }} />
+                      {timings[`${thread.id}:followup`] && <button className="btn" type="button" disabled={!!busy} onClick={() => { cancelCopy(); setTimings(current => { const next = { ...current }; delete next[`${thread.id}:followup`]; return next; }); }}>Cancel followup date edit</button>}
                       <p>Write and save the reminder below, then choose a weekday at least three business days after your last reported send.</p>
                       <button className="btn" type="button" disabled={!!busy || dirty || !draft.subject.trim() || !draft.body.trim() || !timings[`${thread.id}:followup`]?.at || !timings[`${thread.id}:followup`]?.zone || (thread.followups_sent || 0) >= 2 || thread.suppressed || thread.paused}
                         onClick={() => void mutate("followups", "POST", { subject: draft.subject, body: draft.body,
@@ -743,12 +750,13 @@ export function OutreachWorkspace({
                         <textarea
                           disabled={!!busy}
                           value={incoming[thread.id] || ""}
-                          onChange={(event) =>
+                          onChange={(event) => {
+                            cancelCopy();
                             setIncoming((current) => ({
                               ...current,
                               [thread.id]: event.target.value,
-                            }))
-                          }
+                            }));
+                          }}
                           rows={3}
                         />
                       </label>
@@ -818,6 +826,7 @@ export function OutreachWorkspace({
                             <button className="btn" type="button" disabled={!!busy} onClick={() => void mutate("reply-state", "PATCH", { reply_state: replySelections[thread.id], revisit_at: revisitAtDrafts[thread.id] || null, revisit_timezone: revisitZoneDrafts[thread.id] || null })}>
                               Save reply review
                             </button>
+                            <button className="btn" type="button" disabled={!!busy} onClick={() => { cancelCopy(); setReplySelections(current => { const next = { ...current }; delete next[thread.id]; return next; }); setRevisitAtDrafts(current => { const next = { ...current }; delete next[thread.id]; return next; }); setRevisitZoneDrafts(current => { const next = { ...current }; delete next[thread.id]; return next; }); }}>Cancel return date edit</button>
                           </section>
                         )}
                         </>
@@ -989,7 +998,7 @@ export function OutreachWorkspace({
                         dirty ||
                         footerMissing ||
                         basisDirty ||
-                        timingDirty || pendingReplyReview ||
+                        timingDirty || pendingReplyReview || incomingDirty ||
                         !draft.recipient.trim() ||
                         !draft.subject.trim() ||
                         !draft.body.trim() ||

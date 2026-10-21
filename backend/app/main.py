@@ -23,6 +23,7 @@ from .store import Repository
 from .customers import CustomerSearch, CustomerSearchRequest, DiscoveryRequest, ProviderError, discover_customers, engine_status
 from .primitives import now
 from .cost_admission import CostLedger, CostContext
+from .local_data import WorkspaceClosed, export_tenant
 from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftCostDenied, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
 
 logger = logging.getLogger(__name__)
@@ -96,7 +97,10 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
             return JSONResponse({'detail': 'Only the configured workspace browser may access this API'}, status_code=403)
         if request.method in ('POST', 'PUT', 'PATCH') and request.headers.get('content-type', '').split(';')[0].lower() != 'application/json':
             return JSONResponse({'detail': 'Mutations require application/json'}, status_code=415)
-        response = await call_next(request)
+        if request.url.path != '/api/health' and app.state.repository.closed():
+            response = JSONResponse({'detail': 'This local workspace is closed or is a quarantined restore. No changes or paid work are allowed.'}, status_code=410)
+        else:
+            response = await call_next(request)
         # Host middleware returns plain text by default; keep the documented error shape.
         if response.status_code == 400 and request.headers.get('host', '').split(':')[0] not in ('localhost', '127.0.0.1', 'testserver' if testing else ''):
             response = JSONResponse({'detail': 'Invalid local demo host'}, status_code=400)
@@ -114,6 +118,10 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     @app.exception_handler(FetchError)
     async def fetch_error(request: Request, error: FetchError):
         return JSONResponse({'detail': str(error)}, status_code=422)
+
+    @app.exception_handler(WorkspaceClosed)
+    async def workspace_closed(request: Request, error: WorkspaceClosed):
+        return JSONResponse({'detail': 'This local workspace is closed. No data was saved.'}, status_code=410)
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception):
@@ -143,6 +151,16 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     @app.get('/api/workspace', response_model=Workspace)
     def workspace():
         return repository().workspace()
+
+    @app.get('/api/privacy/export')
+    def privacy_export():
+        if configured_origin or public_access:
+            raise HTTPException(403, 'Local workspace export is unavailable on a public preview.')
+        try:
+            snapshot = export_tenant(repository())
+        except ValueError as error:
+            raise HTTPException(413, str(error)) from None
+        return JSONResponse(snapshot, headers={'Content-Disposition': 'attachment; filename="clientrove-workspace.json"'})
 
     @app.get('/api/customers/engine')
     def customer_engine():

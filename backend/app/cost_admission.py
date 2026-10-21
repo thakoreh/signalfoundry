@@ -193,6 +193,8 @@ class CostLedger:
         fingerprint = digest([operation, payload, billing_identity])
         with self.repo.connect() as db:
             db.execute('BEGIN IMMEDIATE')
+            if db.execute("SELECT 1 FROM local_controls WHERE (name='erased' AND scope_id=?) OR name='quarantine' LIMIT 1", (tenant,)).fetchone():
+                raise CostDenied('Paid work is blocked for this closed or quarantined local workspace.')
             prior = db.execute('SELECT fingerprint FROM paid_attempts WHERE tenant=? AND attempt=?', (tenant, attempt)).fetchone()
             if prior:
                 if prior['fingerprint'] != fingerprint:

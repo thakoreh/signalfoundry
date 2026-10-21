@@ -13,6 +13,7 @@ import { BusinessOnboarding } from "./business-onboarding";
 import { NextUpQueue } from "./next-up-queue";
 import { OutreachInsights } from "./outreach-insights";
 import { SavedOutreach } from "./saved-outreach";
+import { LocalDataControls } from "./local-data-controls";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -180,6 +181,7 @@ export default function Workspace({
           <NextUpQueue />
           <SavedOutreach />
           <OutreachInsights />
+          <LocalDataControls />
         </> : undefined}
       />
     </>

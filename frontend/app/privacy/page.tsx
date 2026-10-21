@@ -44,7 +44,9 @@ export default function PrivacyPage() {
           <p>
             If you use the workspace, you may provide a website, company
             domains, CSV rows, profile notes, shortlist decisions, and research
-            output. The preview may also receive basic technical information
+            output, contact details, drafted messages, pasted replies and
+            manually reported meeting or customer outcomes. Local mode saves
+            these records on the computer running the app. The preview may also receive basic technical information
             needed to operate a session.
           </p>
           <h2>How to use this preview safely</h2>
@@ -63,6 +65,14 @@ export default function PrivacyPage() {
             Drafts are editable, and this feature does not send messages.
           </p>
           <h2>Retention and requests</h2>
+          <p>
+            Local mode offers a saved-workspace JSON export. The owner can
+            logically erase and close a local workspace with the documented
+            offline data tool. Minimal suppression, financial audit and closure
+            facts remain so deletion cannot reopen stopped outreach or reset
+            spending. This does not securely wipe disk remnants or delete
+            separate backups, exports or messages in an external email app.
+          </p>
           <p>
             Retention, deletion, subprocessors, and production support processes
             have not been finalized for this staging preview. No production

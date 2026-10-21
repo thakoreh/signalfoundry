@@ -43,7 +43,7 @@ describe("NextUpQueue", () => {
     expect(container.textContent).toContain("Next up");
     expect(container.textContent).toContain("Example business");
     expect(container.textContent).toContain("Write a human answer");
-    expect(container.querySelector('a[href="/workspace/outreach/search_a?thread=thread_a"]')?.textContent).toBe("Open conversation");
+    expect(container.querySelector('a[href="/workspace/outreach/search_a?thread=thread_a&view=Conversations"]')?.textContent).toBe("Open conversation");
   });
   it("shows an honest empty state without inventing durable work", async () => {
     api.mockResolvedValue({ items: [] });

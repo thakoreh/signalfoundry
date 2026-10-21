@@ -47,7 +47,7 @@ export function NextUpQueue() {
         <div>
           <span className="eyebrow">RETURNING WORK</span>
           <h2 id="next-up-title">Next up</h2>
-          <p>One safe, durable action at a time. Opening this list never creates work or sends anything.</p>
+            <p>Replies to answer, messages to review and meetings to report. Check your own inbox for new replies.</p>
         </div>
         <button type="button" onClick={() => void load()} disabled={loading}>
           {loading ? "Checking…" : "Refresh"}
@@ -65,7 +65,7 @@ export function NextUpQueue() {
             <p>{actionLabels[item.action]}</p>
             <small>{item.reason}</small>
           </div>
-          <Link className="btn primary" href={`/workspace/outreach/${encodeURIComponent(item.search_id)}?thread=${encodeURIComponent(item.thread_id)}${item.action === "report_meeting" ? "&view=Meetings" : item.action === "review_reply" ? "&view=Conversations" : ""}`}>
+          <Link className="btn primary" href={`/workspace/outreach/${encodeURIComponent(item.search_id)}?thread=${encodeURIComponent(item.thread_id)}${item.action === "report_meeting" ? "&view=Meetings" : ["review_reply", "answer_reply"].includes(item.action) ? "&view=Conversations" : ""}`}>
             Open conversation
           </Link>
         </article>

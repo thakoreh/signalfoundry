@@ -1,4 +1,5 @@
 import type { Account } from "./types.ts";
+import { normalizeBusinessWebsite } from "./business-intake.ts";
 
 export type CustomerEngine = {
   monetary?: { status: "blocked" | "admission_required"; detail: string; historical_usage_known: boolean };
@@ -101,8 +102,7 @@ export function publicSourceUrl(value: string): string | null {
   try {
     const url = new URL(value);
     return ["https:", "http:"].includes(url.protocol) &&
-      !url.username &&
-      !url.password
+      !!normalizeBusinessWebsite(value)
       ? url.href
       : null;
   } catch {
