@@ -9,6 +9,7 @@ from unittest.mock import Mock, patch
 
 from fastapi.testclient import TestClient
 import httpx
+from tests.cost_fixtures import cost_context
 
 from app.customers import (CustomerSearchRequest, DiscoveryRequest, ProviderError, business_url,
                            discover_customers, engine_status, enrich_contact, provider_json,
@@ -282,25 +283,23 @@ class DiscoveryTests(unittest.TestCase):
         self.assertIn('ineligible', result.accounts[0].contacts[0].note)
 
     def test_fixed_transport_redacts_secret_errors_and_blocks_redirect(self):
-        real_client = httpx.Client
         observed = []
         def handler(request):
             observed.append(request)
             return httpx.Response(302, headers={'location': 'https://evil.com/?key=secret'}, text='secret body')
-        with patch.dict(os.environ, ENV), patch('app.customers.httpx.Client', side_effect=lambda **opts: real_client(transport=httpx.MockTransport(handler), **opts)):
+        with patch.dict(os.environ, ENV):
             with self.assertRaises(ProviderError) as error:
-                provider_json('deepseek', 'search', {'query': 'accounting firms', 'count': 5, 'need_content': False})
+                provider_json('deepseek', 'search', {'query': 'accounting firms', 'count': 5, 'need_content': False}, cost=cost_context(self), transport=httpx.MockTransport(handler))
         self.assertEqual(len(observed), 1)
         self.assertEqual(observed[0].method, 'POST')
         self.assertNotIn('secret', str(error.exception))
         self.assertNotIn('test-only', str(error.exception))
 
     def test_hunter_http_logging_cannot_emit_key_bearing_url(self):
-        real_client = httpx.Client
         with patch.dict(os.environ, {**ENV, 'HUNTER_API_KEY': 'test-only-private-value'}), \
-             patch('app.customers.httpx.Client', side_effect=lambda **opts: real_client(transport=httpx.MockTransport(lambda request: httpx.Response(200, json={'data': {}})), **opts)), \
              self.assertNoLogs('httpx', level='INFO'):
-            self.assertEqual(provider_json('hunter', 'domain-search', {'domain': 'business.com', 'limit': 1}), {'data': {}})
+            self.assertEqual(provider_json('hunter', 'domain-search', {'domain': 'business.com', 'limit': 1}, cost=cost_context(self),
+                transport=httpx.MockTransport(lambda request: httpx.Response(200, json={'data': {}}))), {'data': {}})
 
     def test_malformed_results_do_not_masquerade_as_empty_success(self):
         with patch.dict(os.environ, ENV):

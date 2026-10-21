@@ -22,7 +22,8 @@ from .safety import FetchError, fetch_public_page, normalize_url
 from .store import Repository
 from .customers import CustomerSearch, CustomerSearchRequest, DiscoveryRequest, ProviderError, discover_customers, engine_status
 from .primitives import now
-from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
+from .cost_admission import CostLedger, CostContext
+from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftCostDenied, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
 
 logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = [f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 8000)]
@@ -71,6 +72,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     app = FastAPI(title='SignalFoundry local demo', version='0.1.0',
                   description='Local demo only. No authentication. Never expose this service to a public network.')
     app.state.repository = Repository(db_path or os.environ.get('SIGNALFOUNDRY_DB_PATH') or Path(__file__).resolve().parents[1] / 'data' / 'signalfoundry.sqlite3')
+    app.state.cost_ledger = CostLedger(app.state.repository)
+    app.state.cost_ledger.recover_inflight()
     app.state.fetch_page = fetch_public_page
     app.state.decision_provider = RulesDecisionProvider()
     # Explicit opt-in is mandatory. Merely having unrelated credentials in the
@@ -144,9 +147,17 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     @app.get('/api/customers/engine')
     def customer_engine():
         state = engine_status()
+        state['monetary'] = ({'status': 'blocked', 'historical_usage_known': False, 'detail': 'Hosted paid admission is unavailable.'}
+                             if configured_origin or public_access else app.state.cost_ledger.status(repository().tenant_id))
         if configured_origin:
             state['discovery'].update(status='unavailable', detail='Customer discovery requires an authenticated workspace on hosted deployments.')
         return state
+
+    @app.get('/api/cost/status')
+    def cost_status():
+        if configured_origin or public_access:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
+        return app.state.cost_ledger.status(repository().tenant_id)
 
     @app.post('/api/customers/search', response_model=CustomerSearch)
     def customer_search_start(body: CustomerSearchRequest):
@@ -168,7 +179,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
                 try:
                     search.status, search.stage, search.updated_at = 'running', 'Finding businesses and checking public facts', now()
                     repository().save_customer_search(search)
-                    result = discover_customers(request, fetch_page=app.state.fetch_page)
+                    result = discover_customers(request, fetch_page=app.state.fetch_page,
+                        cost=CostContext(app.state.cost_ledger, repository().tenant_id, 'search:' + search.id))
                     search.accounts, search.errors, search.query = result.accounts, result.errors, result.query
                     search.status = ('partial' if result.accounts else 'failed') if result.errors else 'complete'
                     search.stage = 'Search finished'
@@ -222,9 +234,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
             raise HTTPException(422, 'Save your business profile before drafting a message.')
         try:
             key = draft_cache_key(profile, account)
-            if draft_status()['status'] != 'ready':
-                raise HTTPException(503, 'AI message drafting is not connected yet.')
-            cached = repository().reserve_customer_draft(key, body.idempotency_key)
+            cached = repository().reserve_customer_draft(key, body.idempotency_key, allow_new=draft_status()['status'] == 'ready')
             if cached:
                 return cached
         except DraftTerminalError as exc:
@@ -232,7 +242,11 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         except DraftError as exc:
             raise HTTPException(409, str(exc)) from None
         try:
-            draft = app.state.generate_customer_draft(DraftInput(profile=profile, account=account))
+            draft = app.state.generate_customer_draft(DraftInput(profile=profile, account=account),
+                cost=CostContext(app.state.cost_ledger, repository().tenant_id, 'intro:' + body.idempotency_key))
+        except DraftCostDenied as error:
+            repository().finish_customer_draft(key, body.idempotency_key)
+            return JSONResponse({'detail': str(error), 'code': 'COST_BLOCKED'}, status_code=503)
         except Exception:
             repository().finish_customer_draft(key, body.idempotency_key)
             # Never log/stringify the model, provider, prompt or credential error.

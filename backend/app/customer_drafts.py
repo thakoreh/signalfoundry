@@ -27,6 +27,10 @@ class DraftTerminalError(DraftError):
     """A recorded failed attempt; an explicit new key may admit another attempt."""
 
 
+class DraftCostDenied(DraftError):
+    """A fixed monetary admission failure, not a retryable provider failure."""
+
+
 class DraftRequest(StrictModel):
     idempotency_key: Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{8,128}$')]
 
@@ -115,7 +119,10 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
     return content
 
 
-def generate_customer_draft(body: DraftInput, *, transport=None) -> CustomerDraft:
+def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> CustomerDraft:
+    from .cost_admission import paid_call, CostDenied
+    if transport is not None and not isinstance(transport, httpx.MockTransport):
+        raise DraftError('Only an offline mock transport may be injected.')
     if draft_status()['status'] != 'ready':
         raise DraftError('AI message drafting is not connected yet.')
     facts = draft_facts(body.profile, body.account)
@@ -124,7 +131,7 @@ def generate_customer_draft(body: DraftInput, *, transport=None) -> CustomerDraf
                'messages': [{'role': 'system', 'content': SYSTEM},
                             {'role': 'user', 'content': json.dumps(facts, ensure_ascii=True)}]}
     started = time.monotonic()
-    try:
+    def dispatch():
         with httpx.Client(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(20.0, connect=5.0), transport=transport) as client:
             with client.stream('POST', 'https://api.deepseek.com/chat/completions',
                                headers={'Authorization': 'Bearer ' + os.environ['DEEPSEEK_API_KEY'].strip(), 'Content-Type': 'application/json'},
@@ -137,11 +144,15 @@ def generate_customer_draft(body: DraftInput, *, transport=None) -> CustomerDraf
                     if size > MAX_RESPONSE_BYTES or time.monotonic() - started > 25:
                         raise DraftError('AI drafting exceeded its response limit. No automatic retry was made.')
                     chunks.append(chunk)
-        raw = json.loads(b''.join(chunks))
+        return json.loads(b''.join(chunks))
+    try:
+        raw = paid_call(cost, 'deepseek:intro', payload, dispatch)
         choice = raw['choices'][0]
         if choice.get('finish_reason') != 'stop':
             raise DraftError('AI drafting did not finish cleanly. No automatic retry was made.')
         content = validate_content(json.loads(choice['message']['content']), facts)
+    except CostDenied as error:
+        raise DraftCostDenied(str(error)) from None
     except DraftError:
         raise
     except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):

@@ -53,6 +53,17 @@ afterEach(async () => {
 });
 
 describe("customer search form handoff", () => {
+  it("keeps a configured key from starting paid discovery when monetary history is unknown", async () => {
+    api.mockImplementation(async (path: string) => path === "/customers/engine"
+      ? { ...engine, monetary: { status: "blocked", historical_usage_known: false, detail: "Historical spend is unknown. Paid work is paused." } }
+      : fixtureWorkspace);
+    await mount();
+    expect(container.textContent).toContain("Historical spend is unknown");
+    expect(container.querySelector<HTMLButtonElement>('button[type="submit"]')?.disabled).toBe(true);
+    await submit();
+    expect(api.mock.calls.some(([path]) => path === "/customers/search")).toBe(false);
+    expect(push).not.toHaveBeenCalled();
+  });
   it("uses the saved actual target, defaults to five and lets users request one through five results", async () => {
     await mount();
     expect(container.querySelector<HTMLInputElement>("input")!.value).toBe(

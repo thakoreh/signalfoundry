@@ -127,6 +127,10 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
   async function start(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current || loading) return;
+    if (engine?.monetary?.status === "blocked") {
+      setError(engine.monetary.detail);
+      return;
+    }
     if (createdRun.current) {
       router.push(customerSearchPath(createdRun.current));
       return;
@@ -245,6 +249,7 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
               : "Not connected"}
         </span>
       </div>
+      {engine?.monetary?.status === "blocked" && <div className="customer-search-notice" role="status"><strong>Paid discovery is paused.</strong><p>{engine.monetary.detail}</p></div>}
       {!loading && !engine && (
         <div className="customer-search-notice">
           <p>Search availability could not be loaded.</p>
@@ -356,7 +361,7 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
         )}
         <button
           className="btn primary"
-          disabled={starting || loading || engine?.discovery.status !== "ready"}
+          disabled={starting || loading || engine?.discovery.status !== "ready" || engine?.monetary?.status === "blocked"}
           type="submit"
         >
           {starting ? "Opening your search…" : "Find customers"}

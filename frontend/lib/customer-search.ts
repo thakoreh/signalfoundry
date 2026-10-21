@@ -1,6 +1,7 @@
 import type { Account } from "./types.ts";
 
 export type CustomerEngine = {
+  monetary?: { status: "blocked" | "admission_required"; detail: string; historical_usage_known: boolean };
   discovery: {
     provider: string;
     status: "ready" | "unconfigured" | "unavailable";

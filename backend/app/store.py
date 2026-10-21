@@ -147,7 +147,7 @@ class Repository:
         with self.connect() as db:
             db.execute('UPDATE customer_searches SET data=? WHERE tenant_id=? AND id=?', (search.model_dump_json(), self.tenant_id, search.id))
 
-    def reserve_customer_draft(self, cache_key: str, request_key: str):
+    def reserve_customer_draft(self, cache_key: str, request_key: str, *, allow_new=True):
         """Transactionally admit one attempt per immutable profile/evidence snapshot.
 
         A request key is never charged twice. Only an explicit new key after a
@@ -195,6 +195,8 @@ class Repository:
                     if age(old['created_at']) > 90:
                         recover(old['request_key'])
                     raise DraftError('This draft is already in progress. Check it again shortly; no extra attempt was made.')
+            if not allow_new:
+                raise DraftError('AI message drafting is not connected. Existing saved drafts remain available.')
             recent = db.execute('SELECT created_at FROM customer_draft_requests WHERE tenant_id=? AND charged=1 ORDER BY created_at DESC LIMIT 5',
                                 (self.tenant_id,)).fetchall()
             if sum((current - datetime.fromisoformat(row['created_at'].replace('Z', '+00:00'))).total_seconds() < 3600 for row in recent) >= 5:

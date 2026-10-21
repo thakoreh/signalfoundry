@@ -1,5 +1,13 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Monetary admission implementation checkpoint
+
+Added durable local global+tenant integer-USD policies, immutable price/input/period-bound attempts, reservation before actual HTTP dispatch, token-usage settlement before draft-content validation, pending/uncertain stop, operator receipt reconciliation/audit, explicit kill/reauthorization, and fail-closed rollover/restart behavior. One shared paid request in flight is intentional: a failed settlement/uncertainty write leaves a durable dispatching row that stops every other process instead of silently reopening exposure. No current provider prices/history/authorization are seeded; actual historical DeepSeek usage remains UNKNOWN. A separately copied database is not a global authority; hosted/stateless workers and live legacy Jev remain gated at transport. Local search and each Hunter operation carry explicit context. The search UI explains the monetary pause; cached initial drafts remain retrievable with provider flags/keys off. See MONETARY_SAFEGUARDS.md and the offline operator script; no operator policy has been configured on owner data.
+
+Tests: 67 focused backend cost/search/draft/Jev PASS, including zero HTTP clients without authority, last-dollar race across tenant/connections, changed-input/retry binding, historical+tenant caps, missing/over-bound usage, restart/month rollover, failed settlement writes, late/conflicting receipts, explicit audited reconciliation, separate Hunter admissions and Unicode bounds. Existing pinned-network and redaction assertions are retained: their offline fixtures now supply synthetic monetary policies or mock the newly introduced admission dependency while separately proving real admission denies no-context live transport. Rates/receipts are fictional. Prior full backend191 PASS preceded the final additional operator/receipt cases; final whole-suite rerun remains required. Focused budget-pause form4 PASS; typecheck/lint passed before the last small form/test additions and must be rerun. No real provider calls, sends, accounts, credentials, subscription, deployment or owner-data operations.
+
+Independent dbdac05 lifecycle recheck closed both meeting findings (including same-instant zone correction), 51 focused tests plus seven independent probes PASS within stated scope. Funnel counts exclude demos; company safety flags/departure still include saved examples as records and must not be represented as demand evidence. Full rendered/mobile/integrated acceptance remains pending.
+
 ## Continuation checkpoint — bounded followups and timed meetings
 
 ### Integrated activity projection and lifecycle review repair

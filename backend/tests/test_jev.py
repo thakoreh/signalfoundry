@@ -234,7 +234,7 @@ class JevTest(unittest.TestCase):
         response.read1.side_effect = body.read
         connection = MagicMock()
         connection.getresponse.return_value = response
-        with patch('app.jev.resolve_public', return_value=['8.8.8.8']) as resolver, patch('app.jev.PinnedHTTPSConnection', return_value=connection) as factory:
+        with patch('app.jev.paid_call', side_effect=lambda context, operation, payload, dispatch: dispatch()), patch('app.jev.resolve_public', return_value=['8.8.8.8']) as resolver, patch('app.jev.PinnedHTTPSConnection', return_value=connection) as factory:
             account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'jev')
         resolver.assert_called_once_with('api.typesafe.ai', 443, 2.0)
@@ -249,7 +249,7 @@ class JevTest(unittest.TestCase):
         response.status = 200
         response.getheader.return_value = 'identity'
         connection.getresponse.return_value = response
-        with patch('app.jev.resolve_public', return_value=['8.8.8.8']), patch('app.jev.PinnedHTTPSConnection', return_value=connection), patch('app.jev.time.monotonic', side_effect=[0, 1, 9]):
+        with patch('app.jev.paid_call', side_effect=lambda context, operation, payload, dispatch: dispatch()), patch('app.jev.resolve_public', return_value=['8.8.8.8']), patch('app.jev.PinnedHTTPSConnection', return_value=connection), patch('app.jev.time.monotonic', side_effect=[0, 1, 9]):
             account = JevDecisionProvider(self.api_key).evaluate(DEMO_PROFILE, PAGE, campaign_id='cmp_test')
         self.assertEqual(account.decision_engine, 'rules')
         self.assertIn('timeout', account.unknowns[0])

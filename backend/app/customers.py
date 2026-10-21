@@ -90,7 +90,22 @@ def engine_status() -> dict:
     }
 
 
-def provider_json(provider: str, endpoint: str, params: dict) -> dict:
+def provider_json(provider: str, endpoint: str, params: dict, *, cost=None, transport=None) -> dict:
+    from .cost_admission import paid_call, CostDenied
+    if transport is not None and not isinstance(transport, httpx.MockTransport):
+        raise ProviderError('Only an offline mock transport may be injected.')
+    operation = provider + ':' + endpoint
+    if operation not in ('deepseek:search', 'brave:search', 'hunter:domain-search', 'hunter:email-verifier'):
+        raise ProviderError('Unsupported provider operation.')
+    if provider == 'hunter' and cost:
+        cost = cost.child(params.get('domain') or params.get('email'))
+    try:
+        return paid_call(cost, operation, params, lambda: _provider_json_transport(provider, endpoint, params, transport=transport))
+    except CostDenied as error:
+        raise ProviderError(str(error)) from None
+
+
+def _provider_json_transport(provider: str, endpoint: str, params: dict, *, transport=None) -> dict:
     """Only fixed provider endpoints; no env proxies, redirects, or response-body errors."""
     method, request_options = 'GET', {'params': params}
     if provider == 'deepseek' and endpoint == 'search':
@@ -112,7 +127,7 @@ def provider_json(provider: str, endpoint: str, params: dict) -> dict:
         raise ProviderError('Unsupported provider operation.')
     try:
         deadline = time.monotonic() + 8
-        with httpx.Client(timeout=6, follow_redirects=False, trust_env=False) as client:
+        with httpx.Client(timeout=6, follow_redirects=False, trust_env=False, transport=transport) as client:
             with client.stream(method, url, **request_options, headers={**headers, 'Accept': 'application/json'}) as response:
                 if response.status_code != 200:
                     raise ProviderError(f'{provider.title()} could not complete this request. Check its configuration or allowance.')
@@ -305,8 +320,8 @@ class ContactLookup:
     rejected_email: str | None = None
 
 
-def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
-    result = provider_json('hunter', 'domain-search', {'domain': domain, 'limit': 1})
+def enrich_contact(domain: str, timestamp: str, *, cost=None) -> ContactLookup:
+    result = provider_json('hunter', 'domain-search', {'domain': domain, 'limit': 1}, cost=cost)
     data = result.get('data', {})
     if not isinstance(data, dict) or data.get('webmail') or data.get('disposable'):
         return ContactLookup()
@@ -317,7 +332,7 @@ def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
     email = row.get('value')
     if not isinstance(email, str) or not re.fullmatch(r'[^\s@,;<>]{1,64}@[A-Za-z0-9.-]{1,253}', email) or email.rsplit('@', 1)[1].lower() != domain.lower():
         return ContactLookup()
-    verification = provider_json('hunter', 'email-verifier', {'email': email}).get('data', {})
+    verification = provider_json('hunter', 'email-verifier', {'email': email}, cost=cost).get('data', {})
     if not isinstance(verification, dict):
         raise ProviderError('Hunter returned an unreadable verification response.')
     # A high confidence score or catch-all domain does not establish verification.
@@ -336,7 +351,9 @@ def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
                    + ('Provider reports valid; this does not guarantee delivery or decision authority.' if verified else 'Validity is not established; do not treat this address as verified.')))
 
 
-def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, call=provider_json) -> DiscoveryResult:
+def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, call=None, cost=None) -> DiscoveryResult:
+    if call is None:
+        call = lambda provider, endpoint, params: provider_json(provider, endpoint, params, cost=cost)
     state = engine_status()
     if state['discovery']['status'] != 'ready':
         raise ProviderError('Customer discovery is not configured. Connect the search provider first.')
@@ -397,7 +414,7 @@ def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, 
             return account, f'{account.domain}: Contact lookup was not attempted within the research time budget.'
         error = None
         try:
-            lookup = enrich_contact(account.domain, account.researched_at)
+            lookup = enrich_contact(account.domain, account.researched_at, cost=cost)
             if lookup.rejected_email:
                 visible_contacts = [item for item in visible_contacts if item.email.casefold() != lookup.rejected_email.casefold()]
                 account.contacts = visible_contacts
