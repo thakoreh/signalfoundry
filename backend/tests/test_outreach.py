@@ -321,6 +321,66 @@ class OutreachTest(unittest.TestCase):
         self.assertEqual(thread.meeting_state, 'attended_reported')
         self.assertEqual(thread.sale_state, 'won_reported')
 
+    def test_source_question_is_sticky_suppressed_even_when_selected_as_question(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Where did you get my email?', reply_state='question'))
+        self.assertEqual(thread.reply_state, 'source_question')
+        self.assertTrue(thread.suppressed)
+        self.assertIsNone(thread.approval)
+        corrected = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(
+            **self.fields(thread), reply_state='interested'))
+        self.assertTrue(corrected.suppressed)
+
+    def test_bounce_marks_only_address_invalid_and_pauses_same_company_sibling(self):
+        first = self.ready()
+        second_search = self.search.model_copy(deep=True)
+        second_search.id = 'second_saved_search'
+        second_account = self.account.model_copy(update={'id': 'account_b'})
+        second_search.accounts = [second_account]
+        with self.repo.connect() as db:
+            db.execute('INSERT INTO customer_searches VALUES (?,?,?,?,?)',
+                       (self.repo.tenant_id, second_search.id, 'second_search', second_search.created_at, second_search.model_dump_json()))
+        sibling = self.repo.start_outreach(StartOutreach(
+            search_id=second_search.id, account_ids=[second_account.id], idempotency_key=self.key()))['threads'][0]
+        bounced = self.repo.mutate_outreach(first.id, 'reply', PasteReply(
+            **self.fields(first), body='Delivery failed permanently', reply_state='bounce'))
+        self.assertEqual(bounced.reply_state, 'bounce')
+        self.assertEqual(bounced.recipient_status, 'invalid')
+        self.assertFalse(bounced.suppressed)
+        paused = self.repo.outreach_thread(sibling.id)
+        self.assertTrue(paused.paused)
+        self.assertIsNone(paused.approval)
+
+    def test_auto_reply_and_referral_are_recorded_but_not_actionable_on_original_thread(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Out of office until Monday', reply_state='auto_reply'))
+        self.assertEqual(thread.reply_state, 'auto_reply')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.start()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Please contact my colleague instead', reply_state='referral'))
+        self.assertEqual(thread.reply_state, 'referral')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_next_up_is_read_only_and_prioritizes_inbound_review(self):
+        thread = self.ready()
+        inbound = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Can you explain more?', reply_state='awaiting_review'))
+        before = self.repo.outreach_thread(thread.id)
+        with self.repo.connect() as db:
+            request_count = db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0]
+        projection = self.repo.outreach_next_up()
+        self.assertEqual(projection['items'][0]['thread_id'], thread.id)
+        self.assertEqual(projection['items'][0]['action'], 'review_reply')
+        self.assertEqual(projection['items'][0]['reply_state'], 'awaiting_review')
+        self.assertEqual(self.repo.outreach_thread(thread.id).revision, before.revision)
+        with self.repo.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0], request_count)
+
     def test_sent_snapshot_preserves_exact_approved_link_after_later_edits(self):
         self.sender()
         # Booking invitations require an explicitly reported interested reply.
@@ -369,6 +429,7 @@ class OutreachTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.text)
             thread = response.json()['threads'][0]
             self.assertEqual(client.get('/api/outreach', params={'search_id': self.search.id}).json()['threads'][0]['id'], thread['id'])
+            self.assertEqual(client.get('/api/outreach/next-up').status_code, 200)
             self.assertEqual(client.post(f"/api/outreach/{thread['id']}/reply-draft", json={}).status_code, 503)
             self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': self.key(), 'tenant_id': 'other'}).status_code, 422)
             self.assertEqual(client.put(f"/api/outreach/{thread['id']}/draft", json={'expected_revision': 1, 'idempotency_key': 'bad_address_123', 'recipient': 'bad\nBcc:another@business.com', 'subject': '', 'body': ''}).status_code, 422)

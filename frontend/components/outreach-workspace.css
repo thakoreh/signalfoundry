@@ -256,6 +256,24 @@
   font-size: 12px !important;
   line-height: 1.65;
 }
+.outreach-saved-facts {
+  margin: 0 0 22px;
+  padding: 14px 16px;
+  border: 1px solid #d6e2ce;
+  border-radius: 10px;
+  background: #fbfcf9;
+}
+.outreach-saved-facts h3 {
+  margin-top: 0;
+}
+.outreach-saved-facts p {
+  margin: 6px 0 0;
+  color: #5f7059;
+  overflow-wrap: anywhere;
+}
+.outreach-saved-facts strong {
+  color: #314f2c;
+}
 .outreach-feedback,
 .outreach-blocked {
   padding: 14px 18px;

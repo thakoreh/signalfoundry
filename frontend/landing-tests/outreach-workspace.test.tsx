@@ -335,6 +335,31 @@ it("shows a persistent safe next action and scopes pause to this outreach", asyn
   expect(button("Pause this outreach")).toBeTruthy();
 });
 
+it("shows saved seller facts beside the reply editor without inventing unknowns", async () => {
+  await act(async () =>
+    root.render(
+      <OutreachWorkspace
+        searchId="search_a"
+        profile={{
+          company_name: "Fixture Co",
+          description: "A saved description of the offer.",
+          industries: ["SaaS"],
+          company_sizes: [],
+          geographies: ["Canada"],
+          buyer_roles: ["Operations leaders"],
+          keywords: [],
+          exclusions: [],
+        }}
+      />,
+    ),
+  );
+  await click("Conversations");
+  expect(container.textContent).toContain("Saved offer facts");
+  expect(container.textContent).toContain("A saved description of the offer.");
+  expect(container.textContent).toContain("Operations leaders");
+  expect(container.textContent).toContain("Price or integration details: Unknown");
+});
+
 it("keeps unknown email provenance unknown and separates approval from reachability", async () => {
   await mount();
   expect(container.textContent).toContain("Email status: published but not verified");

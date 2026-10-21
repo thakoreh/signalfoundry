@@ -103,6 +103,10 @@ class Repository:
         from .outreach import OutreachStore
         return OutreachStore(self).get(thread_id)
 
+    def outreach_next_up(self):
+        from .outreach import OutreachStore
+        return OutreachStore(self).next_up()
+
     def start_outreach(self, body):
         from .outreach import OutreachStore
         return OutreachStore(self).start(body)

@@ -109,6 +109,7 @@ export function CustomerWorkspaceScreen({
               // hydration is not a scope switch and must not destroy drafts.
               key={`${mode}:${searchId}`}
               searchId={searchId}
+              profile={workspace?.profile || null}
               profileRefresh={profileRefresh}
               suspended={editing}
             />

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { errorMessage, jsonBody } from "../lib/api";
+import type { Profile } from "../lib/types";
 import {
   replyLabels,
   outreachMessageBody,
@@ -22,10 +23,12 @@ import "./outreach-workspace.css";
 type Step = "Review" | "Conversations" | "Meetings";
 export function OutreachWorkspace({
   searchId,
+  profile,
   profileRefresh = 0,
   suspended = false,
 }: {
   searchId: string;
+  profile?: Profile | null;
   profileRefresh?: number;
   suspended?: boolean;
 }) {
@@ -597,8 +600,17 @@ export function OutreachWorkspace({
               ) : (
                 <>
                   {step === "Conversations" && (
+                    <>
+                    <section className="outreach-saved-facts" aria-label="Saved offer facts">
+                      <h3>Saved offer facts</h3>
+                      <p><strong>What you sell:</strong> {profile?.description || "Unknown"}</p>
+                      <p><strong>Buyer roles:</strong> {profile?.buyer_roles.length ? profile.buyer_roles.join(", ") : "Unknown"}</p>
+                      <p><strong>Industries:</strong> {profile?.industries.length ? profile.industries.join(", ") : "Unknown"}</p>
+                      <p><strong>Geographies:</strong> {profile?.geographies.length ? profile.geographies.join(", ") : "Unknown"}</p>
+                      <p><strong>Price or integration details:</strong> Unknown</p>
+                    </section>
                     <section className="outreach-conversation">
-                      <h3>Conversation history</h3>
+                    <h3>Conversation history</h3>
                       {!thread.messages.length && (
                         <p>No messages recorded yet.</p>
                       )}
@@ -686,6 +698,7 @@ export function OutreachWorkspace({
                         Replies are written by you.
                       </p>
                     </section>
+                    </>
                   )}
                   <div className="outreach-draft-fields">
                     <label>

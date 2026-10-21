@@ -5,7 +5,11 @@ export type ReplyState =
   | "not_now"
   | "not_interested"
   | "opt_out"
-  | "uncertain";
+  | "uncertain"
+  | "referral"
+  | "source_question"
+  | "auto_reply"
+  | "bounce";
 export type OutreachMessage = {
   id: string;
   direction: "outbound" | "inbound";
@@ -101,4 +105,8 @@ export const replyLabels: Record<ReplyState, string> = {
   not_interested: "Not interested",
   opt_out: "Opted out",
   uncertain: "Uncertain",
+  referral: "Referred contact",
+  source_question: "Asked for source",
+  auto_reply: "Auto-reply / OOO",
+  bounce: "Address bounced",
 };

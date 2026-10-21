@@ -21,7 +21,7 @@ from .safety import FetchError, normalize_url
 
 Key = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{8,128}$')]
 Identifier = Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{1,128}$')]
-ReplyState = Literal['awaiting_review', 'interested', 'question', 'not_now', 'not_interested', 'opt_out', 'uncertain']
+ReplyState = Literal['awaiting_review', 'interested', 'question', 'not_now', 'not_interested', 'opt_out', 'uncertain', 'referral', 'source_question', 'auto_reply', 'bounce']
 MeetingState = Literal['not_recorded', 'booked_reported', 'attended_reported', 'no_show_reported', 'cancelled_reported']
 SaleState = Literal['not_recorded', 'won_reported', 'lost_reported']
 
@@ -194,13 +194,15 @@ class OutreachThread(StrictModel):
     company_name: str
     domain: str
     recipient: str = ''
-    recipient_status: Literal['missing', 'verified', 'published_unverified', 'user_entered'] = 'missing'
+    recipient_status: Literal['missing', 'verified', 'published_unverified', 'user_entered', 'invalid'] = 'missing'
+    invalid_recipient_emails: list[str] = Field(default_factory=list, max_length=10)
     subject: str = ''
     body: str = ''
     booking_link: str = ''
     sender_footer: str = ''
     contact_basis: ContactBasis | None = None
     paused: bool = False
+    cold_followups_stopped: bool = False
     suppressed: bool = False
     suppression_reason: str | None = None
     reply_state: ReplyState = 'awaiting_review'
@@ -232,7 +234,11 @@ def contact_basis_ready(thread: OutreachThread) -> bool:
 
 def blocked(thread: OutreachThread) -> bool:
     has_reply = any(m.direction == 'inbound' for m in thread.messages)
-    return thread.suppressed or thread.paused or (has_reply and thread.reply_state not in ('interested', 'question'))
+    return thread.suppressed or thread.paused or thread.recipient_status == 'invalid' or (has_reply and thread.reply_state not in ('interested', 'question'))
+
+
+def source_question(body: str) -> bool:
+    return bool(re.search(r'\b(where|how) did you get my (email|address)|how did you find me|source of (your|the) (email|information)', body, re.I))
 
 
 def sender_footer(profile) -> str:
@@ -274,6 +280,8 @@ class OutreachStore:
                                  (self.tenant, domain_target(thread.domain), 'email:' + thread.recipient.lower())).fetchone()
         if suppression:
             thread.suppressed, thread.suppression_reason = True, suppression['reason']
+        if thread.recipient and thread.recipient.lower() in {value.lower() for value in thread.invalid_recipient_emails}:
+            thread.recipient_status = 'invalid'
         if blocked(thread) or not contact_basis_ready(thread) or not thread.sender_footer or not thread.body.endswith(thread.sender_footer):
             thread.approval = None
         thread.ready_for_manual_action = bool(not blocked(thread) and thread.recipient and thread.subject and thread.body and
@@ -290,6 +298,24 @@ class OutreachStore:
         thread = self._view(db, thread)
         db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?', (thread.model_dump_json(), self.tenant, thread.id))
         return thread
+
+    def _pause_company_siblings(self, db, thread):
+        """Pause same-tenant/domain outreach without touching other tenants."""
+        target = domain_target(thread.domain)
+        rows = db.execute('SELECT id,data FROM outreach_threads WHERE tenant_id=?', (self.tenant,)).fetchall()
+        for row in rows:
+            if row['id'] == thread.id:
+                continue
+            sibling = OutreachThread.model_validate_json(row['data'])
+            if domain_target(sibling.domain) != target:
+                continue
+            sibling.paused = True
+            sibling.cold_followups_stopped = True
+            sibling.approval = None
+            sibling.revision += 1
+            sibling.updated_at = now()
+            db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?',
+                       (sibling.model_dump_json(), self.tenant, sibling.id))
 
     def _replay(self, db, operation, body):
         prior = db.execute('SELECT fingerprint,resource_ids FROM outreach_requests WHERE tenant_id=? AND request_key=?',
@@ -329,6 +355,34 @@ class OutreachStore:
         fields = ('id', 'search_id', 'account_id', 'company_name', 'domain', 'recipient', 'reply_state', 'paused', 'suppressed',
                   'ready_for_manual_action', 'meeting_state', 'sale_state', 'updated_at')
         return {'threads': [{name: getattr(t, name) for name in fields} for t in threads]}
+
+    def next_up(self, limit=1):
+        """Return a read-only, durable-work projection for returning users."""
+        with self.repo.connect() as db:
+            rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=? ORDER BY rowid DESC',
+                              (self.tenant,)).fetchall()
+            threads = [self._view(db, OutreachThread.model_validate_json(row['data'])) for row in rows]
+        ranked = []
+        for thread in threads:
+            inbound = any(message.direction == 'inbound' for message in thread.messages)
+            if inbound and thread.reply_state in ('awaiting_review', 'uncertain', 'not_now', 'not_interested', 'opt_out', 'source_question', 'auto_reply', 'bounce', 'referral'):
+                priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
+            elif inbound and thread.reply_state in ('interested', 'question'):
+                priority, action, reason = 1, 'answer_reply', 'Write and review a human answer using saved facts.'
+            elif thread.meeting_state == 'booked_reported':
+                priority, action, reason = 2, 'report_meeting', 'Report what happened after the meeting time.'
+            elif thread.approval and thread.ready_for_manual_action:
+                priority, action, reason = 3, 'manual_send', 'Copy or send the exact approved message, then record what happened.'
+            else:
+                continue
+            ranked.append((priority, thread.updated_at, thread, action, reason))
+        ranked.sort(key=lambda item: (item[0], item[1]), reverse=False)
+        return {'items': [
+            {'thread_id': thread.id, 'company_name': thread.company_name, 'action': action,
+             'reason': reason, 'reply_state': thread.reply_state,
+             'meeting_state': thread.meeting_state, 'updated_at': thread.updated_at}
+            for _, _, thread, action, reason in ranked[:limit]
+        ]}
 
     def get(self, thread_id):
         with self.repo.connect() as db:
@@ -453,35 +507,50 @@ class OutreachStore:
                 # Obvious unsubscribe language fails closed even if the selected
                 # classification was accidentally left on an affirmative value.
                 opt_out = re.search(r'\b(unsubscribe|remove me|do not contact|don.t contact|stop emailing|opt[ -]?out)\b', body.body, re.I)
-                state = 'opt_out' if opt_out else body.reply_state
+                state = 'opt_out' if opt_out else ('source_question' if source_question(body.body) else body.reply_state)
+                if state == 'bounce':
+                    address = thread.recipient.lower()
+                    if address and address not in thread.invalid_recipient_emails:
+                        thread.invalid_recipient_emails.append(address)
+                    thread.recipient_status = 'invalid'
                 thread.messages.append(ConversationMessage(id=new_id('msg'), direction='inbound', recipient=thread.recipient,
                     subject=thread.subject, body=body.body, reply_state=state, created_at=now()))
                 thread.reply_state, thread.body, thread.approval = state, '', None
+                thread.cold_followups_stopped = True
+                self._pause_company_siblings(db, thread)
                 if thread.subject and not thread.subject.lower().startswith('re:'):
                     thread.subject = ('Re: ' + thread.subject)[:160]
             elif operation == 'reply-state':
                 latest = next((m for m in reversed(thread.messages) if m.direction == 'inbound'), None)
                 if latest is None:
                     raise OutreachError('Paste a reply before reviewing its classification.')
-                latest.reply_state, thread.reply_state, thread.approval = body.reply_state, body.reply_state, None
+                state = 'source_question' if source_question(latest.body) else body.reply_state
+                latest.reply_state, thread.reply_state, thread.approval = state, state, None
+                thread.cold_followups_stopped = True
             elif operation == 'pause':
                 thread.paused, thread.approval = body.paused, None
             elif operation == 'outcomes':
                 if body.meeting_state in ('attended_reported', 'no_show_reported') and thread.meeting_state not in ('booked_reported', 'attended_reported', 'no_show_reported'):
                     raise OutreachError('Report a booked meeting before recording attendance or a no-show.')
                 thread.meeting_state, thread.sale_state = body.meeting_state, body.sale_state
+                if body.meeting_state != 'not_recorded':
+                    thread.cold_followups_stopped = True
+                    self._pause_company_siblings(db, thread)
             else:
                 raise OutreachError('Unsupported conversation action', 404)
-            if thread.reply_state == 'opt_out':
+            if thread.reply_state in ('opt_out', 'source_question'):
                 latest_inbound = next((m for m in reversed(thread.messages) if m.direction == 'inbound'), None)
                 addresses = {thread.recipient.lower()}
                 if latest_inbound:
                     addresses.add(latest_inbound.recipient.lower())
+                reason = ('A source-of-contact question was recorded. Outreach approval is blocked.'
+                          if thread.reply_state == 'source_question'
+                          else 'An opt-out was recorded. Outreach approval is blocked.')
                 for target in [domain_target(thread.domain)] + ['email:' + address for address in addresses if address]:
                     db.execute('INSERT OR IGNORE INTO outreach_suppressions VALUES (?,?,?,?)',
-                               (self.tenant, target, 'An opt-out was recorded. Outreach approval is blocked.', now()))
+                               (self.tenant, target, reason, now()))
                 thread.suppressed = True
-                thread.suppression_reason = 'An opt-out was recorded. Outreach approval is blocked.'
+                thread.suppression_reason = reason
             thread.revision, thread.updated_at = next_revision, now()
             thread = self._save(db, thread)
             self._record(db, operation_key, body, [thread])
@@ -505,6 +574,10 @@ def outreach_router(repository, *, blocked_preview=False):
     @router.get('')
     def list_threads(search_id: str | None = None):
         return call(service().outreach_threads, search_id)
+
+    @router.get('/next-up')
+    def next_up():
+        return call(service().outreach_next_up)
 
     @router.post('')
     def start(body: StartOutreach):
