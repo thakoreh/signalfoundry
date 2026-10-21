@@ -62,6 +62,25 @@ class CostAdmissionTests(unittest.TestCase):
             with self.assertRaises(CostDenied):
                 provider._request({'model': 'fixture'})
 
+    def test_partial_upgrade_with_existing_column_repairs_legacy_but_keeps_new_transport_recoverable(self):
+        context = cost_context(self)
+        context.ledger.reserve(context.tenant, 'partially_upgraded', 'deepseek:search', {'query': 'fixture'})
+        with context.ledger.repo.connect() as db:
+            db.execute('DELETE FROM monetary_migrations')  # Fictional pre-v2 partial upgrade.
+            db.execute("UPDATE paid_attempts SET status='uncertain',actual=5354,usage=?,resolution_lock=0", (json.dumps({'operator_reference': 'fictional-old-receipt'}),))
+        upgraded = CostLedger(Repository(context.ledger.repo.db_path))
+        with self.assertRaisesRegex(CostDenied, 'operator reconciliation'):
+            upgraded.settle(context.tenant, 'partially_upgraded', {})
+        with upgraded.repo.connect() as db:
+            self.assertEqual(db.execute('SELECT actual,resolution_lock FROM paid_attempts').fetchone()[:], (5354, 1))
+        # An unrelated modern transport interruption has known provenance.
+        fresh = cost_context(self)
+        fresh.ledger.reserve(fresh.tenant, 'new_transport', 'deepseek:search', {'query': 'fixture'})
+        fresh.ledger.uncertain(fresh.tenant, 'new_transport')
+        reopened = CostLedger(Repository(fresh.ledger.repo.db_path))
+        reopened.settle(fresh.tenant, 'new_transport', {'results': []})
+        self.assertEqual(reopened.status(fresh.tenant)['status'], 'admission_required')
+
     def test_global_last_allowance_is_atomic_across_tenants_and_connections(self):
         context = cost_context(self, cap=100)
         ledger = context.ledger
