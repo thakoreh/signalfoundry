@@ -1,0 +1,6 @@
+{"error": "AssertionError([{'case': 'resume_after_owner_inbound', 'paused': False, 'company_conflict': False, 'ready_for_manual_action': True, 'approval': True}])", "name": "company_guard_tenant_scope_legacy_and_resume", "status": "FAIL"}
+{"name": "queue_completion_interested", "status": "PASS"}
+{"name": "queue_completion_question", "status": "PASS"}
+{"name": "dates_and_suppression", "status": "PASS"}
+{"name": "source_question_guard", "status": "PASS"}
+{"summary": {"failed": 1, "passed": 4}}

@@ -1,0 +1,61 @@
+# Copy-paste continuation prompt
+
+You are taking over SignalFoundry (some source/UI still says ClientRove). Finish the existing app, not another plan, prototype or replacement. The original whole-app goal is INCOMPLETE. A previous one-hour completion target was missed; it is historical, not a new deadline or permission to weaken acceptance.
+
+## Repository and first actions
+
+- Repository: https://github.com/thakoreh/signalfoundry
+- Continue branch `codex/clientrove-release-candidate` and existing draft PR #7: https://github.com/thakoreh/signalfoundry/pull/7.
+- Last application-code checkpoint is `c929cbaf0019909ff21bce3633f25842cf67c281`. Handoff documentation is in later commits. Fetch and inspect the ACTUAL current HEAD, status, worktrees, origin/main and PR before changing anything.
+- Do not start over from main, lose the 23 application commits, switch onto an owner's live checkout, reopen PR #5, or use `codex/clientrove-outreach-journey` (finished history).
+- Preserve all saved profiles, searches, drafts, evidence, approvals, actual-sent history and suppressions. Do not copy owner `.env` files/databases or reuse the owner's ports/Chrome profile. Use fresh, clearly fictional fixtures in an isolated worktree/database and unused ports.
+- Read applicable AGENTS.md files, then `docs/continuation/README.md`, `OWNER_CONTRACT.md`, `STATUS.md`, `LOCAL_DECISIONS.md` and the original requirement files linked there. Read Convex-specific instructions before editing convex/. If those instructions cannot be found, keep that seam gated rather than guessing.
+- Source and the latest explicit owner contract win over stale architecture, readiness notes and old phase/timebox instructions. Verify current provider documentation before integration/pricing decisions. Do not import Hermes-specific scheduling, profiles, chat IDs or infrastructure.
+
+## Outcome and work order
+
+A busy founder can go website -> confirmed business/offer/buyer/sender -> relevant prospects -> exact approved outreach -> real manual reply -> qualified conversation -> timed meeting -> measured reported customer outcome, then return tomorrow and clear a useful queue. Leads plus draft templates are NOT the finished product.
+
+First reconcile the committed 14-step status against current source. Run a focused baseline, then IMPLEMENT the next useful missing seam. Do not spend the session repeating plans, reproducing already accepted defects without new evidence, or polishing a report instead of the app. Use direct execution with focused on-demand helpers if useful, at most two concurrently and one product writer. Give reviewers separate immutable worktrees/fixtures. Do not recreate a permanent CTO/Kanban retry hierarchy. Push small coherent checkpoints, keep progress durable, and communicate real milestones/blockers without noisy per-worker announcements.
+
+Priority:
+1. Resolve the company-resume review discrepancy by reproducing the actual contract, not blindly coding to a reviewer's mistaken assumption. See the dedicated section below.
+2. Complete the local day-two loop: fresh-contact referral creation with credit/evidence/suppression; durable max-two cold followups with independently approved messages and confirmed dates; any inbound permanently cancels cold followups; timed meetings/timezone, confirmation approval, after-time attended/no-show/cancelled and later won reports; departure summary; honest company funnel; contacted/suppressed next-batch flags. Wire the UI and real read-only Next up to each feature, not just backend endpoints.
+3. Finish durable global AND tenant monetary admission across existing search/draft/local DeepSeek paths before any optional paid reply AI: reserve before dispatch, settle/reconcile real usage, deduplicate, bound tokens/retries/concurrency, stop on unknown historical exposure, and provide a kill switch. Usage counts are not dollars and a disabled feature is not an implemented ledger.
+4. Complete useful authorized offline/auth/tenant/privacy/export/delete/backup/restore/operations logic, then gated hosted parity and permitted mailbox adapter prerequisites. Never trade away the useful local journey to add unmaintainable infrastructure. Keep unavailable integrations visibly gated; do not represent mocks as provider verification.
+5. Full integrated security/cost/tenant and busy-founder UX review, fix actionable findings, exact-head checks, portable setup/off switches/rollback, and a genuinely reviewable owner handoff.
+
+## Proven checkpoint, not proof of the final app
+
+At c929cba the required source-checks/container-checks/GitGuardian passed (run39540683162); author backend167 and frontend landing97 tests passed. Independent real Next/FastAPI/fresh-SQLite Chrome review passed the narrow returning queue at1440/390/320, exact-thread navigation/reload/Back, zero POSTs on those reads, answer task removal/new inbound reopening, and incomplete-date body preservation. Backend independent queue/date/suppression/initial company-ownership controls passed; one explicit-resume scenario is disputed. This is not blanket backend, full14-journey, real auth/provider, physical-device or screen-reader acceptance. Read committed reviews, including their scope/limits. Older results at other SHAs do not transfer automatically.
+
+Preserve sender identity/footer admission, exact-content approvals, private/unsafe source URL rejection, publication-basis/region checks, unsaved profile/message/inbound edits, and stale-recipient/Copy invalidation. A copied/opened email is not sent. Preserve actual external-send text separately from approved text. Provider acceptance is not delivery; booking link is not booking; meeting is not sale; unknown stays unknown. Only explicit human reports are reported outcomes.
+
+## Company-resume finding: do not blindly broaden the policy
+
+The owner's exact rule: "Default to one active cold thread per company. A reply, opt-out or meeting at a company pauses pending outreach to its other contacts until the founder decides."
+
+The final backend reviewer called explicit sibling resume followed by NEW approval after the first contact's interested reply a P1. The main session disputed the interpretation: an explicit founder decision plus fresh approval may be permitted; a permanent company lock was NOT requested. This issue remains unclosed, not a confirmed automatic bypass and not a blanket PASS.
+
+Write independent controls distinguishing: no explicit resume; resume alone restoring stale approval (must not); fresh approval after explicit founder choice; two concurrent cold owners; opt-out/source-question/bounce persistence across correction/resume; current-state replay and different-tenant independence. Resume must clear no suppression/invalidity and restore no approval/followup. Preserve real reported history. Resolve the literal policy with actual evidence before changing behavior. Preserve the raw independent report and document your adjudication.
+
+Date policy is already adjudicated: validate original wall time AND numeric offset against the IANA zone BEFORE UTC normalization. Reject nonexistent spring-gap and mismatched-offset inputs. Both valid explicit Toronto fall offsets (-04:00 and -05:00) disambiguate and MUST be accepted. Missing date/zone pairs preserve inbound in awaiting_review with repair required. Expiry creates review work only, never authorization or an automatic send.
+
+## Boundaries
+
+- Owner thakoreh alone reviews and merges. No merge, auto-merge, approval, main push, force/rebase of pushed history, branch deletion, secrets/ruleset/check changes or weakened tests. Merge origin/main normally into this branch if main advances; never force. Keep PR draft until genuinely ready; green CI alone is not readiness.
+- No real outreach, email delivery, account connection/signup, purchases, ads, customer charges, new subscriptions/services/queues, public deploys or fake live results. Existing stack: Next.js, FastAPI/SQLite local, Clerk/Convex, DeepSeek. Keep SQLite loopback-only. All existing cron jobs stay paused. No owner preview/data interference.
+- US$25/month is an early ceiling INCLUDING historical DeepSeek, NOT authorization to spend it; history is unreconciled. Allocate no Ads budget. Default/max5 discovery results. Unknown exposure denies new paid dispatch. Obtain explicit owner permission for spending or real provider operations.
+- No real provider/secret copying to fixtures. Never expose credentials, commit local DBs, customer data, browser profiles, runtime dumps or `.env` files. Test data is clearly fictional and excluded/segregated from actual business metrics.
+- No open/click tracking, fabricated verification, testimonials, response rates, confidence, buyer intent, legal clearance, sender identity/address, price or integration claims. Shared inboxes are labelled/ranked below named contacts. All outreach includes saved name/company/address/plain opt-out. An opt-out remains sticky across searches, recipient changes and corrections. Recheck primary US/Canadian legal sources before claiming compliance; existing attestation is not consent verification.
+- Chrome only for app browser QA; no embedded in-app browser. Preserve the current warm-neutral/forest-green UI and approved flows; no broad redesign without owner direction.
+
+## Verification and finish criteria
+
+README documents setup/run/check entry points: `bash scripts/setup.sh`, `bash scripts/dev.sh`, `bash scripts/check.sh`. Inspect launcher port constraints before running in an existing machine. Install only necessary reviewed dependencies with lockfiles; no silent paid fallbacks. Keep one portable setup doc documenting each env var/manual step/off switch/rollback.
+
+Exercise real isolated Next + FastAPI + SQLite, not only mocked components. Capture all14 journey steps and unhappy paths at desktop,390px,320px; keyboard/focus/dialogs, long input,200%zoom, reduced motion, errors, pending/discard preservation, races and zero-paid-call safe reads. Explicitly label physical-phone/screen-reader gaps. Run relevant backend, Node, Convex, component/browser, lint/type/build, dependency/secret, preflight, packaging/container checks. Obtain fresh independent integrated review and rerun critical changed boundaries. source-checks and container-checks must pass on the EXACT FINAL pushed head up to date with main. Re-read remote/PR/CI rather than trusting push exit status.
+
+Keep `docs/overnight/PROGRESS.md` and the source-backed requirement checklist current. Distinguish built, locally tested, staging verified, production verified, blocked and deferred. Separate owner-input gates from unbuilt code; finish safe useful autonomous work before requesting human decisions. Produce a concise final verdict,14-step status, exact branch/head/checks, screenshots/defects, known/unknown spending, manual versus connected capabilities, owner setup and rollback. Split reviewable seams if the diff is too large for a solo one-hour review without rewriting published history or deleting work. Do not claim done because tests pass or a clock expires.
+
+Start executing now if your environment has repository/terminal/browser tools. If it does not, state that capability blocker instead of simulating edits, tests, deployments or outcomes.

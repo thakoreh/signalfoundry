@@ -1,0 +1,136 @@
+{
+  "application_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
+  "scope": "Portable continuation context, historical evidence and fictional queue screenshots; no runtime/customer data. Hashes exclude this manifest.",
+  "files": [
+    {
+      "path": "DATE_REVIEW_ADJUDICATION.md",
+      "bytes": 1380,
+      "sha256": "c77ad74e6f25acddeaeaa381b34c3ccd0773b6f43de30cc5151a975d98bb407c"
+    },
+    {
+      "path": "LEADPOET_REVIEW.md",
+      "bytes": 3255,
+      "sha256": "b2c0d75e77fae6dc5370abeedf23ecab4b031d2c7088e114866e47f943b9b1d2"
+    },
+    {
+      "path": "LOCAL_DECISIONS.md",
+      "bytes": 7305,
+      "sha256": "3518dd1882fd120f2fe143e8fbf16ff07a608804cc45d088ebcf10d84d256d7f"
+    },
+    {
+      "path": "LOCAL_LOOP_CONTRACT.md",
+      "bytes": 29038,
+      "sha256": "623a0f6ea1b3059c7177739cc6970bf1e4c26edf53001198a2a641af5d09217d"
+    },
+    {
+      "path": "NEXT_AGENT_PROMPT.md",
+      "bytes": 11251,
+      "sha256": "dd13e482b1d09130a9453cacb249f1b6c497817f09389ea48de97cd2d9e6f3d8"
+    },
+    {
+      "path": "OWNER_CONTRACT.md",
+      "bytes": 20228,
+      "sha256": "001cd93044bc51e0fdddac33249b43b1425e4f73be5009367cb99bc49674ad59"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6758,
+      "sha256": "d17e2523d1650d2297299facdada5fed825f73055f6eece5688e9aa4206bd203"
+    },
+    {
+      "path": "STATUS.md",
+      "bytes": 7783,
+      "sha256": "e7b90d96528c2a9df0c4ea7d99f610ddf8479881a954c341e0dbe9966af5e5cd"
+    },
+    {
+      "path": "evidence/backend/findings.jsonl",
+      "bytes": 1383,
+      "sha256": "3b4e06ad49df71cff6f34ad3fc23a623c9b832feafde46cc69e522c51765f34e"
+    },
+    {
+      "path": "evidence/backend/logs/adversarial-final.jsonl",
+      "bytes": 497,
+      "sha256": "e267428590acbaf3907c9d73a797b5c84f6814b5d03778c0650d410d930ae73e"
+    },
+    {
+      "path": "evidence/backend/tests/c929_backend_adversarial.py",
+      "bytes": 18333,
+      "sha256": "e4896808b929a29a5eaf5b85ffec645d9ec3458e0dd756000fe81025a3f3d345"
+    },
+    {
+      "path": "evidence/frontend/findings.json",
+      "bytes": 2088,
+      "sha256": "91892213bb99ddea659712ea57d9ccbd627f42f42233a33ce7d9f08a19937513"
+    },
+    {
+      "path": "evidence/frontend/focused_returning_flow.mjs",
+      "bytes": 4737,
+      "sha256": "c3af1dcfe8341735beba6772dd11f17ea209c377911de74873bd029687bf7c68"
+    },
+    {
+      "path": "evidence/screenshots/returning-next-up-viewport-1440.png",
+      "bytes": 72886,
+      "sha256": "9f13b52ef177911622376875a0d1e3ab6e9906c14b95cf3d0d389c1bb495cfe1"
+    },
+    {
+      "path": "evidence/screenshots/returning-next-up-viewport-320.png",
+      "bytes": 63488,
+      "sha256": "1c745e748546ad1ee86ec1bc2dcb6b73dde21dbf79f292c0e28f815a95bc225e"
+    },
+    {
+      "path": "evidence/screenshots/returning-next-up-viewport-390.png",
+      "bytes": 66420,
+      "sha256": "0a1b6db4eedaa80cb064110fca48ff0ca7026b67798f7df4e3ba036fcd12a1a4"
+    },
+    {
+      "path": "reports/BACKEND_REVIEW_c929cba.md",
+      "bytes": 3502,
+      "sha256": "6f4de11a27332791ab0157d7b9d77b824ca489eda27ef6cb60ee6220227f6c1b"
+    },
+    {
+      "path": "reports/BASELINE_REVIEW_09a986f.md",
+      "bytes": 4731,
+      "sha256": "a82450a3b95e5520ba274b6a6c953d0f205c1533d90b872c96b622c3c36742c2"
+    },
+    {
+      "path": "reports/DATE_REVIEW_320edf3.md",
+      "bytes": 4320,
+      "sha256": "8a70680651f6d9e4e779fdb7e70590b9ea4ab9e73657acabbe941b15e676c83a"
+    },
+    {
+      "path": "reports/ENGINEERING_HANDOFF.md",
+      "bytes": 7312,
+      "sha256": "29784e5007d58245393d1477aba4dac7ba50afd0d9fc55062656c6ab617dffc0"
+    },
+    {
+      "path": "reports/FRONTEND_REVIEW_c929cba.md",
+      "bytes": 3269,
+      "sha256": "e6aa0d29b3c7b88c2e920e116d7882bda95008e28e3444af3e6940030b78af27"
+    },
+    {
+      "path": "reports/S1_REVIEW_5106da3.md",
+      "bytes": 4871,
+      "sha256": "4e4a3e4b6001df439ee6cedd3b7021b8a8eeeb5855395a2666013a4fb6e8f1f2"
+    },
+    {
+      "path": "reports/S2A_REVIEW_70aa549.md",
+      "bytes": 5067,
+      "sha256": "1004b9faca88a63e971632330330cbc6cbb38c32e6a4ef2b5b95b9a8160a8ced"
+    },
+    {
+      "path": "reports/S2B_REVIEW_7b2ea52.md",
+      "bytes": 4096,
+      "sha256": "100e939f600b5fbc2d85fbbf1996a253fb0d6338110aa3fbf7168697c30cea2f"
+    },
+    {
+      "path": "reports/S2_INDEPENDENT_REVIEW_f1b3b325.md",
+      "bytes": 6666,
+      "sha256": "a00410ee2d01cc310cb6f2633dbcaaca90f91c8e37ccd0a236af140e2bd91ba7"
+    },
+    {
+      "path": "reports/SAFETY_REVIEW_eef5ddf.md",
+      "bytes": 3843,
+      "sha256": "7d06c9c91ca1068624a09b363c5b98d930a9c4eee5b0e4670a7f2c55d41e3cdf"
+    }
+  ]
+}
