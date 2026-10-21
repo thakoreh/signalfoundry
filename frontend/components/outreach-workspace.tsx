@@ -18,18 +18,21 @@ import { ContactBasisEditor, emptyContactBasis } from "./contact-basis-editor";
 import { isCustomerMessageDraft } from "./customer-result-view";
 import { useWorkspaceSession } from "./workspace-session";
 import { useUnsavedChanges } from "./use-unsaved-changes";
+import { TimingFields, SavedMeeting, type TimingInput } from "./outreach-timing";
 import "./outreach-workspace.css";
 
 type Step = "Review" | "Conversations" | "Meetings";
 export function OutreachWorkspace({
   searchId,
   initialThreadId,
+  initialView,
   profile,
   profileRefresh = 0,
   suspended = false,
 }: {
   searchId: string;
   initialThreadId?: string;
+  initialView?: "Review" | "Conversations" | "Meetings";
   profile?: Profile | null;
   profileRefresh?: number;
   suspended?: boolean;
@@ -37,13 +40,14 @@ export function OutreachWorkspace({
   const { api, mode } = useWorkspaceSession();
   const [threads, setThreads] = useState<OutreachThread[]>([]);
   const [active, setActive] = useState("");
-  const [step, setStep] = useState<Step>("Review");
+  const [step, setStep] = useState<Step>(initialView || "Review");
   const [drafts, setDrafts] = useState<Record<string, OutreachDraft>>({});
   const [bases, setBases] = useState<Record<string, ContactBasis>>({});
   const basisGeneration = useRef(0);
   const [incoming, setIncoming] = useState<Record<string, string>>({});
   const [replySelections, setReplySelections] = useState<Record<string, string>>({});
   const [referrals, setReferrals] = useState<Record<string, { recipient: string; contact_name: string; referrer_name: string }>>({});
+  const [timings, setTimings] = useState<Record<string, TimingInput>>({});
   const [revisitAtDrafts, setRevisitAtDrafts] = useState<Record<string, string>>({});
   const [revisitZoneDrafts, setRevisitZoneDrafts] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
@@ -135,6 +139,7 @@ export function OutreachWorkspace({
     Object.keys(drafts).length > 0 ||
       Object.values(incoming).some(Boolean) ||
       Object.keys(referrals).length > 0 ||
+      Object.keys(timings).length > 0 || Object.values(revisitAtDrafts).some(Boolean) || Object.values(revisitZoneDrafts).some(Boolean) ||
       !!changedSent,
   );
   const replyPermitsAction =
@@ -182,6 +187,8 @@ export function OutreachWorkspace({
                 ? "Next: save your sender details in Edit business before approval."
                 : !thread.contact_basis
                   ? "Next: review and save recipient evidence before approval."
+                  : thread.manual_action_block
+                    ? thread.manual_action_block
                   : !thread.approval
                     ? "Next: approve the exact saved message after review."
                     : canAct
@@ -256,6 +263,9 @@ export function OutreachWorkspace({
       if (action === "reply-state")
         setReplySelections((current) => { const next = { ...current }; delete next[updated.id]; return next; });
       if (action === "sent") setChangedSent(null);
+      if (action === "meeting" || action === "followups")
+        setTimings(current => { const next = { ...current }; delete next[thread.id]; return next; });
+      if (action === "meeting-confirmation") setStep("Review");
       setNotice(
         action === "referrals"
           ? "New referred contact saved. Review its own contact basis and message before fresh approval."
@@ -450,12 +460,15 @@ export function OutreachWorkspace({
               setDrafts({});
               setIncoming({});
               setReferrals({});
+              setTimings({});
+              setRevisitAtDrafts({});
+              setRevisitZoneDrafts({});
               setLoading(true);
               setError("");
               setReload((value) => value + 1);
             }}
           >
-            {dirty || basisDirty || Object.values(incoming).some(Boolean) || Object.keys(referrals).length > 0 || changedSent
+            {dirty || basisDirty || Object.values(incoming).some(Boolean) || Object.keys(referrals).length > 0 || Object.keys(timings).length > 0 || changedSent
               ? "Reload saved version (discard edits)"
               : "Reload saved outreach"}
           </button>
@@ -561,6 +574,19 @@ export function OutreachWorkspace({
                     These are your records. A booking link or a sent message
                     does not establish that a meeting happened.
                   </p>
+                  <SavedMeeting thread={thread} />
+                  <TimingFields kind="Meeting" disabled={!!busy} value={timings[thread.id] || { at: "", zone: "" }}
+                    onChange={value => setTimings(current => ({ ...current, [thread.id]: value }))} />
+                  <button className="btn" type="button" disabled={!!busy || dirty || !timings[thread.id]?.at || !timings[thread.id]?.zone}
+                    onClick={() => void mutate("meeting", "POST", { meeting_at: timings[thread.id].at, meeting_timezone: timings[thread.id].zone })}>
+                    {thread.meeting_at ? "Report a changed meeting time" : "Report a timed booking"}
+                  </button>
+                  {thread.meeting_state === "booked_reported" && thread.meeting_at && (
+                    <button className="btn" type="button" disabled={!!busy || dirty || thread.suppressed || thread.paused}
+                      onClick={() => void mutate("meeting-confirmation", "POST", {
+                        subject: "Confirming our meeting", body: `Confirming our meeting at ${thread.meeting_at} (${thread.meeting_timezone}). Please reply if this time no longer works.${thread.sender_footer || ""}`,
+                      })}>Prepare a confirmation for review</button>
+                  )}
                   <label>
                     Booking link
                     <input
@@ -593,7 +619,7 @@ export function OutreachWorkspace({
                       }
                     >
                       <option value="not_recorded">Not recorded</option>
-                      <option value="booked_reported">Booked</option>
+                      <option value="booked_reported" disabled>Booked · confirm the time above</option>
                       <option value="attended_reported">Attended</option>
                       <option value="no_show_reported">No show</option>
                       <option value="cancelled_reported">Cancelled</option>
@@ -621,6 +647,19 @@ export function OutreachWorkspace({
                 </div>
               ) : (
                 <>
+                  {!thread.messages.some(message => message.direction === "inbound") && thread.messages.some(message => message.direction === "outbound") && thread.meeting_state === "not_recorded" && (
+                    <section className="outreach-followup" aria-label="Manual followup plan">
+                      <h3>Plan a reminder</h3>
+                      <p>{thread.followups_sent || 0} of 2 followups recorded. Check your inbox first. Every received reply stops the cold sequence.</p>
+                      {thread.next_followup_at && <p>Next review: {thread.next_followup_at} ({thread.followup_timezone}). Approval is required when due.</p>}
+                      <TimingFields kind="Followup" disabled={!!busy} value={timings[thread.id] || { at: "", zone: "" }}
+                        onChange={value => setTimings(current => ({ ...current, [thread.id]: value }))} />
+                      <p>Write and save the reminder below, then choose a weekday at least three business days after your last reported send.</p>
+                      <button className="btn" type="button" disabled={!!busy || dirty || !draft.subject.trim() || !draft.body.trim() || !timings[thread.id]?.at || !timings[thread.id]?.zone || (thread.followups_sent || 0) >= 2 || thread.suppressed || thread.paused}
+                        onClick={() => void mutate("followups", "POST", { subject: draft.subject, body: draft.body,
+                          scheduled_at: timings[thread.id].at, scheduled_timezone: timings[thread.id].zone })}>Save followup review date</button>
+                    </section>
+                  )}
                   {step === "Conversations" && (
                     <>
                     <section className="outreach-saved-facts" aria-label="Saved offer facts">
@@ -736,13 +775,13 @@ export function OutreachWorkspace({
                           <section className="outreach-revisit-controls" aria-label="Revisit date controls">
                             <label>
                               Return date and time (include numeric offset)
-                              <input type="datetime-local" step="60" value={revisitAtDrafts[thread.id] || ""} onChange={(event) => setRevisitAtDrafts((current) => ({ ...current, [thread.id]: event.target.value }))} />
+                              <input placeholder="2026-11-05T10:00:00-05:00" value={revisitAtDrafts[thread.id] || ""} onChange={(event) => setRevisitAtDrafts((current) => ({ ...current, [thread.id]: event.target.value }))} />
                             </label>
                             <label>
                               IANA timezone
                               <input placeholder="America/Toronto" value={revisitZoneDrafts[thread.id] || ""} onChange={(event) => setRevisitZoneDrafts((current) => ({ ...current, [thread.id]: event.target.value }))} />
                             </label>
-                            <button className="btn" type="button" disabled={!!busy} onClick={() => void mutate("reply-state", "PATCH", { reply_state: replySelections[thread.id], revisit_at: revisitAtDrafts[thread.id] ? new Date(revisitAtDrafts[thread.id]).toISOString() : null, revisit_timezone: revisitZoneDrafts[thread.id] || null })}>
+                            <button className="btn" type="button" disabled={!!busy} onClick={() => void mutate("reply-state", "PATCH", { reply_state: replySelections[thread.id], revisit_at: revisitAtDrafts[thread.id] || null, revisit_timezone: revisitZoneDrafts[thread.id] || null })}>
                               Save reply review
                             </button>
                           </section>
@@ -918,6 +957,7 @@ export function OutreachWorkspace({
                         !draft.body.trim() ||
                         thread.suppressed ||
                         thread.paused ||
+                        !!thread.manual_action_block ||
                         !replyPermitsAction ||
                         !!thread.approval
                       }

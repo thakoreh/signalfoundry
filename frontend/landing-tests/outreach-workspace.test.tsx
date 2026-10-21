@@ -617,6 +617,20 @@ beforeEach(() => {
       thread.meeting_state = body.meeting_state;
       thread.sale_state = body.sale_state;
     }
+    if (action === "meeting") {
+      thread.meeting_at = body.meeting_at;
+      thread.meeting_timezone = body.meeting_timezone;
+      thread.meeting_state = "booked_reported";
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "followups") {
+      thread.next_followup_at = body.scheduled_at;
+      thread.followup_timezone = body.scheduled_timezone;
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+      thread.manual_action_block = "The confirmed followup is not due yet.";
+    }
     thread.revision++;
     return structuredClone(thread);
   });
@@ -694,8 +708,13 @@ describe("persisted manual outreach journey", () => {
     await change("Booking link", "https://example.org/book");
     await click("Save booking link");
     expect(thread.meeting_state).toBe("not_recorded");
-    await change("Meeting · reported by you", "booked_reported");
+    expect(button("Report a timed booking").disabled).toBe(true);
+    await change("Meeting date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Meeting IANA timezone", "America/Toronto");
+    expect(thread.meeting_state).toBe("not_recorded");
+    await click("Report a timed booking");
     expect(thread.meeting_state).toBe("booked_reported");
+    expect(thread.meeting_at).toBe("2026-11-05T10:00:00-05:00");
     expect(thread.sale_state).toBe("not_recorded");
     await change("Customer outcome · reported by you", "won_reported");
     expect(thread.sale_state).toBe("won_reported");
@@ -704,6 +723,22 @@ describe("persisted manual outreach journey", () => {
         ([path]) => path.includes("/draft") && path.includes("/customers/"),
       ),
     ).toBe(false);
+  });
+  it("preserves a reminder date while switching views and only saves it explicitly", async () => {
+    thread.messages = [{ id: "initial", direction: "outbound", recipient: thread.recipient,
+      subject: thread.subject, body: thread.body, source: "user_reported", reply_state: null, created_at: "2026-10-19T14:00:00Z" }];
+    await mount();
+    await change("Followup date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Followup IANA timezone", "America/Toronto");
+    await click("Meetings");
+    await click("Review");
+    expect(field("Followup date and time with numeric offset").value).toBe("2026-11-05T10:00:00-05:00");
+    expect(api.mock.calls.some(([path]) => path.endsWith("/followups"))).toBe(false);
+    await click("Save followup review date");
+    const payload = JSON.parse(api.mock.calls.find(([path]) => path.endsWith("/followups"))![1].body);
+    expect(payload).toMatchObject({ scheduled_at: "2026-11-05T10:00:00-05:00", scheduled_timezone: "America/Toronto", body: thread.body });
+    expect(button("Approve exact message").disabled).toBe(true);
+    expect(thread.messages).toHaveLength(1);
   });
   it("preserves unsaved message edits across navigation and blocks paused actions", async () => {
     await mount();

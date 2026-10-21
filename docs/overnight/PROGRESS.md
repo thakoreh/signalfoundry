@@ -1,5 +1,13 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Continuation checkpoint — bounded followups and timed meetings
+
+Implemented durable max-two cold followup plans after a reported initial send, with explicit offset/IANA validation, at least three weekday spacing, due-time fresh approval, original-recipient binding, and permanent cancellation after any inbound. Read-only Next up projects due reminders; time passing never approves or sends. New UI saves a review date beside the saved reminder, retains unsaved timing through view switches, and exposes the admission reason. Revisit UI now submits the original explicit numeric offset instead of silently converting browser-local time.
+
+Timed booking reports store UTC/IANA plus append-only reschedule/outcome events. Meeting confirmations use the same footer/basis/exact approval pipeline, are limited to one recorded confirmation per current booking version, and stop at the meeting time. Attendance/no-show before the time is denied; ignored outcomes stay unknown. The old undated booking fixture was enriched with an explicit past time while retaining all link/attendance/sale assertions and adding an undated-booking denial. New approvals and reported sends carry an immutable contact-basis snapshot; legacy snapshots remain unknown, not backfilled.
+
+Commands: isolated backend `..\\.venv\\Scripts\\python.exe -m unittest discover -s tests -q`: 177 PASS (15.146s). Focused outreach/Next-up components: 47 PASS; frontend typecheck and lint PASS. Two temporary author command errors were corrected (Python default Windows decoding; npm invoked from repository rather than frontend); no checks/settings were weakened. Browser integration and fresh independent lifecycle review remain pending. Connected Chrome exposes only the owner's personal profile; an optional request for an isolated Playwright Chrome profile is pending, so that profile has not been used. No provider calls, real sends or owner-data changes.
+
 ## Continuation run — Windows baseline and policy adjudication
 
 ### Safety regression checkpoint

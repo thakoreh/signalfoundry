@@ -12,6 +12,7 @@ const actionLabels: Record<NextUpItem["action"], string> = {
   answer_reply: "Write a human answer",
   report_meeting: "Report what happened after the meeting",
   manual_send: "Copy and record the approved message",
+  review_followup: "Check for a reply and review the due reminder",
 };
 
 export function NextUpQueue() {
@@ -62,7 +63,7 @@ export function NextUpQueue() {
             <p>{actionLabels[item.action]}</p>
             <small>{item.reason}</small>
           </div>
-          <Link className="btn primary" href={`/workspace/outreach/${encodeURIComponent(item.search_id)}?thread=${encodeURIComponent(item.thread_id)}`}>
+          <Link className="btn primary" href={`/workspace/outreach/${encodeURIComponent(item.search_id)}?thread=${encodeURIComponent(item.thread_id)}${item.action === "report_meeting" ? "&view=Meetings" : item.action === "review_reply" ? "&view=Conversations" : ""}`}>
             Open conversation
           </Link>
         </article>

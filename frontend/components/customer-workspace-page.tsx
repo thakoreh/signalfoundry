@@ -9,10 +9,12 @@ import { SaasCustomerWorkspace } from "./saas-customer-workspace";
 export async function CustomerWorkspacePage({
   searchId,
   initialThreadId,
+  initialView,
   outreach = false,
 }: {
   searchId?: string;
   initialThreadId?: string;
+  initialView?: "Review" | "Conversations" | "Meetings";
   outreach?: boolean;
 }) {
   const config = runtimeConfig();
@@ -20,7 +22,7 @@ export async function CustomerWorkspacePage({
   if (config.mode === "local-demo")
     return (
       <WorkspaceSession mode="local-demo" role="org:admin">
-        <CustomerWorkspaceScreen searchId={searchId} initialThreadId={initialThreadId} outreach={outreach} />
+        <CustomerWorkspaceScreen searchId={searchId} initialThreadId={initialThreadId} initialView={initialView} outreach={outreach} />
       </WorkspaceSession>
     );
   const session = await auth();

@@ -1,9 +1,11 @@
 """Fictional SQLite/API controls for the manual day-two journey; no providers."""
 import unittest
+from datetime import datetime, timezone
+from unittest.mock import patch
 from fastapi.testclient import TestClient
 from tests import test_outreach as fixtures
 from app.main import create_app
-from app.outreach import PasteReply, CorrectReply
+from app.outreach import PasteReply, CorrectReply, RevisionRequest, SentRequest, OutreachError, OutcomesRequest
 
 
 class LocalJourneyTest(unittest.TestCase):
@@ -73,6 +75,133 @@ class LocalJourneyTest(unittest.TestCase):
             duplicate = client.post(f'/api/outreach/{parent.id}/referrals', json=self.referral_body(parent))
             self.assertEqual(duplicate.status_code, 409)
         self.assertEqual(len(self.repo.outreach_threads(parent.search_id)['threads']), 2)
+
+    def report_initial(self):
+        thread = self.ready()
+        with patch('app.outreach.now', return_value='2026-10-19T14:00:00+00:00'):
+            return self.repo.mutate_outreach(thread.id, 'sent', SentRequest(**self.fields(thread)))
+
+    def test_followup_needs_confirmed_business_day_spacing_due_review_and_is_bounded(self):
+        thread = self.report_initial()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            body = dict(**self.fields(thread), scheduled_at='2026-10-20T10:00:00-04:00', scheduled_timezone='America/Toronto',
+                        subject='Re: A relevant introduction', body='A brief reminder' + thread.sender_footer)
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 409)
+            body['scheduled_at'] = '2026-10-22T10:00:00-04:00'
+            response = client.post(f'/api/outreach/{thread.id}/followups', json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertIsNone(thread.approval)
+            self.assertFalse(thread.ready_for_manual_action)
+            with self.assertRaises(OutreachError):
+                self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            clock.now.return_value = datetime(2026, 10, 22, 14, tzinfo=timezone.utc)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertFalse(thread.ready_for_manual_action, 'Time passing does not approve a message')
+            thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            self.assertTrue(thread.ready_for_manual_action)
+            report = SentRequest(**self.fields(thread))
+            with patch('app.outreach.now', return_value=clock.now.return_value.isoformat()):
+                thread = self.repo.mutate_outreach(thread.id, 'sent', report)
+                thread = self.repo.mutate_outreach(thread.id, 'sent', report)
+            self.assertEqual(len(thread.messages), 2)
+            self.assertEqual(thread.followups_sent, 1)
+            body = dict(**self.fields(thread), scheduled_at='2026-10-27T10:00:00-04:00', scheduled_timezone='America/Toronto',
+                        subject='Re: A relevant introduction', body='One last reminder' + thread.sender_footer)
+            response = client.post(f'/api/outreach/{thread.id}/followups', json=body)
+            self.assertEqual(response.status_code, 200, response.text)
+            clock.now.return_value = datetime(2026, 10, 27, 14, tzinfo=timezone.utc)
+            thread = self.repo.outreach_thread(thread.id)
+            thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            thread = self.repo.mutate_outreach(thread.id, 'sent', SentRequest(**self.fields(thread)))
+            self.assertEqual(thread.followups_sent, 2)
+            body = {**body, **self.fields(thread), 'scheduled_at': '2026-10-30T10:00:00-04:00'}
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 409)
+
+            thread = self.edit(thread, body='A third unscheduled reminder' + thread.sender_footer)
+            thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            self.assertFalse(thread.ready_for_manual_action)
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/sent', json=self.fields(thread)).status_code, 409)
+
+    def test_timed_booking_confirmation_and_after_time_outcomes_preserve_manual_truth(self):
+        thread = self.ready()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            payload = dict(**self.fields(thread), meeting_at='2026-10-22T10:00:00-04:00', meeting_timezone='America/Toronto')
+            malformed = {**payload, 'meeting_at': '2026-10-22T10:00:00-05:00'}
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/meeting', json=malformed).status_code, 422)
+            response = client.post(f'/api/outreach/{thread.id}/meeting', json=payload)
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertIsNone(thread.approval)
+            self.assertEqual(thread.meeting_at, '2026-10-22T14:00:00+00:00')
+            self.assertEqual(thread.sale_state, 'not_recorded')
+            self.assertNotIn('report_meeting', [item['action'] for item in self.repo.outreach_next_up()['items']])
+            outcome = dict(**self.fields(thread), meeting_state='attended_reported', sale_state='not_recorded')
+            self.assertEqual(client.patch(f'/api/outreach/{thread.id}/outcomes', json=outcome).status_code, 409)
+            confirmation = dict(**self.fields(thread), subject='Our meeting', body='Confirming the time you agreed.' + thread.sender_footer)
+            response = client.post(f'/api/outreach/{thread.id}/meeting-confirmation', json=confirmation)
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertFalse(thread.ready_for_manual_action)
+            thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            thread = self.repo.mutate_outreach(thread.id, 'sent', SentRequest(**self.fields(thread)))
+            snapshot = thread.messages[-1].model_dump()
+            self.assertEqual(snapshot['outbound_purpose'], 'meeting_confirmation')
+            self.assertIsNotNone(snapshot['contact_basis_snapshot'])
+            # A second confirmation of the same reported booking cannot become actionable.
+            confirmation.update(self.fields(thread))
+            client.post(f'/api/outreach/{thread.id}/meeting-confirmation', json=confirmation)
+            thread = self.repo.outreach_thread(thread.id)
+            with self.assertRaises(OutreachError):
+                self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+            clock.now.return_value = datetime(2026, 10, 22, 15, tzinfo=timezone.utc)
+            self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'report_meeting')
+            outcome.update(self.fields(thread))
+            response = client.patch(f'/api/outreach/{thread.id}/outcomes', json=outcome)
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            self.assertEqual(thread.sale_state, 'not_recorded', 'Attendance is not a sale')
+            thread = self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread),
+                meeting_state='attended_reported', sale_state='won_reported'))
+            self.assertEqual(thread.messages[-1].model_dump(), snapshot)
+            self.assertEqual(thread.sale_state, 'won_reported')
+
+    def test_due_followup_queue_is_read_only_and_changed_recipient_cannot_inherit_sequence(self):
+        thread = self.report_initial()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            body = dict(**self.fields(thread), scheduled_at='2026-10-22T10:00:00-04:00', scheduled_timezone='America/Toronto',
+                        subject='Re: Introduction', body='A reminder' + thread.sender_footer)
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 200)
+            self.assertEqual(self.repo.outreach_next_up()['items'], [])
+            clock.now.return_value = datetime(2026, 10, 22, 14, tzinfo=timezone.utc)
+            before = self.repo.outreach_thread(thread.id)
+            self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'review_followup')
+            self.assertEqual(self.repo.outreach_thread(thread.id).model_dump(), before.model_dump())
+            thread = self.edit(before, recipient='another@business.com')
+            self.assertIsNone(thread.next_followup_at)
+            body.update(self.fields(thread))
+            body['scheduled_at'] = '2026-10-27T10:00:00-04:00'
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 409)
+
+    def test_any_inbound_cancels_planned_followup_and_correction_does_not_restore_it(self):
+        thread = self.report_initial()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 19, 14, tzinfo=timezone.utc)
+            body = dict(**self.fields(thread), scheduled_at='2026-10-22T10:00:00-04:00', scheduled_timezone='America/Toronto',
+                        subject='Re: Introduction', body='A brief reminder' + thread.sender_footer)
+            planned = client.post(f'/api/outreach/{thread.id}/followups', json=body)
+            self.assertEqual(planned.status_code, 200, planned.text)
+            thread = self.repo.outreach_thread(thread.id)
+            thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Automatic reply', reply_state='auto_reply'))
+            self.assertIsNone(thread.next_followup_at)
+            thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+            replay = client.post(f'/api/outreach/{thread.id}/followups', json=body).json()
+            self.assertIsNone(replay['next_followup_at'])
+            body = {**body, **self.fields(thread)}
+            self.assertEqual(client.post(f'/api/outreach/{thread.id}/followups', json=body).status_code, 409)
 
 
 if __name__ == '__main__':

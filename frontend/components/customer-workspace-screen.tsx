@@ -18,12 +18,14 @@ import "./business-onboarding.css";
 export function CustomerWorkspaceScreen({
   searchId,
   initialThreadId,
+  initialView,
   organizationControl,
   userControl,
   outreach = false,
 }: {
   searchId?: string;
   initialThreadId?: string;
+  initialView?: "Review" | "Conversations" | "Meetings";
   organizationControl?: React.ReactNode;
   userControl?: React.ReactNode;
   outreach?: boolean;
@@ -112,6 +114,7 @@ export function CustomerWorkspaceScreen({
               key={`${mode}:${searchId}`}
               searchId={searchId}
               initialThreadId={initialThreadId}
+              initialView={initialView}
               profile={workspace?.profile || null}
               profileRefresh={profileRefresh}
               suspended={editing}

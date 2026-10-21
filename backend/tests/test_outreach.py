@@ -316,7 +316,11 @@ class OutreachTest(unittest.TestCase):
         self.assertEqual(thread.sale_state, 'not_recorded')
         with self.assertRaises(OutreachError):
             self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='attended_reported', sale_state='not_recorded'))
-        thread = self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='booked_reported', sale_state='not_recorded'))
+        from app.outreach import MeetingRequest
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='booked_reported', sale_state='not_recorded'))
+        thread = self.repo.mutate_outreach(thread.id, 'meeting', MeetingRequest(**self.fields(thread),
+            meeting_at='2026-01-05T10:00:00-05:00', meeting_timezone='America/Toronto'))
         thread = self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='attended_reported', sale_state='won_reported'))
         self.assertEqual(thread.meeting_state, 'attended_reported')
         self.assertEqual(thread.sale_state, 'won_reported')
