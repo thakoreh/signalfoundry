@@ -24,7 +24,7 @@ The literal company-resume discrepancy is closed: an explicit founder decision p
 
 ## Exact source and checks
 
-Repository: thakoreh/signalfoundry. Branch: `codex/clientrove-release-candidate`. Existing [draft PR7](https://github.com/thakoreh/signalfoundry/pull/7), never PR5. Started this continuation from handoff`0c1418d`, based on main`cfd22af0e693a4854e3e2c46e034ccf5a39127f3`; fetched main remained unchanged. Owner checkout is still on main with its original generated next-env edit preserved. Our application source checkpoint is **`8ccf104be6f329dec5f142a968feeed90ea9ece4`**. A later report/manifest-only commit must be checked separately via the current PR head.
+Repository: thakoreh/signalfoundry. Branch: `codex/clientrove-release-candidate`. Existing [draft PR7](https://github.com/thakoreh/signalfoundry/pull/7), never PR5. Started this continuation from handoff`0c1418d`, based on main`cfd22af0e693a4854e3e2c46e034ccf5a39127f3`; fetched main remained unchanged. Owner checkout is still on main with its original generated next-env edit preserved. Our application source checkpoint is **`8ccf104be6f329dec5f142a968feeed90ea9ece4`**. Packaging/test follow-up **`65d31301488c8ea1d531e6532a8301f555354a54`** additionally passed source-checks, container-checks and GitGuardian in [run39694051204](https://github.com/thakoreh/signalfoundry/actions/runs/39694051204). A later report/manifest-only commit must be checked separately via the current PR head.
 
 Commands actually rerun on8ccf104:
 
@@ -39,6 +39,8 @@ Commands actually rerun on8ccf104:
 |required GitHub source/container/GitGuardian at8ccf104|PASS; [run39692903599](https://github.com/thakoreh/signalfoundry/actions/runs/39692903599)|
 
 Required source-checks includes the applicable Linux full-stack/proxy, existing browser regression, dependency and history/current secret checks. Container checks build the three images and exercise smoke boundaries. Local Docker daemon was unavailable and POSIX-only Nginx path tests do not run correctly on Windows; no security assertions were weakened. Those Linux CI results are distinct from local runtime/real-account proof. The one transient Windows worker temporary-directory cleanup failure and subsequent passing reruns are recorded in PROGRESS.md.
+
+At65d3130 Docker now excludes private/export/backup/local directories and CSV files from build contexts. The required CI smoke actually built a tiny manufactured FROM-scratch context and inspected an unstarted container export: all16 private/runtime sentinels absent, four public-source sentinels retained. No real data was used as the test context. Independent source/mock packaging review passed six controls; its limits are preserved in reports/SECURITY_REVIEW_65d3130.md. This is packaging evidence, not deployed secrecy or full app acceptance.
 
 Scoped independent reviews caught and drove repairs for dual cold ownership/bounce, repeated/changed-recipient booking confirmation, conflicting/legacy monetary receipts, stale inbound handoff, private source links, inaccessible older saved work, cleared timing edits, restore interruption and HTTP fixture port ownership. Final scoped reports pass; they do not certify full-product/Chrome/production readiness. See reports/CONTINUATION_EVIDENCE.md and SECURITY_REVIEW_8ccf104.md.
 

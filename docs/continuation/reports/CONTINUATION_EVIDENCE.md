@@ -9,5 +9,7 @@ These are verbatim scoped agent reports, not whole-product acceptance or GitHub 
 - SECURITY_REVIEW_ce37b6c.md: original restore-publication interruption finding, fixed at58bd82b.
 - SECURITY_REVIEW_58bd82b.md: restore nine-control PASS; initial HTTP harness port-ownership defect, fixed at3befd3d.
 - SECURITY_REVIEW_3befd3d.md: five mock-only failed-child/nonce/socket-lifecycle/environment controls PASS. Root separately executed real HTTP/SQLite on Windows; this report does not claim independent actual OS/network execution.
+- SECURITY_REVIEW_8ccf104.md: eight scoped mock/source controls plus two existing API regressions PASS for local off switches, fictional seed admission and launcher ownership. Not a rendered journey review.
+- SECURITY_REVIEW_65d3130.md: six independent source/mock packaging controls PASS. Its then-pending actual Docker boundary was subsequently exercised successfully by required CI run39694051204 on the same commit; the independent report remains verbatim and does not itself claim that execution.
 
 Fresh full-journey rendered Chrome/mobile/zoom/reduced-motion/physical-device/screen-reader acceptance is still pending. No report verifies live prices, prior spending, provider/mailbox/calendar/auth/billing accounts, hosted parity or production readiness. Read current STATUS.md and PROGRESS.md before using historical screenshots or checks.
