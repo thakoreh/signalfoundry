@@ -564,6 +564,54 @@ describe("pending Copy intent", () => {
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }
+function replySuggestionFixture() {
+  return { draft: { subject: thread.subject, body: "AI reply stays editable.", evidence_ids: ["seller:offer"], warnings: ["Review this suggestion."],
+    generation_engine: "deepseek", created_at: "2026-10-21" }, snapshot_key: "a".repeat(64), expected_revision: thread.revision,
+    inbound_id: "latest_question", facts: [{ id: "seller:offer", excerpt: "Saved seller offering." }] };
+}
+function reviewedQuestionFixture() {
+  thread.reply_state = "question";
+  thread.sender_footer = "\n\n--\nSaved fictional sender footer";
+  thread.messages = [{ id: "latest_question", direction: "inbound", recipient: thread.recipient, subject: thread.subject,
+    body: "Please explain your offering.", reply_state: "question", source: "user_reported", created_at: "2026-10-21" }];
+}
+it("applies AI reply only to the private editor with saved footer and separate save/approval", async () => {
+  reviewedQuestionFixture();
+  const original = api.getMockImplementation()!;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/reply-draft/check")) return { current: true, snapshot_key: "a".repeat(64) };
+    if (path.endsWith("/reply-draft")) return replySuggestionFixture();
+    return original(path, options);
+  });
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion"); await click("Use as editable reply");
+  expect(field("Message").value).toBe("AI reply stays editable." + thread.sender_footer);
+  expect(thread.body).toBe("A reviewed factual message.");
+  expect(api.mock.calls.some(([path]) => /\/(draft|approve|sent)$/.test(path))).toBe(false);
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Save changes");
+  expect(thread.body).toBe("AI reply stays editable." + thread.sender_footer);
+  expect(thread.approval).toBeNull();
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+it("preserves private typing when a reply suggestion ignores abort and returns late", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => path.endsWith("/reply-draft") ? late : original(path, options));
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion");
+  const signal = api.mock.calls.find(([path]) => path.endsWith("/reply-draft"))![1].signal;
+  await change("Message", "Private answer typed while AI was pending.");
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish(replySuggestionFixture()));
+  expect(field("Message").value).toBe("Private answer typed while AI was pending.");
+  expect(button("Use as editable reply")).toBeUndefined();
+  expect(thread.body).toBe("A reviewed factual message.");
+});
 it("creates a separate referred contact only on explicit action and preserves its parent", async () => {
   thread.reply_state = "referral";
   thread.messages = [{ id: "referral_inbound", direction: "inbound", recipient: thread.recipient,

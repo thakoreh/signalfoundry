@@ -47,6 +47,6 @@ Historical `<LOCAL_HOME>` / `<HISTORICAL_LOCAL_ARTIFACT_ROOT>` paths in reports 
 
 ## Remaining release work at this checkpoint
 
-The current local implementation covers the referral/followup/meeting/funnel and monetary admission seams with scoped offline reviews. Outstanding are live history/pricing/authority, fresh full Chrome/mobile/accessibility acceptance, hosted auth/outreach/privacy parity, reply-AI/mailbox/outbox/calendar and real billing/provider prerequisites, production operations/recovery/retention and whole-product acceptance. Do not label unbuilt code as merely an account-input gate. Detailed built/tested/blocked/deferred mapping is STATUS.md.
+The current local implementation covers the referral/followup/meeting/funnel and monetary admission seams with scoped offline reviews. Active continuation adds local reply suggestions under REPLY_COPILOT.md with mocked-provider evidence, not live quality acceptance. Outstanding are live history/pricing/authority, fresh full Chrome/mobile/accessibility acceptance, hosted auth/outreach/privacy parity, mailbox/outbox/calendar and real billing/provider prerequisites, production operations/recovery/retention and whole-product acceptance. Do not label unbuilt code as merely an account-input gate. Detailed built/tested/blocked/deferred mapping is STATUS.md.
 
 The previous one-hour target expired on2026-10-21; it is not a new countdown. Do not mark complete at a clock boundary. Continue useful safe code/tests, prove the actual journey, and report unfinished or genuinely gated work honestly.

@@ -36,13 +36,13 @@
     },
     {
       "path": "LOCAL_SETUP.md",
-      "bytes": 8623,
-      "sha256": "cc51b86d3c9fd42411769f9bfff7518e7686e6619af8005111bb37a0ad9ed5be"
+      "bytes": 9035,
+      "sha256": "6d53d84fa18c3191ef8ecbae9365d2911d6f4ad25461184763c8e67371c71f72"
     },
     {
       "path": "MONETARY_SAFEGUARDS.md",
-      "bytes": 7273,
-      "sha256": "5c9d25fb09c21c98546049364938dab3a6670c02656014f04ebcd51c0d1d0797"
+      "bytes": 7854,
+      "sha256": "1fd9c87078de35f3d332f4a7a8b79719c132dc2f9ee2fc2a30fc01f8679bb3d0"
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
@@ -56,18 +56,23 @@
     },
     {
       "path": "README.md",
-      "bytes": 7525,
-      "sha256": "f1fe223c522f7ed81c71cb655163caab17bd62a00daf15342289271e489e7418"
+      "bytes": 7648,
+      "sha256": "6153c27be6cc265959c0f88f8324c9193392908a0ff1208f2b9ddab511ff3cc3"
     },
     {
       "path": "RELEASE_HANDOFF.md",
-      "bytes": 8505,
-      "sha256": "8fcd2bc79c805159dd7790fbe7fef68ef8124925fdc7d52f0bceb7d94edb1243"
+      "bytes": 9222,
+      "sha256": "cd9b7977d301680705d5d2f5cdcdbb151e3fe17b6e9d1cb8e15aec29334d4c02"
+    },
+    {
+      "path": "REPLY_COPILOT.md",
+      "bytes": 5646,
+      "sha256": "2d41090258182418f5277b8fc95c32009de6430cdbb0f6882e3b7d312bad52c1"
     },
     {
       "path": "STATUS.md",
-      "bytes": 18612,
-      "sha256": "93196bea262fedd58e946e789a123c8baeb1ebbfe861892bb7c456cb0ec730e3"
+      "bytes": 19644,
+      "sha256": "2c911536c222749f35881da9bb58683a3aa8c43c40aaf354b72526aa791edf12"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -214,5 +219,6 @@
       "bytes": 9425,
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
-  ]
+  ],
+  "application_checkpoint_scope": "Previous fully checked application freeze. Active reply copilot after7e815a8 is described in PROGRESS/STATUS and awaits exact-source independent review; inspect current branch head."
 }

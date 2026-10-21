@@ -24,6 +24,7 @@ import { isSharedInbox } from "../lib/customer-search";
 import { RecipientTime } from "./recipient-time";
 import { manualEmailLink, requestEmailApp } from "../lib/manual-email";
 import { DraftClaimReview } from "./draft-claim-review";
+import { ReplyCopilot } from "./reply-copilot";
 import "./outreach-workspace.css";
 
 type Step = "Review" | "Conversations" | "Meetings";
@@ -834,8 +835,17 @@ export function OutreachWorkspace({
                       <h3>Write your reply</h3>
                       <p>
                         Check the received reply and write your response below.
-                        Replies are written by you.
+                        Optional AI help gives you an editable starting point; you review and approve what you use.
                       </p>
+                      <ReplyCopilot
+                        key={JSON.stringify([thread.id, thread.revision, profileRefresh, profile, dirty, basisDirty, incomingDirty, timingDirty, pendingReplyReview, !!busy])}
+                        thread={thread} disabled={!!busy || dirty || basisDirty || incomingDirty || timingDirty || pendingReplyReview}
+                        onApply={suggestion => {
+                          cancelCopy();
+                          setDrafts(current => ({ ...current, [thread.id]: { ...threadDraft(thread),
+                            subject: suggestion.subject, body: suggestion.body.trimEnd() + (thread.sender_footer || "") } }));
+                          setNotice("AI suggestion added to your editor. Review every claim, save changes and approve the exact message separately.");
+                        }} />
                     </section>
                     </>
                   )}

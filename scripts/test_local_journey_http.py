@@ -63,7 +63,7 @@ def run():
         env = {key: os.environ[key] for key in ('PATH', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'HOME', 'LANG') if key in os.environ}
         env.update(PYTHONPATH=str(ROOT / 'backend'), PYTHONDONTWRITEBYTECODE='1',
                    SIGNALFOUNDRY_DB_PATH=str(path), SIGNALFOUNDRY_MODE='local-demo', DECISION_ENGINE='rules',
-                   CLIENTROVE_DEEPSEEK_ENABLED='false', CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED='false',
+                   CLIENTROVE_DEEPSEEK_ENABLED='false', CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED='false', CLIENTROVE_DEEPSEEK_REPLIES_ENABLED='false',
                    CLIENTROVE_HUNTER_ENABLED='false', CLIENTROVE_BRAVE_SEARCH_ENABLED='false')
         opener = build_opener(ProxyHandler({}))
         # Keep ownership from allocation through teardown. Never release a random
@@ -143,6 +143,7 @@ def run():
                 assert child['id'] != first['id'] and not child['contact_basis'] and child['recipient_status'] == 'user_entered'
                 child = mutate(child, 'replies', {'body': 'Please unsubscribe me.', 'reply_state': 'opt_out'})
                 assert child['suppressed']
+                mutate(child, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v1'}, expected=409)
                 assert request('GET', f"/outreach/{first['id']}")['suppressed'], 'Company stop survives across contacts'
                 mutate(child, 'reply-state', {'reply_state': 'interested'}, 'PATCH')
                 assert request('GET', f"/outreach/{child['id']}")['suppressed'], 'Status correction never clears an opt-out'
@@ -150,6 +151,9 @@ def run():
                 second = mutate(draft(threads[1]), 'approve')
                 second = mutate(second, 'sent')
                 second = mutate(second, 'replies', {'body': 'Yes, let us discuss it.', 'reply_state': 'interested'})
+                mutate(second, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v1'}, expected=409)
+                request('POST', f"/outreach/{second['id']}/reply-draft/check", {'expected_revision': second['revision'],
+                        'snapshot_key': '0' * 64}, expected=409)
                 past = datetime.now(timezone.utc) - timedelta(hours=1)
                 second = mutate(second, 'meeting', {'meeting_at': past.isoformat(), 'meeting_timezone': 'UTC'})
                 queue = request('GET', '/outreach/next-up')['items']
@@ -163,7 +167,7 @@ def run():
                 assert len(request('GET', '/outreach')['threads']) == 3
                 with repo.connect() as db:
                     assert db.execute('SELECT COUNT(*) FROM paid_attempts').fetchone()[0] == 0
-                print('PASS: real loopback HTTP + isolated SQLite: saved setup, five-result bound, exact approval, distinct actual send, dated followup, OOO cancellation, fresh referral, sticky company opt-out, timed meeting, reported funnel, export and saved return. Zero paid attempts.')
+                print('PASS: real loopback HTTP + isolated SQLite: saved setup, five-result bound, exact approval, distinct actual send, dated followup, OOO cancellation, fresh referral, sticky company opt-out, gated reply suggestion and stale-check denial, timed meeting, reported funnel, export and saved return. Zero paid attempts.')
                 print('Not verified: rendered Next/Chrome, real auth, providers, email delivery, calendar, physical phone or accessibility.')
             finally:
                 if process.is_alive(): process.terminate()

@@ -4,12 +4,13 @@ One SQLite file is the authority for all its tenants. Hosted/stateless workers
 have no context and cannot dispatch. Operator policy methods are not HTTP APIs.
 """
 from dataclasses import dataclass
+from collections.abc import Callable
 from datetime import datetime, timezone
 import hashlib
 import json
 
 CEILING = 25_000_000  # Integer micro-USD. This cap is not spending permission.
-OPERATIONS = {'deepseek:search', 'brave:search', 'hunter:domain-search', 'hunter:email-verifier', 'deepseek:intro'}
+OPERATIONS = {'deepseek:search', 'brave:search', 'hunter:domain-search', 'hunter:email-verifier', 'deepseek:intro', 'deepseek:reply'}
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS cost_policies (
  scope TEXT NOT NULL, scope_id TEXT NOT NULL, period TEXT NOT NULL,
@@ -56,7 +57,7 @@ def quote_call(operation, payload, spec):
     encoded = json.dumps(payload, ensure_ascii=True, separators=(',', ':')).encode()
     if len(encoded) > 40_000:
         raise CostDenied('The paid request exceeds its admitted payload limit.')
-    if operation == 'deepseek:intro':
+    if operation in ('deepseek:intro', 'deepseek:reply'):
         if spec.get('kind') != 'tokens' or payload.get('max_tokens') != 600 or payload.get('model') != spec.get('model'):
             raise CostDenied('The model or token bound is not covered by the current price policy.')
         # Deliberately pessimistic byte bound plus framing. No len(text)/4 guess.
@@ -187,7 +188,7 @@ class CostLedger:
                 'tenant_ledger_exposure_micro_usd': exposure,
                 'detail': 'Every request still needs atomic price/cap admission.' if ready else 'Paid work is blocked until history, pricing and owner authorization are reconciled. Saved work and manual outreach remain available.'}
 
-    def reserve(self, tenant, attempt, operation, payload, *, billing_identity=None):
+    def reserve(self, tenant, attempt, operation, payload, *, billing_identity=None, admission_guard=None):
         created = utc_now()
         period = created[:7]
         fingerprint = digest([operation, payload, billing_identity])
@@ -195,6 +196,11 @@ class CostLedger:
             db.execute('BEGIN IMMEDIATE')
             if db.execute("SELECT 1 FROM local_controls WHERE (name='erased' AND scope_id=?) OR name='quarantine' LIMIT 1", (tenant,)).fetchone():
                 raise CostDenied('Paid work is blocked for this closed or quarantined local workspace.')
+            # Trusted read-only application guard; shares this admission lock.
+            # No lock is held across provider IO. A later stop cannot unsend
+            # already admitted context, and must discard its eventual result.
+            if admission_guard is not None:
+                admission_guard(db)
             prior = db.execute('SELECT fingerprint FROM paid_attempts WHERE tenant=? AND attempt=?', (tenant, attempt)).fetchone()
             if prior:
                 if prior['fingerprint'] != fingerprint:
@@ -273,8 +279,8 @@ class CostLedger:
             db.execute('INSERT INTO monetary_audit(at,kind,scope,reference) VALUES (?,?,?,?)',
                        (utc_now(), 'receipt_reconciled', 'tenant:' + tenant + ':' + attempt, reference))
 
-    def run(self, tenant, attempt, operation, payload, dispatch, *, billing_identity=None):
-        self.reserve(tenant, attempt, operation, payload, billing_identity=billing_identity)
+    def run(self, tenant, attempt, operation, payload, dispatch, *, billing_identity=None, admission_guard=None):
+        self.reserve(tenant, attempt, operation, payload, billing_identity=billing_identity, admission_guard=admission_guard)
         try:
             result = dispatch()
             self.settle(tenant, attempt, result)
@@ -289,13 +295,15 @@ class CostContext:
     ledger: CostLedger
     tenant: str
     logical_attempt: str
+    admission_guard: Callable | None = None
 
     def run(self, operation, payload, dispatch, *, billing_identity=None):
         attempt = digest([self.logical_attempt, operation])
-        return self.ledger.run(self.tenant, attempt, operation, payload, dispatch, billing_identity=billing_identity)
+        return self.ledger.run(self.tenant, attempt, operation, payload, dispatch, billing_identity=billing_identity,
+                               admission_guard=self.admission_guard)
 
     def child(self, unit):
-        return CostContext(self.ledger, self.tenant, digest([self.logical_attempt, unit]))
+        return CostContext(self.ledger, self.tenant, digest([self.logical_attempt, unit]), self.admission_guard)
 
 
 def paid_call(context, operation, payload, dispatch, *, billing_identity=None):

@@ -7,7 +7,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timezone
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 from .models import Account, Campaign, Profile, Workspace
@@ -163,7 +163,7 @@ class Repository:
                 raise WorkspaceClosed('This local workspace is closed. No data was saved.')
             db.execute('UPDATE customer_searches SET data=? WHERE tenant_id=? AND id=?', (search.model_dump_json(), self.tenant_id, search.id))
 
-    def reserve_customer_draft(self, cache_key: str, request_key: str, *, allow_new=True):
+    def reserve_customer_draft(self, cache_key: str, request_key: str, *, allow_new=True, _db=None):
         """Transactionally admit one attempt per immutable profile/evidence snapshot.
 
         A request key is never charged twice. Only an explicit new key after a
@@ -171,8 +171,11 @@ class Repository:
         deduplicate across keys; cached response aliases stay bound to the input.
         """
         from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError
-        with self.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
+        with (self.connect() if _db is None else nullcontext(_db)) as db:
+            if not db.in_transaction:
+                db.execute('BEGIN IMMEDIATE')
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No draft work is allowed.')
             current = datetime.now(timezone.utc)
             def age(timestamp):
                 return (current - datetime.fromisoformat(timestamp.replace('Z', '+00:00'))).total_seconds()
@@ -224,8 +227,8 @@ class Repository:
                        (self.tenant_id, cache_key, request_key, timestamp, 'pending'))
         return None
 
-    def finish_customer_draft(self, cache_key: str, request_key: str, draft=None) -> bool:
-        with self.connect() as db:
+    def finish_customer_draft(self, cache_key: str, request_key: str, draft=None, *, _db=None) -> bool:
+        with (self.connect() if _db is None else nullcontext(_db)) as db:
             updated = db.execute('UPDATE customer_drafts SET status=?,data=? WHERE tenant_id=? AND cache_key=? AND request_key=? AND status=?',
                        ('complete' if draft else 'failed', draft.model_dump_json() if draft else None,
                         self.tenant_id, cache_key, request_key, 'pending'))

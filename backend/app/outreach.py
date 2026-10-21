@@ -1024,9 +1024,4 @@ def outreach_router(repository, *, blocked_preview=False):
     def outcomes(thread_id: str, body: OutcomesRequest):
         return call(service().mutate_outreach, thread_id, 'outcomes', body)
 
-    @router.post('/{thread_id}/reply-draft')
-    def ai_reply(thread_id: str, body: EmptyRequest):
-        call(service().outreach_thread, thread_id)
-        raise HTTPException(503, 'AI reply drafting is disabled until a total monthly spending guard is configured. Write and review a response here without provider charges.')
-
     return router

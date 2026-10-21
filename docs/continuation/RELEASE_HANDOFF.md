@@ -4,6 +4,8 @@
 
 **INCOMPLETE.** The local manual-assisted journey is substantially implemented and tested. It has not passed the required fresh complete Chrome journey, hosted/live integration or production acceptance. Green builds and scoped agent reviews do not change that verdict.
 
+Active continuation after7e815a8 additionally implements a separately gated local editable reply copilot. It uses explicit context disclosure, the existing shared monetary/cache/quota authority, current eligible inbound/source/profile snapshots and separate checked Apply into the private editor. Initial offline tests/build pass; exact-source independent review and final-head CI remain pending in PROGRESS.md. The source/check table below is the earlier freeze, not evidence for this new seam. REPLY_COPILOT.md describes operation, privacy, defaults, grounding limits and owner-input gates.
+
 ## Decisions and external inputs
 
 1. Allow a separate temporary Chrome automation profile/method, or provide an isolated connected Chrome surface. The current computer-use inventory exposes only the protected personal `Hiren` profile and the forbidden in-app browser. No personal profile was opened or changed. A request for isolated Playwright-driven Chrome remains unanswered; that method has not been used.
@@ -52,7 +54,7 @@ There are **no fresh complete-journey screenshots in this run**. Existing c929 s
 
 ## Remaining P0/P1 and setup
 
-STATUS.md maps every canonical14-step and cross-cutting requirement to built/locally tested/blocked/deferred, with source/evidence limits. No staging or production-verified status is assigned. Unbuilt work includes hosted outreach/auth/role parity, grounded reply AI, mailbox/OAuth/durable outbox/inbound recovery/connected daily caps/calendar, hosted privacy/deletion and production recovery/analytics/operations. Real provider/contact accuracy/auth/billing environment acceptance remains blocked; local logic/mocks are not integration proof. The cumulative PR remains too large to claim one-hour review and stays draft; reviewability/whole-product acceptance is still incomplete.
+STATUS.md maps every canonical14-step and cross-cutting requirement to built/locally tested/blocked/deferred, with source/evidence limits. No staging or production-verified status is assigned. Unbuilt work includes hosted outreach/auth/role parity, mailbox/OAuth/durable outbox/inbound recovery/connected daily caps/calendar, hosted privacy/deletion and production recovery/analytics/operations. Local reply suggestion logic is now implemented with mocked-provider evidence; real quality/privacy/provider acceptance is still outstanding. Real provider/contact accuracy/auth/billing environment acceptance remains blocked; local logic/mocks are not integration proof. The cumulative PR remains too large to claim one-hour review and stays draft; reviewability/whole-product acceptance is still incomplete.
 
 LOCAL_SETUP.md consolidates flags, explicit database/port rules and off switches; MONETARY_SAFEGUARDS.md covers source-backed billing reconciliation and kill; LOCAL_DATA_OPERATIONS.md covers export/closure/quarantined restore and disk/external-copy limits. Everything today is manual-assisted: pasted replies, external-send/meeting/sale reports and founder approvals. No connected send/delivery/inbox/calendar claim is made.
 

@@ -123,18 +123,12 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
     return content
 
 
-def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> CustomerDraft:
-    from .cost_admission import paid_call, CostDenied, digest
+def bounded_completion(payload, operation, *, transport=None, cost=None):
+    """Fixed-host, one-attempt JSON boundary shared by explicitly gated drafts."""
+    from .cost_admission import paid_call, digest
     if transport is not None and not isinstance(transport, httpx.MockTransport):
         raise DraftError('Only an offline mock transport may be injected.')
-    if draft_status()['status'] != 'ready':
-        raise DraftError('AI message drafting is not connected yet.')
     credential = os.environ.get('DEEPSEEK_API_KEY', '').strip()
-    facts = draft_facts(body.profile, body.account)
-    payload = {'model': MODEL, 'thinking': {'type': 'disabled'}, 'max_tokens': 600,
-               'temperature': 0.3, 'stream': False, 'response_format': {'type': 'json_object'},
-               'messages': [{'role': 'system', 'content': SYSTEM},
-                            {'role': 'user', 'content': json.dumps(facts, ensure_ascii=True)}]}
     started = time.monotonic()
     def dispatch():
         with httpx.Client(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(20.0, connect=5.0), transport=transport) as client:
@@ -150,8 +144,20 @@ def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> C
                         raise DraftError('AI drafting exceeded its response limit. No automatic retry was made.')
                     chunks.append(chunk)
         return json.loads(b''.join(chunks))
+    return paid_call(cost, operation, payload, dispatch, billing_identity=digest(credential))
+
+
+def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> CustomerDraft:
+    from .cost_admission import CostDenied
+    if draft_status()['status'] != 'ready':
+        raise DraftError('AI message drafting is not connected yet.')
+    facts = draft_facts(body.profile, body.account)
+    payload = {'model': MODEL, 'thinking': {'type': 'disabled'}, 'max_tokens': 600,
+               'temperature': 0.3, 'stream': False, 'response_format': {'type': 'json_object'},
+               'messages': [{'role': 'system', 'content': SYSTEM},
+                            {'role': 'user', 'content': json.dumps(facts, ensure_ascii=True)}]}
     try:
-        raw = paid_call(cost, 'deepseek:intro', payload, dispatch, billing_identity=digest(credential))
+        raw = bounded_completion(payload, 'deepseek:intro', transport=transport, cost=cost)
         choice = raw['choices'][0]
         if choice.get('finish_reason') != 'stop':
             raise DraftError('AI drafting did not finish cleanly. No automatic retry was made.')

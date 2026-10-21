@@ -25,6 +25,7 @@ from .primitives import now
 from .cost_admission import CostLedger, CostContext
 from .local_data import WorkspaceClosed, export_tenant
 from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftCostDenied, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
+from .reply_drafts import ReplyDraftRequest, ReplyDraftCheck, ReplyDraftService, generate_reply_suggestion
 
 logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = [f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 8000)]
@@ -84,6 +85,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         app.state.decision_provider = JevDecisionProvider.from_environment()
     app.state.research_lock = threading.Lock()
     app.state.generate_customer_draft = generate_customer_draft
+    app.state.generate_reply_suggestion = generate_reply_suggestion
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=allowed_origins,
                        allow_methods=['GET', 'POST', 'PUT', 'PATCH'], allow_headers=['Content-Type'],
@@ -378,9 +380,39 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         return Response(output.getvalue(), media_type='text/csv',
                         headers={'Content-Disposition': f'attachment; filename="signalfoundry-{campaign_id}.csv"'})
 
-    from .outreach import outreach_router
-    app.include_router(outreach_router(repository, blocked_preview=bool(configured_origin or public_access or
-        os.environ.get('CLIENTROVE_LOCAL_OUTREACH_ENABLED', 'true') != 'true')))
+    from .outreach import outreach_router, OutreachError
+    outreach_blocked = bool(configured_origin or public_access or
+                            os.environ.get('CLIENTROVE_LOCAL_OUTREACH_ENABLED', 'true') != 'true')
+
+    def reply_service():
+        if outreach_blocked:
+            raise HTTPException(403, 'Conversation review is disabled in this deployment. Your saved research remains available.')
+        return ReplyDraftService(repository(), app.state.cost_ledger, app.state.generate_reply_suggestion)
+
+    @app.post('/api/outreach/{thread_id}/reply-draft')
+    def reply_draft(thread_id: str, body: ReplyDraftRequest | EmptyRequest):
+        service = reply_service()
+        if isinstance(body, EmptyRequest):
+            # Legacy probes/clients never imply consent to transmit replies.
+            repository().outreach_thread(thread_id)
+            raise HTTPException(503, 'AI reply suggestions require explicit context review and monetary admission. The manual editor remains available.')
+        try:
+            return service.request(thread_id, body)
+        except OutreachError as error:
+            raise HTTPException(error.status, str(error)) from None
+        except DraftCostDenied as error:
+            return JSONResponse({'detail': str(error), 'code': 'COST_BLOCKED'}, status_code=503)
+        except DraftError as error:
+            return JSONResponse({'detail': str(error), 'code': 'DRAFT_FAILED'}, status_code=409)
+
+    @app.post('/api/outreach/{thread_id}/reply-draft/check')
+    def check_reply_draft(thread_id: str, body: ReplyDraftCheck):
+        try:
+            return reply_service().check(thread_id, body)
+        except OutreachError as error:
+            raise HTTPException(error.status, str(error)) from None
+
+    app.include_router(outreach_router(repository, blocked_preview=outreach_blocked))
     return app
 
 

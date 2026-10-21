@@ -31,7 +31,8 @@ On Windows, run backend tests from backend with `..\.venv\Scripts\python.exe -m 
 |CLIENTROVE_LOCAL_EXPORT_ENABLED|Default true only for private local export. Set false to deny export; no deletion occurs. Public/hosted export stays denied.|
 |CLIENTROVE_SEARCH_PROVIDER|Existing deepseek/brave selection; does not grant paid permission.|
 |CLIENTROVE_DEEPSEEK_ENABLED / CLIENTROVE_BRAVE_SEARCH_ENABLED / CLIENTROVE_HUNTER_ENABLED|Existing explicit provider activation flags, default off. Keep off for QA; never put real keys in fixtures.|
-|CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED / DEEPSEEK_API_KEY|Existing initial AI draft opt-in+private key. Keys alone do not activate. Monetary admission must also allow every request. No reply-AI flag/implementation is supplied.|
+|CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED / DEEPSEEK_API_KEY|Existing initial AI draft opt-in+private key. Keys alone do not activate. Monetary admission must also allow every request.|
+|CLIENTROVE_DEEPSEEK_REPLIES_ENABLED|Default off. Explicit true permits local founder-requested reply suggestions only after context disclosure, active classified interested/question reply, source/sender checks and separate `deepseek:reply` token-price admission. Keep off for review. No provider calls are authorized by this documentation. Saved unchanged suggestions can reopen without a new call; manual writing remains available. See REPLY_COPILOT.md.|
 |BRAVE_SEARCH_API_KEY / HUNTER_API_KEY|Existing optional private provider keys; never needed by offline tests. No new subscriptions/accounts are authorized.|
 |DECISION_ENGINE|Keep rules. Legacy live Jev is monetary-gated/no authority, not an alternative paid fallback.|
 |SIGNALFOUNDRY_PREVIEW_ORIGIN / SIGNALFOUNDRY_PUBLIC_ACCESS|Existing protected/public-preview configuration; neither enables hosted outreach or public export. Never expose the local API publicly.|
