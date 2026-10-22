@@ -16,6 +16,7 @@ export SIGNALFOUNDRY_MODE=local-demo NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo
 "$PYTHON" "$ROOT/scripts/production_worker_checks.py"
 bash -n "$ROOT/scripts/dev.sh" "$ROOT/scripts/setup.sh" "$ROOT/scripts/package.sh" "$ROOT/deploy/start.sh"
 (cd "$ROOT/frontend" && npm run typecheck && npm run lint && npm test && npm run test:convex && npm run test:landing && npm run build)
+node --test "$ROOT/scripts/test_fixture_fetch_guard.cjs"
 "$PYTHON" "$ROOT/scripts/test_proxy_integration.py"
 "$PYTHON" "$ROOT/scripts/test_full_stack.py"
 

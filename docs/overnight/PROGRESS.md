@@ -1,5 +1,13 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Proxy readiness cause reproduced and test-only fetch admission repaired — Linux CI pending
+
+Read-only differential diagnosis located Next16.3.8 webpack dev startup's awaited, unbounded getVersionInfo fetch to npm dist-tags before hot reloader initialization. Next logs Ready before that await completes; application HTTP times out, including a minimal route with proxy removed. The direct fixture upstream returns200. Installed source and an external diagnostic preload isolated the cause: denying that background external fetch permits Next's intended unknown-version fallback and serves health/readyz immediately. No installed dependency was modified and no registry result/version was invented.
+
+Root added scripts/fixture_loopback_fetch.cjs, loaded ONLY by the disposable proxy-test Node child with --require. It rejects non-loopback fetch, unsupported protocols/credentials/malformed input with a generic error, preserving local original arguments/abort signal/receiver. It is not loaded by app dev/build/start and is not a socket firewall or monetary ledger. Three focused tests use an inert dispatch spy (no external call), reproduced2RED then3PASS. check.sh now runs those tests; no dependency/check/ruleset/production-host change.
+
+AST comparison confirms all7 original proxy assertions unchanged, plus31.25-second fixture delay,60-second readiness deadline and45-second response timeout. Root's Windows portability copy of the actual test now PASS all3 original real-HTTP groups with31.27-second delayed response; both localhost forms, foreign/lookalike/spoofed headers and former30-second timeout remain exercised. Independent external adaptation also PASS3groups/31.27s. Platform adaptation is explicitly not Linux CI proof. Root preserves failed c118/5c/acc required runs; new exact-head Linux checks must pass before claiming repaired CI. Owner chose code checks; native fixture dialog/private edits stay untouched. Whole goal remains ACTIVE/INCOMPLETE.
+
 ## Current5c repair reviewed; required proxy CI still red; real Chrome evidence retained
 
 Exact application5c861c77cbff4b5da31df2d4d8a58a6e0bff1bf3 is pushed on the same branch/draftPR7, based on unchangedmaincfd22af. Optimized webpack production build executed on this exact committed head PASS; author239backend/149components/67Node/types/lint pass. Independent immutable rechecks close all c118 findings: security122distinct offline cases PASS (original83unchanged +8frontend +31backend), UX102distinct PASS (94components +8HTTP; original84unchanged also rerun, not added again). Failed c118 reviews remain verbatim beside repair reports. These are scoped passes, not whole-product acceptance.

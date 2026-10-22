@@ -20,6 +20,8 @@ The complete required check entry point remains `bash scripts/check.sh` on the U
 
 On Windows, run backend tests from backend with `..\.venv\Scripts\python.exe -m unittest discover -s tests -q`; frontend npm commands use Node24. `python scripts/test_local_journey_http.py` runs the credential-free isolated API journey and stops/removes its own fixture. It holds the listening socket across allocation→child→teardown, checks process/nonce ownership before requests and never selects an existing app DB. This is not rendered-browser proof. Native `python scripts/package_source.py` supports source packaging; the Bash wrapper honors PYTHON. POSIX-only Nginx path renderer/proxy scripts still require Ubuntu, and Docker tests require a daemon. Record unsupported local runs honestly and require exact-head CI; never relax security paths for Windows.
 
+The proxy integration test preloads `scripts/fixture_loopback_fetch.cjs` into its own disposable Next child only. This keeps framework metadata fetches offline: Next's development version checker has no timeout and otherwise can hang before serving requests. All original host/security/delayed-response assertions and deadlines remain unchanged. The preload admits loopback HTTP fetch with original request/abort options and rejects external fetch; it is not a generic network firewall. No user env variable is added and ordinary app dev/build/start never loads it. Rollback is an ordinary revert of this test-launch seam, not an app security setting or data reset.
+
 ## Configuration and off switches
 
 | Setting / control | Meaning and safe default |
