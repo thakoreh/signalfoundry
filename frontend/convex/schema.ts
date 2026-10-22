@@ -1,6 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
-import { threadFields, approvalFields, messageFields } from "./lib/outreachLedgerValidators";
+import { threadFields, approvalFields, messageFields, eventFields } from "./lib/outreachLedgerValidators";
 import {
   accountData,
   campaignFields,
@@ -28,6 +28,7 @@ export default defineSchema({
     .index("by_orgId_and_threadId", ["orgId", "threadId"]),
   outreachMessages: defineTable(messageFields)
     .index("by_orgId_and_threadId", ["orgId", "threadId"]),
+  outreachEvents: defineTable(eventFields).index("by_orgId_and_threadId", ["orgId", "threadId"]),
   outreachSuppressions: defineTable({
     orgId: v.string(), target: v.string(),
     reason: v.union(v.literal("opt_out"), v.literal("source_question"), v.literal("bounce")),

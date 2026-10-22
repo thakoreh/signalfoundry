@@ -2,7 +2,7 @@
 
 ## Verdict and owner decisions
 
-Current hosted work adds an internal, default-off manual-ledger foundation, not full parity: tenant/admin/organization-intent checks, exact immutable approvals/actual-sent snapshots, sticky stops, company review and manual reply classifications. The existing hosted REST adapter remains closed. See HOSTED_LEDGER.md and current PROGRESS.md for exact scope/tests; lifecycle projections, hosted referrals/followups/meetings/privacy and shared monetary coordination are still unbuilt. Local14-step implementation and browser/provider acceptance limits below remain separate.
+Current hosted work adds internal, default-off tenant-scoped persistence AND source implementations for referrals, dated max-two followups, timed meetings/outcomes, fresh uncached preflight and clock-aware returning activity. HOSTED_LIFECYCLE.md defines exact scope and remaining gates. The existing hosted REST adapter stays closed; hosted privacy/retention/export/closure, fully mapped UI/adapter parity and shared monetary coordination remain unbuilt. Local14-step code and complete browser/provider acceptance below remain separate.
 
 Repair132831f passes full119 Convex/43 hosted cases,67 Node,135 components and type/lint/build within recorded scopes. Independent baseline4bf review found sender-provenance P1 and contact-fallback/numeric-zone P2s despite green CI; exact132 rechecks now pass (security70 offline+strict copied types, spec original41/extended49 and14 adapter). Failed baseline reports are preserved. Current exact-head CI readback remains in PROGRESS; do not borrow prior green runs or treat scoped rechecks as hosted/browser acceptance.
 

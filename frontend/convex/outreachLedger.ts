@@ -2,288 +2,46 @@
  * No transport, scheduler, provider, account connection or paid operation lives here.
  */
 import { v, type Infer } from "convex/values";
-import type { MutationCtx, QueryCtx } from "./_generated/server";
+import type { MutationCtx } from "./_generated/server";
 import type { Doc, Id } from "./_generated/dataModel";
-import {
-  internalAdminMutation,
-  internalTenantQuery,
-  type Principal,
-} from "./lib/auth";
+import { internalAdminMutation, internalTenantQuery } from "./lib/auth";
 import { appError } from "./lib/errors";
 import { requireWorkspace } from "./lib/records";
 import { text } from "./lib/validation";
 import * as p from "./lib/outreachLedgerPolicy";
 import * as validators from "./lib/outreachLedgerValidators";
 
-type Reader = Pick<QueryCtx, "db">;
-type Scope = { expectedOrgId: string };
-const scope = { expectedOrgId: v.string() };
-const revision = {
-  ...scope,
-  threadId: v.id("outreachThreads"),
-  expectedRevision: v.number(),
-  idempotencyKey: v.string(),
-};
-const gate = (principal: Principal, args: Scope) => {
-  if (process.env.SIGNALFOUNDRY_HOSTED_OUTREACH_PERSISTENCE_ENABLED !== "true")
-    throw appError(
-      "CONFIGURATION_ERROR",
-      "Hosted outreach persistence is disabled; its adapter is not available",
-    );
-  if (args.expectedOrgId !== principal.orgId)
-    throw appError(
-      "CONFLICT",
-      "The active organization changed. Reopen saved work.",
-    );
-};
-async function requireThread(
-  ctx: Reader,
-  orgId: string,
-  id: Id<"outreachThreads">,
-) {
-  const row = await ctx.db.get(id);
-  if (!row || row.orgId !== orgId)
-    throw appError("NOT_FOUND", "Conversation not found");
-  return row;
-}
-async function company(ctx: Reader, thread: Doc<"outreachThreads">) {
-  const row = await ctx.db
-    .query("outreachCompanies")
-    .withIndex("by_orgId_and_companyKey", (q) =>
-      q.eq("orgId", thread.orgId).eq("companyKey", thread.companyKey),
-    )
-    .unique();
-  if (!row)
-    throw appError(
-      "CONFLICT",
-      "This conversation is missing its company safety record",
-    );
-  return row;
-}
-async function stop(ctx: Reader, orgId: string, target: string) {
-  return ctx.db
-    .query("outreachSuppressions")
-    .withIndex("by_orgId_and_target", (q) =>
-      q.eq("orgId", orgId).eq("target", target),
-    )
-    .unique();
-}
-async function binding(
-  thread: Doc<"outreachThreads">,
-  profileVersion: number,
-  companyVersion: number,
-) {
-  return p.fingerprint({
-    threadId: thread._id,
-    recipient: thread.recipient,
-    subject: thread.subject,
-    body: thread.body,
-    contactBasis: thread.contactBasis,
-    latestInboundId: thread.latestInboundId,
-    replyState: thread.replyState,
-    profileVersion,
-    companyVersion,
-    revision: thread.revision,
-  });
-}
-async function view(
-  ctx: Reader,
-  row: Doc<"outreachThreads">,
-): Promise<Infer<typeof validators.view>> {
-  const workspace = await requireWorkspace(ctx, row.orgId);
-  const safety = await company(ctx, row);
-  const [domainStop, emailStop, messages] = await Promise.all([
-    stop(ctx, row.orgId, `domain:${row.companyKey}`),
-    stop(ctx, row.orgId, `email:${row.recipient.toLowerCase()}`),
-    ctx.db
-      .query("outreachMessages")
-      .withIndex("by_orgId_and_threadId", (q) =>
-        q.eq("orgId", row.orgId).eq("threadId", row._id),
-      )
-      .take(51),
-  ]);
-  if (messages.length > 50 || messages.length !== row.messageCount)
-    throw appError("CONFLICT", "Conversation history needs recovery");
-  const footer = p.senderFooter(workspace.profile);
-  const suppressed = Boolean(
-    domainStop || (emailStop?.reason !== "bounce" && emailStop),
-  );
-  const invalid = emailStop?.reason === "bounce";
-  const companyPaused =
-    row.companyReviewVersion !== safety.reviewVersion ||
-    Boolean(safety.coldOwnerId && safety.coldOwnerId !== row._id);
-  let reason: string | null = null;
-  if (suppressed) reason = "A permanent opt-out or contact-source stop applies";
-  else if (invalid) reason = "This address was reported invalid";
-  else if (row.paused || companyPaused)
-    reason = "Review the paused company and make an explicit decision";
-  else if (
-    row.latestInboundId &&
-    !["interested", "question"].includes(row.replyState)
-  )
-    reason = "Review the received reply before outreach";
-  else if (
-    row.latestInboundId &&
-    messages
-      .find((m) => m._id === row.latestInboundId)
-      ?.recipient.toLowerCase() !== row.recipient.toLowerCase()
-  )
-    reason = "The received reply belongs to a different recipient";
-  else if (
-    !row.latestInboundId &&
-    messages.some((m) => m.direction === "outbound")
-  )
-    reason =
-      "Hosted followup planning is not available; do not repeat an initial cold message";
-  else if (!footer)
-    reason = "Save sender name, company, mailing address and reachable contact";
-  else if (!p.basisReady(row.contactBasis, row.recipient))
-    reason =
-      "Review the public address, role relevance and US/Canada contact basis";
-  else if (
-    !row.recipient ||
-    !row.subject ||
-    !row.body ||
-    !row.body.endsWith(footer)
-  )
-    reason = "Save a complete message with the current sender footer";
-  else if (
-    row.replyState !== "interested" &&
-    /https?:\/\/(?:www\.)?(?:calendly\.com|cal\.com|calendar\.[^/\s?#]+)(?=[/?#\s]|$)/i.test(
-      row.subject + "\n" + row.body,
-    )
-  )
-    reason = "Offer the booking link only after interest is recorded";
-  let approval = row.approvalId ? await ctx.db.get(row.approvalId) : null;
-  if (
-    approval &&
-    (approval.orgId !== row.orgId ||
-      approval.threadId !== row._id ||
-      approval.binding !==
-        (await binding(row, workspace.profileVersion, safety.reviewVersion)))
-  )
-    approval = null;
-  if (reason) approval = null;
-  // Hide stale approval references in the view; never rewrite immutable history on GET.
-  return {
-    thread: { ...row, approvalId: approval?._id ?? null },
-    messages,
-    approval,
-    senderFooter: footer,
-    blockedReason: reason,
-    readyForManualAction: Boolean(!reason && approval),
-    companyPaused,
-    suppressed,
-    invalidRecipient: invalid,
-    reviewDue:
-      row.revisitAt !== null &&
-      ["not_now", "auto_reply"].includes(row.replyState) &&
-      row.revisitAt <= Date.now(),
-  };
-}
-async function ledger(ctx: MutationCtx, orgId: string) {
-  const row = await ctx.db
-    .query("outreachLedgers")
-    .withIndex("by_orgId", (q) => q.eq("orgId", orgId))
-    .unique();
-  if (row) return row;
-  const id = await ctx.db.insert("outreachLedgers", {
-    orgId,
-    requestCount: 0,
-    threadCount: 0,
-  });
-  return (await ctx.db.get(id))!;
-}
-async function request(
-  ctx: MutationCtx,
-  orgId: string,
-  key: string,
-  operation: string,
-  args: unknown,
-) {
-  if (!/^[A-Za-z0-9_-]{8,128}$/.test(key))
-    throw appError("VALIDATION_ERROR", "Invalid operation key");
-  const digest = await p.fingerprint([operation, args]);
-  const old = await ctx.db
-    .query("outreachRequests")
-    .withIndex("by_orgId_and_requestKey", (q) =>
-      q.eq("orgId", orgId).eq("requestKey", key),
-    )
-    .unique();
-  if (old && old.fingerprint !== digest)
-    throw appError(
-      "CONFLICT",
-      "This operation key belongs to different changes",
-    );
-  const limits = await ledger(ctx, orgId);
-  if (!old && limits.requestCount >= 10_000)
-    throw appError("RATE_LIMITED", "Manual operation allowance reached");
-  return { old, digest, limits };
-}
-async function record(
-  ctx: MutationCtx,
-  orgId: string,
-  key: string,
-  admission: Awaited<ReturnType<typeof request>>,
-  ids: Id<"outreachThreads">[],
-) {
-  await ctx.db.insert("outreachRequests", {
-    orgId,
-    requestKey: key,
-    fingerprint: admission.digest,
-    threadIds: ids,
-    createdAt: Date.now(),
-  });
-  await ctx.db.patch(admission.limits._id, {
-    requestCount: admission.limits.requestCount + 1,
-  });
-}
-async function revise(
-  ctx: MutationCtx,
-  principal: Principal,
-  args: Scope & {
-    threadId: Id<"outreachThreads">;
-    expectedRevision: number;
-    idempotencyKey: string;
-  },
-  operation: string,
-  input: unknown,
-) {
-  gate(principal, args);
-  const row = await requireThread(ctx, principal.orgId, args.threadId);
-  const admission = await request(
-    ctx,
-    principal.orgId,
-    args.idempotencyKey,
-    operation,
-    input,
-  );
-  if (
-    !admission.old &&
-    (!Number.isSafeInteger(args.expectedRevision) ||
-      args.expectedRevision !== row.revision ||
-      row.revision >= 1_000_000)
-  )
-    throw appError("CONFLICT", "Conversation changed. Reload before saving.");
-  return { row, admission };
-}
-async function save(
-  ctx: MutationCtx,
-  row: Doc<"outreachThreads">,
-  patch: Partial<Doc<"outreachThreads">>,
-) {
-  await ctx.db.patch(row._id, {
-    ...patch,
-    revision: row.revision + 1,
-    updatedAt: Date.now(),
-  });
-}
+import {
+  scope,
+  revision,
+  gate,
+  requireThread,
+  company,
+  stop,
+  binding,
+  view,
+  request,
+  record,
+  revise,
+  save,
+  checkClock,
+} from "./lib/outreachLedgerStore";
+import {
+  emptyActivity,
+  life,
+  qualifiedAccount,
+} from "./lib/outreachLifecyclePolicy";
 
 export const get = internalTenantQuery({
-  args: { ...scope, threadId: v.id("outreachThreads") },
+  args: {
+    ...scope,
+    threadId: v.id("outreachThreads"),
+    clockBucket: v.optional(v.number()),
+  },
   returns: validators.view,
   handler: async (ctx, args) => {
     gate(ctx.principal, args);
+    if (args.clockBucket !== undefined) checkClock(args.clockBucket);
     return view(
       ctx,
       await requireThread(ctx, ctx.principal.orgId, args.threadId),
@@ -382,6 +140,11 @@ export const start = internalAdminMutation({
           "VALIDATION_ERROR",
           "Fictional demo research cannot establish hosted outreach permission",
         );
+      if (!qualifiedAccount(account) || !p.sourceFacts(account).length)
+        throw appError(
+          "VALIDATION_ERROR",
+          "Choose researched prospects with clear customer-type evidence, without exclusions",
+        );
       if (admission.limits.threadCount + ++added > 100)
         throw appError("RATE_LIMITED", "Conversation allowance reached");
       const key = p.companyKey(account.domain);
@@ -440,6 +203,13 @@ export const start = internalAdminMutation({
         createdBy: ctx.principal.userId,
         createdAt: Date.now(),
         updatedAt: Date.now(),
+        lifecycle: life({ latestInboundId: null }),
+        activity: emptyActivity(),
+        eventCount: 0,
+        bookingLink: "",
+        sourceFacts: p.sourceFacts(account),
+        sourceIsDemo: false,
+        completedReferralIds: [],
       });
       results.push(id);
     }
@@ -458,6 +228,7 @@ export const edit = internalAdminMutation({
     recipient: v.string(),
     subject: v.string(),
     body: v.string(),
+    bookingLink: v.optional(v.string()),
   },
   returns: validators.view,
   handler: async (ctx, args) => {
@@ -476,6 +247,9 @@ export const edit = internalAdminMutation({
         subject: p.line(args.subject, "Subject", 160, true),
         body: args.body.trim() ? text(args.body, "Message", 6000) : "",
         approvalId: null,
+        ...(args.bookingLink !== undefined
+          ? { bookingLink: p.bookingLink(args.bookingLink) }
+          : {}),
         ...(changed
           ? {
               recipientName: "",
@@ -483,6 +257,14 @@ export const edit = internalAdminMutation({
                 ? ("user_entered" as const)
                 : ("missing" as const),
               contactBasis: null,
+              lifecycle: {
+                ...life(row),
+                purpose: row.latestInboundId
+                  ? ("answer" as const)
+                  : ("initial" as const),
+                dueAt: null,
+                dueTimezone: null,
+              },
             }
           : {}),
       });
@@ -531,6 +313,12 @@ export const pause = internalAdminMutation({
           ? row.companyReviewVersion
           : safety.reviewVersion,
         approvalId: null,
+        lifecycle: {
+          ...life(row),
+          purpose: row.latestInboundId ? "answer" : "initial",
+          dueAt: null,
+          dueTimezone: null,
+        },
       });
       if (args.paused && safety.coldOwnerId === row._id)
         await ctx.db.patch(safety._id, { coldOwnerId: undefined });
@@ -562,7 +350,9 @@ export const approve = internalAdminMutation({
         threadId: row._id,
         recipient: row.recipient,
         subject: row.subject,
-        body: row.body,
+        body:
+          row.body +
+          (row.bookingLink ? "\n\nBooking link: " + row.bookingLink : ""),
         basis: row.contactBasis!,
         binding: await binding(
           next,
@@ -573,6 +363,8 @@ export const approve = internalAdminMutation({
         companyVersion: safety.reviewVersion,
         approvedBy: ctx.principal.userId,
         approvedAt: Date.now(),
+        lifecycleSnapshot: life(row),
+        bookingLink: row.bookingLink ?? "",
       });
       if (!row.latestInboundId)
         await ctx.db.patch(safety._id, { coldOwnerId: row._id });
@@ -592,10 +384,15 @@ export const checkManualAction = internalTenantQuery({
   returns: validators.approval,
   handler: async (ctx, args) => {
     gate(ctx.principal, args);
-    const current = await view(
-      ctx,
-      await requireThread(ctx, ctx.principal.orgId, args.threadId),
-    );
+    const row = await requireThread(ctx, ctx.principal.orgId, args.threadId);
+    // Cached queries cannot certify time-bound handoffs. Keep this legacy
+    // untimed read compatible; the full journey uses fresh mutation preflight.
+    if (["cold_followup", "meeting_confirmation"].includes(life(row).purpose))
+      throw appError(
+        "CONFLICT",
+        "Use the fresh manual-action preflight for a timed message",
+      );
+    const current = await view(ctx, row);
     if (
       !current.readyForManualAction ||
       current.thread.revision !== args.expectedRevision ||
@@ -666,11 +463,25 @@ export const reportSent = internalAdminMutation({
         source: "user_reported",
         reportedBy: ctx.principal.userId,
         createdAt: Date.now(),
+        purpose: life(row).purpose,
+        scheduledAt: life(row).dueAt,
+        scheduledTimezone: life(row).dueTimezone,
+        meetingVersion:
+          life(row).purpose === "meeting_confirmation"
+            ? (life(row).meeting?.version ?? null)
+            : null,
       });
       await save(ctx, row, {
         approvalId: null,
         body: "",
         messageCount: row.messageCount + 1,
+        bookingLink: "",
+        lifecycle: {
+          ...life(row),
+          purpose: row.latestInboundId ? "answer" : "initial",
+          dueAt: null,
+          dueTimezone: null,
+        },
       });
       await record(ctx, row.orgId, args.idempotencyKey, admission, [row._id]);
     }
@@ -740,6 +551,13 @@ async function applyReply(
     approvalId: null,
     body: "",
     coldFollowupsStopped: true,
+    bookingLink: "",
+    lifecycle: {
+      ...life(row),
+      purpose: "answer" as const,
+      dueAt: null,
+      dueTimezone: null,
+    },
   };
 }
 export const pasteReply = internalAdminMutation({

@@ -199,6 +199,25 @@ class LocalJourneyTest(unittest.TestCase):
             self.assertEqual(client.post(f'/api/outreach/{thread.id}/meeting-confirmation', json=confirmation).status_code, 409)
             self.assertEqual(self.repo.outreach_thread(thread.id).meeting_recipient, 'hello@business.com')
 
+    def test_future_out_of_office_does_not_hide_an_already_due_meeting_outcome(self):
+        thread = self.ready()
+        with patch('app.outreach.datetime', wraps=datetime) as clock, TestClient(create_app(self.path, testing=True)) as client:
+            clock.now.return_value = datetime(2026, 10, 21, 15, tzinfo=timezone.utc)
+            response = client.post(f'/api/outreach/{thread.id}/meeting', json=dict(**self.fields(thread),
+                meeting_at='2026-10-22T10:00:00-04:00', meeting_timezone='America/Toronto'))
+            self.assertEqual(response.status_code, 200, response.text)
+            thread = self.repo.outreach_thread(thread.id)
+            clock.now.return_value = datetime(2026, 10, 23, 15, tzinfo=timezone.utc)
+            thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread),
+                body='Fictional automatic vacation reply', reply_state='auto_reply',
+                revisit_at='2026-11-03T10:00:00-05:00', revisit_timezone='America/Toronto'))
+            items = client.get('/api/outreach/next-up').json()['items']
+            self.assertEqual([item['action'] for item in items if item['thread_id'] == thread.id], ['report_meeting'])
+            saved = self.repo.outreach_thread(thread.id)
+            self.assertEqual(saved.meeting_state, 'booked_reported', 'A prompt never assumes attendance')
+            self.assertEqual(saved.sale_state, 'not_recorded')
+            self.assertFalse(saved.ready_for_manual_action)
+
     def test_company_funnel_deduplicates_and_preserves_unknown_outcomes_and_tenant_boundary(self):
         from app.store import Repository
         thread = self.ready()

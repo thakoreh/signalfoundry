@@ -67,6 +67,10 @@ async function setup() {
     "fictional_search",
     new Date().toISOString(),
   )[0];
+  // The stricter hosted start now shares the actual local customer-type gate.
+  // Supply explicit fictional company-type evidence; retain all old assertions.
+  seed.score_breakdown = [{ label: "Customer-type language", points: 60, max_points: 60, reason: "Fictional published company identity" }];
+  seed.evidence = seed.evidence.map((e) => ({ ...e, kind: "company" as const, url: "https://example.com/about", excerpt: "Fictional operations business runs a published workflow." }));
   const accounts = ["first", "second"].map((name) => ({
     ...seed,
     id: name,

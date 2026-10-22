@@ -1,5 +1,17 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Active continuation — hosted lifecycle and read-only returning work
+
+Author milestone: full235 backend,155 Convex,135 components,67 Node, type/lint and production webpack build PASS. Actual owned-socket/fresh SQLite HTTP journey also PASS with the new future-OOO plus already-due-meeting overlap asserted; zero paid attempts. New source now needs immutable checkpoint, fresh independent probes and its own required CI, not borrowed c1 green.
+
+Previous turn was concrete progress (new hosted persistence, reproduced/repaired review findings and exact c1affd1 required CI PASS run39701811168); the whole goal remains ACTIVE/INCOMPLETE. Re-read active attachment/current docs and fetched actual clean c1affd1 writer/PR7/main cfd22af before edits. Root remains sole product writer; no account/owner-env/browser/provider/preview/data operations.
+
+Extended default-off INTERNAL hosted logic with strong public customer-type eligibility; fresh credited referrals; max-two dated same-recipient followups; any inbound permanently stops cold work; recipient/version-bound timed meetings/confirmation/outcome audit; honest unique-company activity, next-batch flags/departure and a one-action returning queue. Shared transaction/view helpers moved into lib/outreachLedgerStore.ts without removing registered exports; original43 ledger regressions passed immediately after extraction. Optional schema expansion preserves older records/sent snapshots. Bounded3-row activity repair rebuilds projections from actual history and invalidates rather than restoring approvals. No new dependency/service/queue; public REST remains503.
+
+Critical time rule: query clockBucket is cache invalidation only; actual server time authorizes. New read-only mutation preflight always recomputes timed handoff eligibility without a sent/request/event write. The legacy cached query refuses timed purposes. Caller time can never make a followup due or extend an expired confirmation. Hosted UI/adapter integration and real remote runtime/JWT/cache/OCC evidence remain unaccepted.
+
+New overlapping-state test reproduced RED locally and in hosted code: future OOO snooze hid an already-past meeting outcome. Both queues now show the reported meeting question while contact stays snoozed/unready; unknown attendance/sale stay unknown. Author full235 backend PASS28.103s;155 Convex (43 foundation+36 new lifecycle),135 components,67 Node, typecheck/lint PASS. Initial new-test lint found two prefer-const errors/one unused assignment; corrected declarations/added an assertion without disabling rules. Older fixture setup now supplies explicit fictional customer-type evidence needed by the stronger admission; no assertions were removed/weakened. Production build is running in the owned checkout, then actual HTTP/preflight, checkpoint push and fresh immutable security/spec reviews follow. Full Chrome/hosted privacy/global money/mailbox/operations/whole-release acceptance remain missing.
+
 ## Hosted repair independently reaccepted within offline scope —132831f
 
 Exact application132831f source-checks/container-checks/GitGuardian all PASS, read back from PR and run39701258925 after completion. Current main remains cfd22af; normal branch push only. Final report/manifest-only head must receive separate exact-head CI; this application green is not borrowed for that future commit.

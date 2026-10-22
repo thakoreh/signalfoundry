@@ -156,8 +156,13 @@ def run():
                         'snapshot_key': '0' * 64}, expected=409)
                 past = datetime.now(timezone.utc) - timedelta(hours=1)
                 second = mutate(second, 'meeting', {'meeting_at': past.isoformat(), 'meeting_timezone': 'UTC'})
+                future_return = datetime.now(timezone.utc) + timedelta(days=7)
+                second = mutate(second, 'replies', {'body': 'Fictional automatic vacation reply.', 'reply_state': 'auto_reply',
+                    'revisit_at': future_return.isoformat(), 'revisit_timezone': 'UTC'})
                 queue = request('GET', '/outreach/next-up')['items']
                 assert any(item['thread_id'] == second['id'] and item['action'] == 'report_meeting' for item in queue)
+                assert second['meeting_state'] == 'booked_reported' and second['sale_state'] == 'not_recorded'
+                assert not second['ready_for_manual_action'], 'A due meeting prompt does not resume snoozed contact'
                 second = mutate(second, 'outcomes', {'meeting_state': 'attended_reported', 'sale_state': 'not_recorded'}, 'PATCH')
                 assert second['sale_state'] == 'not_recorded', 'Attendance is not a customer'
                 second = mutate(second, 'outcomes', {'meeting_state': 'attended_reported', 'sale_state': 'won_reported'}, 'PATCH')

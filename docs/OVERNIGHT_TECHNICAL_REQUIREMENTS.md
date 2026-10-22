@@ -4,6 +4,8 @@ Prepared October 19, 2026 from the current repository and its release runbooks. 
 
 Current continuation source/status is docs/continuation/STATUS.md. The shared monetary ledger and optional local reply copilot are now implemented with offline evidence; actual history/pricing/authorization and full integration/Chrome acceptance are still missing. The original starting-truth snapshot below is historical and does not override current source or the owner contract.
 
+Current hosted lifecycle overlay: docs/continuation/HOSTED_LIFECYCLE.md records internal source/offline implementations for referrals, dated followups, meeting/outcome audit, time-safe preflight and returning projections. Public adapter remains503; hosted privacy/shared monetary/UI integration and remote/whole-product acceptance are still unmet.
+
 ## Historical starting truth (October19)
 
 - Next.js is the SaaS gateway; verified Clerk organization identity and Convex are the intended hosted trust/data boundaries. SQLite is an unauthenticated, loopback-only local review system. Never expose it as the SaaS backend.

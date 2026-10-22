@@ -1,5 +1,6 @@
 import type { Infer } from "convex/values";
 import type { Profile } from "../validators";
+import type { WorkerAccount } from "../validators";
 import { contactBasis } from "./outreachLedgerValidators";
 import { appError } from "./errors";
 import { normalizeWebsite, text } from "./validation";
@@ -195,4 +196,35 @@ export function detectedReply(body: string, selected: string) {
   )
     return "source_question";
   return selected;
+}
+export function sourceFacts(account: WorkerAccount) {
+  return account.evidence
+    .flatMap((fact) => {
+      if (
+        fact.is_demo ||
+        !["company", "fit"].includes(fact.kind) ||
+        !fact.excerpt.trim()
+      )
+        return [];
+      try {
+        return [
+          {
+            id: line(fact.id, "Source id", 128),
+            excerpt: text(fact.excerpt.slice(0, 900), "Company fact", 900),
+            url: normalizeWebsite(fact.url),
+            retrievedAt: line(fact.retrieved_at, "Source date", 100, true),
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .slice(0, 5);
+}
+export function bookingLink(value: string) {
+  if (!value.trim()) return "";
+  const result = normalizeWebsite(line(value, "Booking link", 2048));
+  if (!result.startsWith("https://"))
+    throw appError("VALIDATION_ERROR", "Use a public HTTPS booking link");
+  return result;
 }

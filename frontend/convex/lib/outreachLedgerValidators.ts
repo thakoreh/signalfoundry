@@ -40,6 +40,57 @@ export const contactBasis = v.object({
   recipient_timezone: v.union(v.string(), v.null()),
   basis_type: v.literal("conspicuous_publication"),
 });
+export const purpose = v.union(
+  v.literal("initial"),
+  v.literal("answer"),
+  v.literal("cold_followup"),
+  v.literal("meeting_confirmation"),
+);
+export const meetingState = v.union(
+  v.literal("not_recorded"),
+  v.literal("booked_reported"),
+  v.literal("attended_reported"),
+  v.literal("no_show_reported"),
+  v.literal("cancelled_reported"),
+);
+export const saleState = v.union(
+  v.literal("not_recorded"),
+  v.literal("won_reported"),
+  v.literal("lost_reported"),
+);
+export const lifecycle = v.object({
+  purpose,
+  dueAt: v.union(v.number(), v.null()),
+  dueTimezone: v.union(v.string(), v.null()),
+  meeting: v.union(
+    v.object({
+      at: v.number(),
+      timezone: v.string(),
+      version: v.number(),
+      recipient: v.string(),
+      state: meetingState,
+    }),
+    v.null(),
+  ),
+  sale: saleState,
+});
+export const activity = v.object({
+  outboundCount: v.number(),
+  coldFollowupsSent: v.number(),
+  hadInbound: v.boolean(),
+  initialRecipient: v.union(v.string(), v.null()),
+  lastOutboundAt: v.union(v.number(), v.null()),
+  lastOutboundRecipient: v.union(v.string(), v.null()),
+  lastInboundRecipient: v.union(v.string(), v.null()),
+  answeredInboundId: v.union(v.id("outreachMessages"), v.null()),
+  confirmedMeetingVersions: v.array(v.number()),
+});
+export const sourceFact = v.object({
+  id: v.string(),
+  excerpt: v.string(),
+  url: v.string(),
+  retrievedAt: v.string(),
+});
 export const threadFields = {
   orgId: v.string(),
   searchId: v.id("customerSearches"),
@@ -69,6 +120,21 @@ export const threadFields = {
   createdBy: v.string(),
   createdAt: v.number(),
   updatedAt: v.number(),
+  // Optional expansion for existing foundation rows. No historical snapshots change.
+  lifecycle: v.optional(lifecycle),
+  activity: v.optional(activity),
+  eventCount: v.optional(v.number()),
+  bookingLink: v.optional(v.string()),
+  sourceFacts: v.optional(v.array(sourceFact)),
+  sourceIsDemo: v.optional(v.boolean()),
+  referral: v.optional(
+    v.object({
+      threadId: v.id("outreachThreads"),
+      messageId: v.id("outreachMessages"),
+      referrerName: v.string(),
+    }),
+  ),
+  completedReferralIds: v.optional(v.array(v.id("outreachMessages"))),
 };
 export const thread = v.object({
   _id: v.id("outreachThreads"),
@@ -87,6 +153,8 @@ export const approvalFields = {
   companyVersion: v.number(),
   approvedBy: v.string(),
   approvedAt: v.number(),
+  lifecycleSnapshot: v.optional(lifecycle),
+  bookingLink: v.optional(v.string()),
 };
 export const approval = v.object({
   _id: v.id("outreachApprovals"),
@@ -107,7 +175,33 @@ export const messageFields = {
   source: v.literal("user_reported"),
   reportedBy: v.string(),
   createdAt: v.number(),
+  purpose: v.optional(purpose),
+  scheduledAt: v.optional(v.union(v.number(), v.null())),
+  scheduledTimezone: v.optional(v.union(v.string(), v.null())),
+  meetingVersion: v.optional(v.union(v.number(), v.null())),
 };
+export const eventFields = {
+  orgId: v.string(),
+  threadId: v.id("outreachThreads"),
+  kind: v.union(
+    v.literal("followup_planned"),
+    v.literal("meeting_reported"),
+    v.literal("outcome_reported"),
+  ),
+  at: v.number(),
+  reportedBy: v.string(),
+  source: v.literal("user_reported"),
+  scheduledAt: v.union(v.number(), v.null()),
+  timezone: v.union(v.string(), v.null()),
+  meetingVersion: v.union(v.number(), v.null()),
+  meetingState: v.union(meetingState, v.null()),
+  saleState: v.union(saleState, v.null()),
+};
+export const event = v.object({
+  _id: v.id("outreachEvents"),
+  _creationTime: v.number(),
+  ...eventFields,
+});
 export const message = v.object({
   _id: v.id("outreachMessages"),
   _creationTime: v.number(),
@@ -124,4 +218,5 @@ export const view = v.object({
   suppressed: v.boolean(),
   invalidRecipient: v.boolean(),
   reviewDue: v.boolean(),
+  events: v.array(event),
 });

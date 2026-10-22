@@ -570,9 +570,11 @@ class OutreachStore:
             latest_inbound = max(inbound_indexes, default=-1)
             latest_outbound = max(outbound_indexes, default=-1)
             inbound = latest_inbound >= 0
-            if thread.reply_state in ('not_now', 'auto_reply') and thread.revisit_at and not thread.review_due:
+            meeting_due = thread.meeting_state == 'booked_reported' and (not thread.meeting_at or datetime.fromisoformat(thread.meeting_at) <= datetime.now(timezone.utc))
+            # Snoozing contact does not defer reporting a meeting already past.
+            if not meeting_due and thread.reply_state in ('not_now', 'auto_reply') and thread.revisit_at and not thread.review_due:
                 continue
-            if thread.meeting_state == 'booked_reported' and (not thread.meeting_at or datetime.fromisoformat(thread.meeting_at) <= datetime.now(timezone.utc)):
+            if meeting_due:
                 priority, action, reason = 2, 'report_meeting', 'Report what happened, or repair a missing meeting date. Unknown stays unknown.'
             elif thread.next_followup_at and datetime.fromisoformat(thread.next_followup_at) <= datetime.now(timezone.utc) and not inbound and not thread.paused and not thread.suppressed and not thread.company_conflict:
                 priority, action, reason = 2, 'review_followup', 'Any reply since your last send? Check your inbox, then review this due reminder. Nothing sends automatically.'
