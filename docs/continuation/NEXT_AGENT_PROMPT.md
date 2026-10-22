@@ -6,6 +6,8 @@ CURRENT OVERLAY: source has advanced beyond the original c929 handoff. Read the 
 
 ## Repository and first actions
 
+Latest hosted overlay: internal default-off Convex manual-ledger prerequisites now exist, including tenant/admin/expected-org, immutable exact approval/actual-sent, sticky suppression, company decision and manual reply/date controls. HOSTED_LEDGER.md gives exact scope. This is not complete parity; do not open REST outreach yet. Hosted lifecycle/referrals/projections/privacy and global local/hosted monetary coordination still need code. Local reply suggestion logic is built/offline reviewed, still default off and unaccepted live. Check current immutable review/repair state at the top of PROGRESS before reusing earlier findings or green CI.
+
 - Repository: https://github.com/thakoreh/signalfoundry
 - Continue branch `codex/clientrove-release-candidate` and existing draft PR #7: https://github.com/thakoreh/signalfoundry/pull/7.
 - Last application-code checkpoint is `c929cbaf0019909ff21bce3633f25842cf67c281`. Handoff documentation is in later commits. Fetch and inspect the ACTUAL current HEAD, status, worktrees, origin/main and PR before changing anything.

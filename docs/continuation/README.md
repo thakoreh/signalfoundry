@@ -6,6 +6,8 @@ Current continuation overlay: local referrals, bounded followups, timed meetings
 
 Read RELEASE_HANDOFF.md first for the current verdict, human inputs, exact tested source/checks and remaining acceptance limits.
 
+Hosted continuation now has internal, default-off manual-ledger prerequisites, described in HOSTED_LEDGER.md. It is partial implementation only; the hosted REST adapter remains unavailable. Local reply copilot remains separately default-off. Neither source feature implies live/provider/browser or whole-product acceptance. Preserve old reports and consult the latest PROGRESS/STATUS rather than rebuilding accepted local work.
+
 ## Start here
 
 1. [NEXT_AGENT_PROMPT.md](NEXT_AGENT_PROMPT.md): copy/paste instructions for the next coding agent.
