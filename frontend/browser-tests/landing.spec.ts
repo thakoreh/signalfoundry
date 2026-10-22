@@ -45,17 +45,19 @@ test("responsive landing sells the journey without dashboard content or overflow
   await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
   await noOverflow(page);
   const preview = page.getByRole("region", {
-    name: "Turn what you do into a reason to talk.",
+    name: "Illustrated customer journey",
   });
   await expect(preview).toBeVisible();
-  await expect(preview.locator("ol > li")).toHaveCount(4);
-  await expect(preview.getByRole("heading", { level: 4 })).toHaveCount(4);
+  await expect(preview.locator("ol > li")).toHaveCount(3);
+  await expect(preview.locator(".sf-tour-story button")).toHaveCount(3);
   await expect(preview.getByRole("table")).toHaveCount(0);
-  await expect(preview).toContainText(
+  await expect(page.locator(".sf-tour-under-note")).toContainText(
     "You approve every message. You send from your own email tool.",
   );
   await expect(preview).toContainText("saved company facts");
-  await expect(preview).toContainText("Record replies and meetings");
+  await expect(preview).toContainText(
+    "Record replies, prepare your next message",
+  );
   await expect(page.getByRole("tab")).toHaveCount(0);
   const before = await preview.boundingBox();
   await page.clock.install();
@@ -101,6 +103,43 @@ test("website validation is keyboard-accessible and never analyzes invalid input
   await website.fill("example.com");
   await expect(validationAlert).toHaveCount(0);
   await expect(website).toHaveAttribute("aria-invalid", "false");
+});
+
+test("illustration controls work by keyboard without hiding the sales story or making API requests", async ({
+  page,
+}) => {
+  await openLanding(page);
+  const requests: string[] = [];
+  page.on("request", (request) => {
+    if (/\/api\//.test(request.url())) requests.push(request.url());
+  });
+  const journey = page.getByRole("region", {
+    name: "Illustrated customer journey",
+  });
+  const next = journey.getByRole("button", {
+    name: "Next journey illustration",
+  });
+  await next.focus();
+  await next.press("Enter");
+  await expect(next).toBeFocused();
+  await expect(journey.locator(".sf-illustration-message")).toBeVisible();
+  await expect(journey.getByRole("status")).toContainText(
+    "Illustration 2 of 3",
+  );
+  await next.press("Enter");
+  await expect(journey.locator(".sf-illustration-conversation")).toBeVisible();
+  await next.press("Enter");
+  await expect(journey.locator(".sf-illustration-buyers")).toBeVisible();
+  await journey
+    .getByRole("button", { name: "Previous journey illustration" })
+    .click();
+  await expect(journey.locator(".sf-illustration-conversation")).toBeVisible();
+  await journey.locator(".sf-tour-story button").nth(1).click();
+  await expect(journey.locator(".sf-illustration-message")).toBeVisible();
+  for (const paragraph of await journey.locator(".sf-tour-copy").all())
+    await expect(paragraph).toBeVisible();
+  expect(requests).toEqual([]);
+  await noOverflow(page);
 });
 
 test("native anchors preserve history and reach intended sections", async ({
@@ -171,14 +210,14 @@ test("legal and contact routes remain reachable", async ({ page }) => {
   }
 });
 
-test("motion is finite and reduced motion retains the complete page", async ({
+test("hero motion is finite and sustained illustrations have pause and reduced-motion controls", async ({
   page,
   browser,
   baseURL,
 }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await openLanding(page);
-  const animationPolicies = await page.locator(".sf-landing").evaluate((root) =>
+  const animationPolicies = await page.locator(".sf-hero").evaluate((root) =>
     [...root.querySelectorAll("*")]
       .flatMap((element) =>
         [null, "::before", "::after"].map((pseudo) => {
@@ -200,12 +239,58 @@ test("motion is finite and reduced motion retains the complete page", async ({
       5,
     );
   }
+  const loopingMotion = await page.locator(".sf-landing").evaluate((root) =>
+    [...root.querySelectorAll("*")].flatMap((element) =>
+      [null, "::before", "::after"].flatMap((pseudo) => {
+        const style = getComputedStyle(element, pseudo);
+        return style.animationIterationCount.includes("infinite")
+          ? [
+              {
+                controlled: Boolean(element.closest(".sf-motion-root")),
+                name: style.animationName,
+              },
+            ]
+          : [];
+      }),
+    ),
+  );
+  expect(loopingMotion.length).toBeGreaterThan(0);
+  for (const animation of loopingMotion)
+    expect(animation.controlled, animation.name).toBe(true);
+  const pause = page.getByRole("button", {
+    name: "Pause page motion",
+    exact: true,
+  });
+  await expect(pause).toBeVisible();
+  await pause.click();
+  await expect(page.locator(".sf-benefit-track")).toHaveCSS(
+    "animation-play-state",
+    "paused",
+  );
+  await expect(page.locator(".sf-buyer-chip").first()).toHaveCSS(
+    "animation-play-state",
+    "paused",
+  );
+  await page
+    .getByRole("button", { name: "Resume page motion", exact: true })
+    .click();
+  await expect(page.locator(".sf-benefit-track")).toHaveCSS(
+    "animation-play-state",
+    "running",
+  );
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(
+    page.getByRole("button", { name: "Motion reduced by system preference" }),
+  ).toBeDisabled();
+  await expect(page.locator(".sf-benefit-track")).toHaveCSS(
+    "animation-name",
+    "none",
+  );
   await expect(page.locator(".sf-analyze-button")).toHaveCSS(
     "transition-duration",
     "0s",
   );
-  await expect(page.locator(".sf-story-stages > li").first()).toHaveCSS(
+  await expect(page.locator(".sf-buyer-chip").first()).toHaveCSS(
     "animation-name",
     "none",
   );
@@ -218,7 +303,8 @@ test("motion is finite and reduced motion retains the complete page", async ({
   const noJs = await context.newPage();
   try {
     await openLanding(noJs);
-    await expect(noJs.locator(".sf-story-stages > li")).toHaveCount(4);
+    await expect(noJs.locator(".sf-tour-story > li")).toHaveCount(3);
+    await expect(noJs.locator(".sf-tour-copy")).toHaveCount(3);
     await noJs.locator(".sf-faq-list summary").first().click();
     await expect(
       noJs.locator(".sf-faq-list details").first().locator("p"),
@@ -243,11 +329,10 @@ test("small screens keep the selling story readable and the website action reach
     ["#business-website", 16],
     [".sf-manual-option", 14],
     [".sf-intake-hint", 12],
-    [".sf-story-stages h4", 18],
-    [".sf-story-stages p", 14],
-    [".sf-story-note", 12],
-    [".sf-steps p", 14],
-    [".sf-value-grid p", 14],
+    [".sf-tour-step-content strong", 18],
+    [".sf-tour-copy", 14],
+    [".sf-tour-under-note", 12],
+    [".sf-momentum-copy > p:not(.sf-kicker)", 14],
     [".sf-faq-list summary", 14],
   ] as const) {
     const size = await page
@@ -257,7 +342,7 @@ test("small screens keep the selling story readable and the website action reach
     expect(size, selector).toBeGreaterThanOrEqual(minimum);
   }
   const preview = page.getByRole("region", {
-    name: "Turn what you do into a reason to talk.",
+    name: "Illustrated customer journey",
   });
   await preview.scrollIntoViewIfNeeded();
   expect(
