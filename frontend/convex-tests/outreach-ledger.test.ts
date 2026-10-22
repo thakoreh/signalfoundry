@@ -923,6 +923,139 @@ describe("internal hosted manual-ledger prerequisites (offline; REST stays close
       "",
     );
   });
+  it.each([
+    {},
+    { sender_name: "", mailing_address: "", sender_contact: "" },
+    {
+      sender_name: "Invented worker sender",
+      mailing_address: "Invented worker address",
+      sender_contact: "invented@example.com",
+    },
+  ])(
+    "website analysis preserves founder-entered identity regardless of worker identity fields %j",
+    async (workerIdentity) => {
+      const s = await setup();
+      const row = await approved(s);
+      const lease = await s.admin.mutation(internal.workspaces.beginAnalyze, {
+        orgId: identity.org_id,
+      });
+      const result = await s.admin.mutation(internal.workspaces.finishAnalyze, {
+        orgId: identity.org_id,
+        ...lease,
+        website: "https://example.com",
+        profile: { ...DEMO_PROFILE, ...workerIdentity },
+      });
+      expect(result.profile).toMatchObject({
+        sender_name: profile.sender_name,
+        mailing_address: profile.mailing_address,
+        sender_contact: profile.sender_contact,
+      });
+      expect((await get(s, row)).approval).toBeNull();
+    },
+  );
+  it("website analysis cannot establish an unsaved sender identity from worker claims", async () => {
+    const s = await setup();
+    await s.t.run(async (ctx) => {
+      const workspace = (await ctx.db.query("workspaces").take(1))[0];
+      await ctx.db.patch(workspace._id, { profile: DEMO_PROFILE });
+    });
+    const lease = await s.admin.mutation(internal.workspaces.beginAnalyze, {
+      orgId: identity.org_id,
+    });
+    const result = await s.admin.mutation(internal.workspaces.finishAnalyze, {
+      orgId: identity.org_id,
+      ...lease,
+      website: "https://example.com",
+      profile,
+    });
+    expect(result.profile?.sender_name).toBeUndefined();
+    expect(result.profile?.mailing_address).toBeUndefined();
+    expect(result.profile?.sender_contact).toBeUndefined();
+    expect((await get(s, s.initial)).senderFooter).toBe("");
+    const repaired = await prepare(s, await get(s, s.initial));
+    await expect(
+      s.admin.mutation(internal.outreachLedger.approve, revision(repaired)),
+    ).rejects.toThrow("sender");
+  });
+  it("does not let inflight analysis overwrite a newer founder identity edit", async () => {
+    const s = await setup();
+    const lease = await s.admin.mutation(internal.workspaces.beginAnalyze, {
+      orgId: identity.org_id,
+    });
+    await s.admin.mutation(api.workspaces.saveProfile, {
+      profile: { ...profile, sender_name: "Updated fictional founder" },
+    });
+    await expect(
+      s.admin.mutation(internal.workspaces.finishAnalyze, {
+        orgId: identity.org_id,
+        ...lease,
+        website: "https://example.com",
+        profile: DEMO_PROFILE,
+      }),
+    ).rejects.toThrow("changes were preserved");
+    expect(
+      (await s.admin.query(api.workspaces.get, {}))?.profile?.sender_name,
+    ).toBe("Updated fictional founder");
+  });
+  it("tries valid alternate saved contacts instead of hiding them behind one invalid address", async () => {
+    const s = await setup();
+    await s.t.run((ctx) =>
+      ctx.db.patch(s.searchId, {
+        accounts: s.accounts.map((a) => ({
+          ...a,
+          contacts: [
+            { ...a.contacts[1], email: "bad@@example.com" },
+            { ...a.contacts[1], email: "valid.person@example.com" },
+            { ...a.contacts[0], email: "info@example.com" },
+          ],
+        })),
+      }),
+    );
+    const row = await sibling(s);
+    expect(row.thread.recipient).toBe("valid.person@example.com");
+    expect(row.thread.recipientStatus).toBe("published_unverified");
+    expect(row.thread.contactBasis).toBeNull();
+    const invalidOnly = {
+      ...s.accounts[0],
+      id: "third_invalid",
+      contacts: s.accounts[0].contacts.map((c) => ({
+        ...c,
+        email: "bad@@example.com",
+      })),
+    };
+    await s.t.run((ctx) =>
+      ctx.db.patch(s.searchId, { accounts: [...s.accounts, invalidOnly] }),
+    );
+    const [missing] = await s.admin.mutation(internal.outreachLedger.start, {
+      ...scope,
+      searchId: s.searchId,
+      accountIds: [invalidOnly.id],
+      idempotencyKey: key(),
+    });
+    expect(missing.thread.recipient).toBe("");
+    expect(missing.thread.recipientStatus).toBe("missing");
+    expect(missing.readyForManualAction).toBe(false);
+  });
+  it("requires a named IANA zone even when Intl supports offset-only zone strings", async () => {
+    const s = await setup();
+    for (const zone of ["-05:00", "+00:00", "+05:30"]) {
+      await expect(
+        s.admin.mutation(internal.outreachLedger.pasteReply, {
+          ...revision(s.initial),
+          body: "Future return (fictional)",
+          replyState: "auto_reply",
+          revisitAt: `2026-11-03T10:00:00${zone}`,
+          revisitTimezone: zone,
+        }),
+      ).rejects.toThrow("IANA");
+    }
+    expect(zonedInstant("2026-11-03T10:00:00Z", "UTC")).toBe(
+      Date.parse("2026-11-03T10:00:00Z"),
+    );
+    expect(zonedInstant("2026-11-03T10:00:00-05:00", "Etc/GMT+5")).toBe(
+      Date.parse("2026-11-03T15:00:00Z"),
+    );
+  });
   it("preserves omitted sender identity on old-client saves while explicit clearing invalidates approval", async () => {
     const s = await setup();
     const row = await approved(s);

@@ -80,6 +80,10 @@ export function awareInstant(value: string) {
 }
 export function timezone(value: string) {
   line(value, "Timezone", 100);
+  // Newer Intl runtimes also accept raw numeric offsets. Those are not the
+  // separate IANA zone required to check the original wall time across DST.
+  if (!/^[A-Za-z][A-Za-z0-9._+-]*(?:\/[A-Za-z0-9._+-]+)*$/.test(value))
+    throw appError("VALIDATION_ERROR", "Use a named IANA timezone");
   try {
     new Intl.DateTimeFormat("en-US", { timeZone: value }).format(0);
   } catch {

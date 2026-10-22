@@ -402,17 +402,19 @@ export const start = internalAdminMutation({
       const shared =
         /^(info|hello|support|sales|contact|admin|office|team|enquiries|inquiries)@/i;
       const contacts = account.contacts
-        .filter((c) => c.email)
+        .flatMap((contact) => {
+          try {
+            const address = p.email(contact.email ?? "", true);
+            return address ? [{ ...contact, email: address }] : [];
+          } catch {
+            return [];
+          } // A malformed candidate cannot hide valid alternates.
+        })
         .sort(
           (a, b) =>
             Number(shared.test(a.email!)) - Number(shared.test(b.email!)),
         );
-      let recipient = "";
-      try {
-        recipient = p.email(contacts[0]?.email ?? "", true);
-      } catch {
-        /* A bad saved address is not a sendable contact. */
-      }
+      const recipient = contacts[0]?.email ?? "";
       const id = await ctx.db.insert("outreachThreads", {
         orgId,
         searchId: search._id,
