@@ -10,7 +10,7 @@
   margin-bottom: 16px;
 }
 .sf-pipeline-caption {
-  color: #5f7465;
+  color: var(--muted);
   font-size: 11px;
 }
 .sf-pipeline-steps {
@@ -25,27 +25,27 @@
   position: relative;
   min-width: 0;
   padding: 24px 20px;
-  border: 1px solid #dce6d9;
+  border: 1px solid var(--line);
   border-radius: 17px;
   background: #fff;
-  box-shadow: 0 6px 20px #244d3905;
+  box-shadow: 0 6px 20px #25223805;
 }
 .sf-pipeline-icon {
   display: grid;
   place-items: center;
   height: 43px;
   width: 43px;
-  background: #edf5eb;
-  border: 1px solid #dfeadb;
+  background: var(--surface-tint);
+  border: 1px solid var(--line);
   border-radius: 12px;
-  color: #376d4c;
+  color: var(--ink);
   margin-bottom: 20px;
 }
 .sf-pipeline-number {
   position: absolute;
   top: 27px;
   right: 19px;
-  color: #718573;
+  color: var(--muted);
   font-size: 10px;
   letter-spacing: 1px;
 }
@@ -58,7 +58,7 @@
 .sf-pipeline-detail {
   display: block;
   font-size: 12px;
-  color: #5f7465;
+  color: var(--muted);
   line-height: 1.7;
   margin-top: 5px;
 }
@@ -68,7 +68,7 @@
   top: 45px;
   width: 27px;
   height: 2px;
-  background: #d3e1ce;
+  background: var(--surface-tint);
   overflow: hidden;
   z-index: 1;
 }
@@ -76,8 +76,8 @@
   display: block;
   width: 13px;
   height: 2px;
-  background: #3c805a;
-  box-shadow: 0 0 5px #6aab7d;
+  background: var(--brand-soft);
+  box-shadow: 0 0 5px var(--line);
   transform: translateX(-15px);
 }
 .sf-pipeline-steps[data-flow-running="true"] .sf-pipeline-connector span {
@@ -94,7 +94,7 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  color: #607264;
+  color: var(--ink);
   font-size: 11px;
   line-height: 1.8;
   margin: 19px 0 0;

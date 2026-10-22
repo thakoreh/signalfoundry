@@ -1,3 +1,7 @@
+## Latest owner scope — native shader poster and shared theme
+
+The owner authorized real OGL Flowmap distortion and Paper GrainGradient on a meaningful landing poster, plus a consistent pearl/lilac/ink site theme. This supersedes the earlier cream/green styling only. Read [SHADER_THEME.md](SHADER_THEME.md). The broad release goal stays paused; outreach remains manual/disconnected. Current shader code passes187 component cases, types and focused lint; build and fresh Chrome visual acceptance are pending. Historical passes below do not apply automatically.
+
 # Historical local implementation decisions
 
 **October22 owner feedback supersedes home composition below:** the broad goal is paused; owner requested removing returning-work/Next up, Saved conversations and local-data panels from home in favor of one minimal activity dashboard. Existing storage/projections are preserved; Settings retains data controls. Customer rows prepare their exact selected Review thread. This does not authorize sending. See WORKSPACE_FEEDBACK.md. Latest mailbox requirement excludes customers' main inboxes; Instantly/separate sending accounts are under research, not chosen or connected. No actual engine implementation until a permitted affordable provider decision; US25includes unknown DeepSeek history. Historical Next up-as-home wording is not a reason to restore the removed panels.

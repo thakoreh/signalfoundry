@@ -26,6 +26,11 @@ export default async function RootLayout({
     : null;
   return (
     <html lang="en">
+      <head>
+        {/* Paper's style marker prevents nonce-less runtime style insertion.
+            All actual shader surface styles are in the bundled stylesheets. */}
+        <style data-paper-shader nonce={nonce ?? undefined} />
+      </head>
       <body>
         {origin && nonce ? (
           <script
@@ -38,6 +43,18 @@ export default async function RootLayout({
           <SetupState issues={config.issues} />
         ) : config.mode === "saas" ? (
           <ClerkProvider
+            appearance={{
+              variables: {
+                colorPrimary: "var(--brand-primary)",
+                colorForeground: "var(--ink)",
+                colorBackground: "var(--white)",
+                colorInput: "var(--white)",
+                colorMutedForeground: "var(--muted)",
+                colorBorder: "var(--line)",
+                fontFamily: "var(--font)",
+                borderRadius: "10px",
+              },
+            }}
             dynamic
             signInUrl="/sign-in"
             signUpUrl="/sign-up"

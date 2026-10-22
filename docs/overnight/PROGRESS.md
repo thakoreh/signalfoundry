@@ -1,3 +1,7 @@
+## October 22 shader/theme milestone — source checks pass, rendered QA pending
+
+Owner explicitly requested real OGL Flowmap poster distortion plus Paper GrainGradient and a consistent whole-site theme. Scope/roles/boundaries: docs/continuation/SHADER_THEME.md. Broad goal stays paused. Changed only frontend visual code, pinned two libraries, and added 13 lifecycle cases. Current commands: full Vitest landing 187/187 PASS; nonincremental tsc PASS; focused ESLint PASS. No paid/provider/send/account/deploy/main action. Chrome reconnect now succeeds; production build and fresh desktop/phone verification are next. Do not reuse the earlier component-polish screenshots as shader proof.
+
 # CURRENT: portable continuation handoff — 2026-10-21
 
 ## October22 component polish — final contrast recheck complete

@@ -11,8 +11,8 @@ export function GET() {
         width: "100%",
         height: "100%",
         padding: "90px",
-        background: "#f5f8f4",
-        color: "#173b30",
+        background: "#f8f7fb",
+        color: "#252238",
         fontFamily: "sans-serif",
       }}
     >
@@ -27,7 +27,7 @@ export function GET() {
         }}
       >
         <svg width="40" height="44" viewBox="0 0 40 44">
-          <g fill="#17664c" transform="translate(2 5) skewY(-14)">
+          <g fill="#6652b5" transform="translate(2 5) skewY(-14)">
             <rect y="21" width="8" height="17" rx="2" opacity=".48" />
             <rect x="13" y="12" width="8" height="26" rx="2" opacity=".7" />
             <rect x="26" width="8" height="38" rx="2" />
@@ -46,7 +46,7 @@ export function GET() {
       >
         Find businesses that need what you sell.
       </div>
-      <div style={{ marginTop: "28px", fontSize: "27px", color: "#536a60" }}>
+      <div style={{ marginTop: "28px", fontSize: "27px", color: "#646073" }}>
         Start with your website. Build a list you can act on.
       </div>
     </div>,

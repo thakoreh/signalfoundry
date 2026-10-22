@@ -3,7 +3,7 @@
   width: min(1120px, 100%);
   margin: 0 auto;
   padding: 28px 8px;
-  color: var(--forest, #173e32);
+  color: var(--forest, var(--ink));
   overflow-wrap: anywhere;
 }
 .outreach-dashboard-header,
@@ -21,7 +21,7 @@
   margin: 12px 0;
 }
 .outreach-dashboard-header p {
-  color: #647065;
+  color: var(--ink);
   margin: 0;
   font-size: 16px;
 }
@@ -33,7 +33,7 @@
 }
 .outreach-connection {
   font-size: 13px;
-  color: #637266;
+  color: var(--ink);
   margin: 26px 0 20px;
 }
 .outreach-dashboard-stats {
@@ -44,13 +44,13 @@
 }
 .outreach-dashboard-stats > div {
   background: white;
-  border: 1px solid #dce4d8;
+  border: 1px solid var(--line);
   border-radius: 16px;
   padding: 20px;
 }
 .outreach-dashboard-stats dt {
   font-size: 14px;
-  color: #657061;
+  color: var(--ink);
 }
 .outreach-dashboard-stats dd {
   font-size: 36px;
@@ -74,23 +74,23 @@
   border: 1px solid transparent;
   background: transparent;
   border-radius: 8px;
-  color: #4b6452;
+  color: var(--ink);
   padding: 10px 14px;
   min-height: 44px;
   cursor: pointer;
 }
 .outreach-dashboard-filters [aria-pressed="true"] {
-  background: #e7eedf !important;
-  border-color: #c9d7be !important;
-  color: #213f2e !important;
+  background: var(--surface-tint) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
 }
 .outreach-dashboard-search input {
   max-width: 100%;
-  border: 1px solid #d3ddce;
+  border: 1px solid var(--line);
   border-radius: 9px;
   padding: 12px;
   background: white;
-  color: #173e32;
+  color: var(--ink);
   font: inherit;
 }
 .outreach-dashboard-activity {
@@ -98,7 +98,7 @@
   padding: 0;
   margin: 0;
   background: white;
-  border: 1px solid #dbe3d7;
+  border: 1px solid var(--line);
   border-radius: 16px;
 }
 .outreach-dashboard-activity li {
@@ -107,39 +107,39 @@
   align-items: center;
   gap: 20px;
   padding: 20px;
-  border-bottom: 1px solid #e7ece3;
+  border-bottom: 1px solid var(--line);
 }
 .outreach-dashboard-activity li:last-child {
   border-bottom: 0;
 }
 .outreach-dashboard-activity li > div > span {
   display: block;
-  color: #657061;
+  color: var(--ink);
   font-size: 13px;
   margin-top: 5px;
 }
 .outreach-dashboard-state {
   font-size: 13px;
-  color: #4f6352;
+  color: var(--ink);
 }
 .outreach-dashboard-empty {
   padding: 40px 20px;
   text-align: center;
   background: white;
-  border: 1px dashed #cfdbc6;
+  border: 1px dashed var(--line);
   border-radius: 16px;
 }
 .outreach-dashboard-empty h3 {
   font-size: 19px;
 }
 .outreach-dashboard-empty p {
-  color: #637161;
+  color: var(--ink);
   line-height: 1.6;
 }
 .outreach-dashboard-details {
   margin-top: 20px;
   font-size: 13px;
-  color: #5c6d5e;
+  color: var(--ink);
   line-height: 1.6;
 }
 .outreach-dashboard-details summary {
@@ -149,7 +149,7 @@
 .outreach-dashboard button:focus-visible,
 .outreach-dashboard a:focus-visible,
 .outreach-dashboard input:focus-visible {
-  outline: 3px solid #487e56;
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 .workspace-settings h1 {

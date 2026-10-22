@@ -19,19 +19,25 @@ function subscribeVisibility(callback: () => void) {
   return () => document.removeEventListener("visibilitychange", callback);
 }
 
-const MotionContext = createContext({
+const fallbackMotion = {
   paused: false,
   reduced: true,
   pageVisible: true,
   motionAllowed: false,
   togglePause: () => {},
-});
+};
+const MotionContext = createContext<typeof fallbackMotion | null>(null);
 
 export function useLandingMotion() {
-  return useContext(MotionContext);
+  return useContext(MotionContext) ?? fallbackMotion;
 }
 
 export function LandingMotionProvider({ children }: { children: ReactNode }) {
+  const parent = useContext(MotionContext);
+  return parent ? children : <LandingMotionRoot>{children}</LandingMotionRoot>;
+}
+
+function LandingMotionRoot({ children }: { children: ReactNode }) {
   const [paused, setPaused] = useState(false);
   const reduced = useSyncExternalStore(
     subscribeMotion,

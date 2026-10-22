@@ -3,12 +3,12 @@
   max-width: 1100px;
   margin: 30px auto 70px;
   padding: 0 28px;
-  color: #294b27;
+  color: var(--ink);
   min-width: 0;
 }
 .outreach-back {
   font-size: 14px;
-  color: #536b4c;
+  color: var(--ink);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -27,13 +27,13 @@
 .outreach-heading p {
   font-size: 15px;
   line-height: 1.8;
-  color: #66775f;
+  color: var(--muted);
   max-width: 650px;
 }
 .outreach-steps {
   display: flex;
   gap: 8px;
-  border-bottom: 1px solid #dae3d3;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 24px;
 }
 .outreach-workspace button {
@@ -41,10 +41,10 @@
   cursor: pointer;
   font: inherit;
   font-size: 14px;
-  border: 1px solid #d7e1ce;
+  border: 1px solid var(--line);
   background: #fff;
   border-radius: 8px;
-  color: #37562e;
+  color: var(--ink);
   padding: 10px 14px;
 }
 .outreach-workspace button:disabled {
@@ -55,7 +55,7 @@
 .outreach-workspace input:focus-visible,
 .outreach-workspace textarea:focus-visible,
 .outreach-workspace select:focus-visible {
-  outline: 2px solid #75955f;
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 .outreach-steps button {
@@ -66,8 +66,8 @@
   border-bottom: 3px solid transparent;
 }
 .outreach-steps button[aria-current] {
-  border-bottom-color: #719a51;
-  color: #2c4f24;
+  border-bottom-color: var(--brand-accent);
+  color: var(--ink);
   font-weight: 600;
 }
 .outreach-layout {
@@ -77,7 +77,7 @@
   align-items: start;
 }
 .outreach-leads {
-  border: 1px solid #dce4d5;
+  border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
   background: #fff;
@@ -91,15 +91,15 @@
   width: 100%;
   border: 0;
   border-radius: 0;
-  border-bottom: 1px solid #e3e9dd;
+  border-bottom: 1px solid var(--line);
   padding: 16px;
 }
 .outreach-leads .outreach-lead:last-child {
   border-bottom: 0;
 }
 .outreach-lead[aria-pressed="true"] {
-  background: #eef4e7;
-  box-shadow: inset 3px 0 #7b9b62;
+  background: var(--surface-tint);
+  box-shadow: inset 3px 0 var(--line);
 }
 .outreach-lead strong {
   font-size: 15px;
@@ -107,12 +107,12 @@
 .outreach-lead span,
 .outreach-lead small {
   font-size: 12px;
-  color: #67775f;
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 .outreach-editor {
   min-width: 0;
-  border: 1px solid #dce4d5;
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;
   padding: 26px;
@@ -122,7 +122,7 @@
   align-items: start;
   justify-content: space-between;
   gap: 15px;
-  border-bottom: 1px solid #e3e9dd;
+  border-bottom: 1px solid var(--line);
   padding-bottom: 18px;
   margin-bottom: 20px;
 }
@@ -133,7 +133,7 @@
 }
 .outreach-company p {
   font-size: 13px;
-  color: #6a795f;
+  color: var(--muted);
   overflow-wrap: anywhere;
   margin: 0;
 }
@@ -144,18 +144,18 @@
   align-items: center;
   margin: 0 0 22px;
   padding: 14px 16px;
-  border: 1px solid #cfddc8;
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: #f4f8ef;
+  background: var(--paper);
 }
 .outreach-next-action strong {
   display: block;
-  color: #2c5127;
+  color: var(--ink);
   font-size: 13px;
 }
 .outreach-next-action p {
   margin-top: 5px;
-  color: #60705a;
+  color: var(--ink);
   font-size: 12px;
   line-height: 1.65;
 }
@@ -163,7 +163,7 @@
   min-height: 44px;
   display: inline-flex;
   align-items: center;
-  color: #41663a;
+  color: var(--ink);
   font-size: 12px;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -186,9 +186,9 @@
   max-width: 100%;
   font: inherit;
   font-size: 15px;
-  color: #2c4529;
+  color: var(--ink);
   background: #fff;
-  border: 1px solid #cedac5;
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
   min-height: 46px;
@@ -218,17 +218,17 @@
 }
 .outreach-action-bar {
   padding-top: 18px;
-  border-top: 1px solid #e3e9dd;
+  border-top: 1px solid var(--line);
 }
 .outreach-workspace .btn.primary {
-  background: #234f40;
-  border-color: #234f40;
+  background: var(--brand-primary);
+  border-color: var(--brand-accent);
   color: #fff;
 }
 .outreach-review-note,
 .outreach-recipient-status {
   font-size: 12px !important;
-  color: #6b795f;
+  color: var(--muted);
 }
 .outreach-recipient-status {
   margin-top: -12px;
@@ -237,12 +237,12 @@
 .outreach-recipient-evidence {
   margin: -8px 0 18px;
   padding: 10px 12px;
-  border-left: 3px solid #d1dfc7;
+  border-left: 3px solid var(--line);
   background: #fafcf8;
 }
 .outreach-recipient-evidence p {
   margin: 0;
-  color: #6a7965;
+  color: var(--muted);
   font-size: 11px !important;
   line-height: 1.65;
   overflow-wrap: anywhere;
@@ -259,7 +259,7 @@
 .outreach-saved-facts {
   margin: 0 0 22px;
   padding: 14px 16px;
-  border: 1px solid #d6e2ce;
+  border: 1px solid var(--line);
   border-radius: 10px;
   background: #fbfcf9;
 }
@@ -268,11 +268,11 @@
 }
 .outreach-saved-facts p {
   margin: 6px 0 0;
-  color: #5f7059;
+  color: var(--ink);
   overflow-wrap: anywhere;
 }
 .outreach-saved-facts strong {
-  color: #314f2c;
+  color: var(--ink);
 }
 .outreach-feedback,
 .outreach-blocked {
@@ -290,14 +290,14 @@
 }
 .outreach-message {
   padding: 14px;
-  border: 1px solid #e0e7d9;
+  border: 1px solid var(--line);
   background: #f8faf5;
   border-radius: 9px;
   margin-bottom: 14px;
 }
 .outreach-message strong {
   font-size: 12px;
-  color: #617755;
+  color: var(--muted);
 }
 .outreach-message p {
   white-space: pre-wrap;
@@ -306,12 +306,12 @@
 }
 .outreach-conversation {
   padding-bottom: 20px;
-  border-bottom: 1px solid #e1e8da;
+  border-bottom: 1px solid var(--line);
   margin-bottom: 22px;
 }
 .outreach-empty {
   padding: 28px;
-  border: 1px solid #dae3d2;
+  border: 1px solid var(--line);
   border-radius: 12px;
 }
 .customer-prepare-outreach p {
@@ -325,8 +325,8 @@
 .customer-run-toolbar:has(.customer-prepare-outreach) > .btn {
   margin-left: auto;
   background: white;
-  color: #49643c;
-  border: 1px solid #d6e1cb;
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 @media (max-width: 700px) {
   .outreach-workspace {
@@ -362,13 +362,13 @@
     width: min(220px, 75vw);
     max-width: 100%;
     flex: 0 0 min(220px, 75vw);
-    border-right: 1px solid #e0e8d8;
+    border-right: 1px solid var(--line);
     border-bottom: 0;
     scroll-snap-align: start;
     padding: 12px 15px;
   }
   .outreach-lead[aria-pressed="true"] {
-    box-shadow: inset 0 -3px #7b9b62;
+    box-shadow: inset 0 -3px var(--line);
   }
   .outreach-editor {
     padding: 20px 16px;
@@ -421,7 +421,7 @@
   }
 }
 .outreach-followup, .outreach-referral, .outreach-reply-copilot {
-  border: 1px solid var(--line, #d4ddcd);
+  border: 1px solid var(--line, var(--line));
   background: var(--paper, #faf9f5);
   border-radius: 12px;
   padding: 16px;
@@ -433,13 +433,13 @@
 }
 .outreach-timing-fields { display: grid; gap: 10px; min-width: 0; }
 .outreach-timing-fields input { width: 100%; min-width: 0; }
-.outreach-send-check { background: var(--paper, #faf9f5); padding: 12px; border: 1px solid var(--line, #d4ddcd); border-radius: 12px; }
+.outreach-send-check { background: var(--paper, #faf9f5); padding: 12px; border: 1px solid var(--line, var(--line)); border-radius: 12px; }
 .outreach-send-check button { margin: 4px 8px 4px 0; }
 .outreach-ai-consent { display: flex; align-items: flex-start; gap: 10px; }
 .outreach-ai-consent input { flex: 0 0 auto; width: auto; margin-top: 4px; }
 .outreach-ai-suggestion { white-space: pre-wrap; overflow-wrap: anywhere; }
 .outreach-layout [id^="outreach-"] { scroll-margin-top: 24px; }
-.outreach-layout [tabindex="-1"]:focus { outline: 2px solid var(--green, #1e4d3a); outline-offset: 4px; }
+.outreach-layout [tabindex="-1"]:focus { outline: 2px solid var(--green, var(--focus)); outline-offset: 4px; }
 .outreach-workspace--embedded { padding:0!important; }
 .outreach-workspace--embedded .outreach-heading { margin-bottom:20px; }
 .outreach-workspace--embedded .outreach-heading .eyebrow { display:none; }
