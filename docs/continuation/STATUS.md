@@ -2,7 +2,7 @@
 
 ## October22 approved component polish — current focused scope
 
-The owner reviewed Teknium component recommendations and authorized the first three treatments. Application `bd99967` adds a labelled animated landing pipeline, an actual-analysis-only input halo, and exact selected-business review in a retained native modal. [PREMIUM_COMPONENT_POLISH.md](PREMIUM_COMPONENT_POLISH.md) records174 component passes, exact production build/TypeScript, focused lint, fresh real Chrome desktop/390/320 and the focus/resize repairs. Root `design-qa.md` passes this adaptation only; it is not independent or whole-product acceptance. Sending stays disconnected, no model/paid call was made, and the broad release goal remains paused. Latest pushed-head CI requires separate readback; historical green checks do not transfer.
+The owner reviewed Teknium component recommendations and authorized the first three treatments. Application `1d8a5f9` adds a labelled animated landing pipeline, an actual-analysis-only input halo, and exact selected-business review in a retained native modal. [PREMIUM_COMPONENT_POLISH.md](PREMIUM_COMPONENT_POLISH.md) records174 component passes, exact production build/TypeScript, focused lint, fresh real Chrome desktop/390/320 and the focus/resize repairs. Root `design-qa.md` passes this adaptation only; it is not independent or whole-product acceptance. Sending stays disconnected, no model/paid call was made, and the broad release goal remains paused. Latest pushed-head CI requires separate readback; historical green checks do not transfer.
 
 ## Current focused workspace feedback — f65fa80; whole-app goal stays paused
 

@@ -4,7 +4,7 @@
 
 Owner reviewed the Teknium recommendations and said “go ahead.” Only the first three treatments were implemented: animated landing pipeline, analysis-state halo, and selected lead to focused outreach review. This is an adaptation to Clientrove's existing cream/forest-green theme, not a clone of Teknium's dark demos. No dependency, subscription, provider, mailbox or transport was added.
 
-Application checkpoint: `bd99967c0e3d614df9c0b2f6d031d5e999b978f6`, following `ad630ac` and the `f9c9ef6` keyboard repair, on `codex/clientrove-release-candidate`, existing draft [PR #7](https://github.com/thakoreh/signalfoundry/pull/7). Subsequent evidence-only commits do not change that application build. Obtain required CI status on the actual final PR head, not an earlier green run.
+Application checkpoint: `1d8a5f9480cff8baab895967e96048235ad94197`, following `ad630ac`, `f9c9ef6` keyboard repair and `bd99967` visual-cancellation repair, on `codex/clientrove-release-candidate`, existing draft [PR #7](https://github.com/thakoreh/signalfoundry/pull/7). Subsequent evidence-only commits do not change that application build. Obtain required CI status on the actual final PR head, not an earlier green run.
 
 ## What changed
 
@@ -20,7 +20,7 @@ On the final application source:
 
 - Full landing/component Vitest suite: **174 tests / 25 files PASS**. Nine new cases cover exact selection/no model dispatch, retained per-company edits/focus/unsaved guard, missing selection, Escape, synchronous transition failure, rejected native transition promises, search isolation, pause/reduced motion and state-only halo. Existing tests were retained.
 - Focused ESLint PASS. Nonincremental TypeScript PASS before the final visual-cancellation change; the optimized production build's TypeScript phase also PASS on exact `bd99967`.
-- Optimized Next webpack production builds PASS on `ad630ac`, `f9c9ef6`, and exact `bd99967`. Standalone static/public assets copied; the final package is running with the real local FastAPI/SQLite fixture.
+- Optimized Next webpack production builds PASS on `ad630ac`, `f9c9ef6`, and exact `bd99967` and final `1d8a5f9`. Standalone static/public assets copied; the final package is running with the real local FastAPI/SQLite fixture.
 - Staged Gitleaks PASS for each source checkpoint. No lockfile/dependency changes. Backend/Convex/transport code was unchanged; this is not a new whole-product backend/provider acceptance claim. Remote source/container/security checks must be read back separately on final head.
 
 Real connected Chrome, task-owned fictional SQLite, provider flags off, no API keys copied:
@@ -37,6 +37,7 @@ Real connected Chrome, task-owned fictional SQLite, provider flags off, no API k
 1. Component tests caught retained-dialog focus restoring to a hidden Close button; restore the opener after React's closing commit. Rechecked with tests and real Chrome.
 2. Browser Shift+Tab exposed the embedded activity summary's CSS-hidden descendants in the custom boundary. Remove that unused subtree, including its request, instead of only hiding it. Rechecked both directions in Chrome and assert absent DOM.
 3. Browser resizing exposed an unhandled View Transition `ready` rejection despite handling `finished`. Handle animation cancellation explicitly; regression uses rejected ready/finished promises, and final Chrome resize produced no app error.
+4. Numeric contrast check found new caption4.35:1 on the actual paper. Final color #5f7465 computes4.72:1; rebuilt final source and rechecked computed Chrome color plus fresh19 comparison.174 tests pass again on exact1d8a5f9.
 
 Scoped visual QA is in root `design-qa.md`; it is not a fresh independent security review or whole-product acceptance.
 
@@ -45,7 +46,7 @@ Scoped visual QA is in root `design-qa.md`; it is not a fresh independent securi
 External local evidence directory, intentionally not a runtime/customer-data attachment:
 `C:\Users\Hiren\Documents\Codex\2026-10-19\https-github-com-thakoreh-signalfoundry-https\work\review-probes\premium-polish-20261022\`
 
-- `12-final-desktop-pipeline.png`: final landing in context.
+- `19-final-contrast-pipeline.png`: final contrast-corrected landing in context;12 is the earlier color.
 - `02-phone390-pipeline.png`, `03-phone320-pipeline.png`: unchanged pipeline phone layout.
 - `10-final-analysis-active.png`: visible Reading state and halo on unchanged analysis CSS.
 - `14-final-resize390-review.png`, `15-final-reduced320-actions.png`: final repaired narrow review/actions.
@@ -54,10 +55,10 @@ External local evidence directory, intentionally not a runtime/customer-data att
 
 Working fictional preview: [landing](http://127.0.0.1:3001/), [results](http://127.0.0.1:3001/workspace/customers/search_2316d9efdad04057a0cfa92ea77ada69), [setup](http://127.0.0.1:3001/workspace/setup). On results, choose a row's Start outreach. All companies/messages are manufactured fixtures, not demand or customer proof.
 
-Final owned wrapper29888 / Next50640 / tool session71144, loopback3001/API8025, same external fixture database/identity as before. These are observations, not safe future kill targets: verify ownership and current PIDs again before stopping anything. Owner checkout/ports/env/data were not reused. No new paid calls; historical DeepSeek spend remains unknown. Sending remains disconnected, manual actions remain explicit.
+Final owned wrapper8260 / Next32824 / tool session86975, loopback3001/API8025, same external fixture database/identity as before. These are observations, not safe future kill targets: verify ownership and current PIDs again before stopping anything. Owner checkout/ports/env/data were not reused. No new paid calls; historical DeepSeek spend remains unknown. Sending remains disconnected, manual actions remain explicit.
 
 ## Limits and rollback
 
 No physical-phone, screen-reader, 200% browser zoom, full14-step regression, live AI, mailbox, hosted or production verification in this focused slice. No new independent final-diff review was conducted here. Broad release requirements remain incomplete; automatic outreach is not enabled. No new purchase/account/spend decision is requested by this polish.
 
-To roll back this slice, revert source commits `bd99967`, `f9c9ef6`, `ad630ac` on this working branch in reverse order, run checks and rebuild an isolated preview. Do not reset or force-push history, touch the owner's checkout, or roll back fictional/owner databases. Documentation-only evidence commits may remain as history.
+To roll back this slice, revert source commits `1d8a5f9`, `bd99967`, `f9c9ef6`, `ad630ac` on this working branch in reverse order, run checks and rebuild an isolated preview. Do not reset or force-push history, touch the owner's checkout, or roll back fictional/owner databases. Documentation-only evidence commits may remain as history.

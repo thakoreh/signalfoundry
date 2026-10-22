@@ -1,5 +1,9 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## October22 component polish — final contrast recheck complete
+
+Final application1d8a5f9480cff8baab895967e96048235ad94197 optimized webpack build/TypeScript PASS; full174 component cases/25files PASS again on exact1d8. Fresh Chrome computed caption rgb95/116/101 over rgb247/248/245 is4.72:1, no page overflow or app errors. Capture19 compared with reference01 in the same image input; earlier contrast finding is closed and root design QA returns passed within focused scope. Existing reviewed interaction code is unchanged by the one-color patch. Canonical application checkpoint and97-file manifest refreshed. Final owned production fixture wrapper8260/Next32824/session86975 on loopback3001/API8025; older runtime rows are historical, never kill by them. Same fictional data; owner checkout stillmaincfd22af with only preexisting next-env drift. No paid/model/send/account/merge/deploy. Final documentation push/check readback follows; no final-head CI pass claimed yet.
+
 ## October22 final contrast measurement
 
 Measured actual new caption on rgb247/248/245 paper: #67796c is4.35:1. Darken to #5f7465, calculated4.72:1. Root design QA temporarily blocked until optimized build and fresh computed/visual check. No interaction or provider change. Prior174 component/source build proof remains scoped; final-head checks will rerun.
