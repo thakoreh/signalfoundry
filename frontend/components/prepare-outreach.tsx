@@ -11,10 +11,12 @@ export function PrepareOutreach({
   searchId,
   accountIds,
   onPrepared,
+  companyName,
 }: {
   searchId: string;
   accountIds: string[];
   onPrepared?: (path: string) => void;
+  companyName?: string;
 }) {
   const { api, mode } = useWorkspaceSession();
   const [busy, setBusy] = useState(false);
@@ -35,7 +37,9 @@ export function PrepareOutreach({
     setBusy(true);
     setError("");
     try {
-      await api("/outreach", {
+      const result = await api<{
+        threads: { id: string; account_id: string; search_id: string }[];
+      }>("/outreach", {
         method: "POST",
         signal,
         body: jsonBody({
@@ -45,7 +49,15 @@ export function PrepareOutreach({
         }),
       });
       if (signal.aborted) return;
-      const path = outreachPath(searchId);
+      const first = result?.threads?.find(
+        (thread) =>
+          thread.search_id === searchId &&
+          selection.includes(thread.account_id) &&
+          /^[A-Za-z0-9_-]{1,128}$/.test(thread.id),
+      );
+      const path =
+        outreachPath(searchId) +
+        (first ? `?thread=${encodeURIComponent(first.id)}&view=Review` : "");
       if (onPrepared) onPrepared(path);
       else window.location.assign(path);
     } catch (cause) {
@@ -58,7 +70,9 @@ export function PrepareOutreach({
     }
   }
   return (
-    <div className="customer-prepare-outreach">
+    <div
+      className={`customer-prepare-outreach${companyName ? " customer-prepare-outreach-row" : ""}`}
+    >
       <button
         className="btn primary"
         type="button"
@@ -69,8 +83,15 @@ export function PrepareOutreach({
           mode !== "local-demo"
         }
         onClick={() => void prepare()}
+        aria-label={
+          companyName ? `Start outreach for ${companyName}` : undefined
+        }
       >
-        {busy ? "Preparing…" : `Prepare outreach (${accountIds.length})`}
+        {busy
+          ? "Preparing…"
+          : companyName
+            ? "Start outreach"
+            : `Start outreach (${accountIds.length})`}
       </button>
       {mode !== "local-demo" && (
         <p>Outreach is not available for hosted workspaces yet.</p>

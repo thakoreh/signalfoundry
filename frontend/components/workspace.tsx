@@ -10,9 +10,7 @@ import {
   type BusinessIntake,
 } from "@/lib/business-intake";
 import { BusinessOnboarding } from "./business-onboarding";
-import { NextUpQueue } from "./next-up-queue";
-import { OutreachInsights } from "./outreach-insights";
-import { SavedOutreach } from "./saved-outreach";
+import { OutreachDashboard } from "./outreach-dashboard";
 import { LocalDataControls } from "./local-data-controls";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
@@ -21,10 +19,12 @@ export default function Workspace({
   organizationControl,
   userControl,
   setup = false,
+  settings = false,
 }: {
   organizationControl?: React.ReactNode;
   userControl?: React.ReactNode;
   setup?: boolean;
+  settings?: boolean;
 }) {
   const { api, mode, isAdmin } = useWorkspaceSession();
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
@@ -172,17 +172,25 @@ export default function Workspace({
         }}
         organizationControl={organizationControl}
         userControl={userControl}
-        home={workspace?.profile && !setup ? <>
-          <div className="workspace-return-heading">
-            <div><h1>Pick up where you left off.</h1><p>Review what needs you, then come back to your saved conversations.</p></div>
-            <Link className="btn primary" href="/workspace/customers">Find customers</Link>
-            <Link className="btn" href="/workspace/setup">Edit business</Link>
-          </div>
-          <NextUpQueue />
-          <SavedOutreach />
-          <OutreachInsights />
-          <LocalDataControls />
-        </> : undefined}
+        home={
+          workspace?.profile && !setup ? (
+            settings ? (
+              <section className="workspace-settings">
+                <Link className="btn" href="/workspace">
+                  ← Dashboard
+                </Link>
+                <h1>Settings</h1>
+                <p>Manage your business and workspace data.</p>
+                <Link className="btn" href="/workspace/setup">
+                  Edit business
+                </Link>
+                <LocalDataControls />
+              </section>
+            ) : (
+              <OutreachDashboard />
+            )
+          ) : undefined
+        }
       />
     </>
   );

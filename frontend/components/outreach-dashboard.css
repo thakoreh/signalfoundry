@@ -1,0 +1,202 @@
+.outreach-dashboard,
+.workspace-settings {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 28px 8px;
+  color: var(--forest, #173e32);
+  overflow-wrap: anywhere;
+}
+.outreach-dashboard-header,
+.outreach-dashboard-nav,
+.outreach-dashboard-list-heading,
+.outreach-dashboard-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.outreach-dashboard-header h1 {
+  font-size: clamp(30px, 4vw, 44px);
+  letter-spacing: -1.4px;
+  margin: 12px 0;
+}
+.outreach-dashboard-header p {
+  color: #647065;
+  margin: 0;
+  font-size: 16px;
+}
+.outreach-dashboard-nav {
+  flex-shrink: 0;
+}
+.outreach-connection {
+  font-size: 13px;
+  color: #637266;
+  margin: 26px 0 20px;
+}
+.outreach-dashboard-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+  margin: 0 0 36px;
+}
+.outreach-dashboard-stats > div {
+  background: white;
+  border: 1px solid #dce4d8;
+  border-radius: 16px;
+  padding: 20px;
+}
+.outreach-dashboard-stats dt {
+  font-size: 14px;
+  color: #657061;
+}
+.outreach-dashboard-stats dd {
+  font-size: 36px;
+  margin: 10px 0 0;
+  font-weight: 550;
+  letter-spacing: -1px;
+}
+.outreach-dashboard-list-heading h2 {
+  font-size: 21px;
+  margin: 0;
+}
+.outreach-dashboard-filters {
+  margin: 18px 0;
+}
+.outreach-dashboard-filters [role="group"] {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.outreach-dashboard-filters [role="group"] button {
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  color: #4b6452;
+  padding: 10px 14px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.outreach-dashboard-filters [aria-pressed="true"] {
+  background: #e7eedf !important;
+  border-color: #c9d7be !important;
+  color: #213f2e !important;
+}
+.outreach-dashboard-search input {
+  max-width: 100%;
+  border: 1px solid #d3ddce;
+  border-radius: 9px;
+  padding: 12px;
+  background: white;
+  color: #173e32;
+  font: inherit;
+}
+.outreach-dashboard-activity {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background: white;
+  border: 1px solid #dbe3d7;
+  border-radius: 16px;
+}
+.outreach-dashboard-activity li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(100px, 160px) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  border-bottom: 1px solid #e7ece3;
+}
+.outreach-dashboard-activity li:last-child {
+  border-bottom: 0;
+}
+.outreach-dashboard-activity li > div > span {
+  display: block;
+  color: #657061;
+  font-size: 13px;
+  margin-top: 5px;
+}
+.outreach-dashboard-state {
+  font-size: 13px;
+  color: #4f6352;
+}
+.outreach-dashboard-empty {
+  padding: 40px 20px;
+  text-align: center;
+  background: white;
+  border: 1px dashed #cfdbc6;
+  border-radius: 16px;
+}
+.outreach-dashboard-empty h3 {
+  font-size: 19px;
+}
+.outreach-dashboard-empty p {
+  color: #637161;
+  line-height: 1.6;
+}
+.outreach-dashboard-details {
+  margin-top: 20px;
+  font-size: 13px;
+  color: #5c6d5e;
+  line-height: 1.6;
+}
+.outreach-dashboard-details summary {
+  cursor: pointer;
+  padding-block: 10px;
+}
+.outreach-dashboard button:focus-visible,
+.outreach-dashboard a:focus-visible,
+.outreach-dashboard input:focus-visible {
+  outline: 3px solid #487e56;
+  outline-offset: 3px;
+}
+.workspace-settings h1 {
+  font-size: 32px;
+}
+@media (max-width: 640px) {
+  .outreach-dashboard {
+    padding: 16px 0;
+  }
+  .outreach-dashboard-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .outreach-dashboard-nav {
+    width: 100%;
+  }
+  .outreach-dashboard-stats {
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .outreach-dashboard-stats > div {
+    padding: 14px 10px;
+    border-radius: 12px;
+  }
+  .outreach-dashboard-stats dt {
+    font-size: 12px;
+  }
+  .outreach-dashboard-stats dd {
+    font-size: 28px;
+  }
+  .outreach-dashboard-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .outreach-dashboard-search input {
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .outreach-dashboard-activity li {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    padding: 16px;
+  }
+  .outreach-dashboard-activity li > div {
+    grid-column: 1/-1;
+  }
+  .outreach-dashboard-activity li .btn {
+    min-height: 44px;
+  }
+  .outreach-connection {
+    line-height: 1.7;
+  }
+}

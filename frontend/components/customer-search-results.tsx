@@ -187,10 +187,7 @@ function CustomerResult({
   const website = publicSourceUrl(`https://${account.domain}`);
   const contacts = account.contacts
     .filter((contact) => contact.email?.trim())
-    .sort(
-      (left, right) =>
-        contactPriority(right) - contactPriority(left),
-    );
+    .sort((left, right) => contactPriority(right) - contactPriority(left));
   const primaryContact = contacts[0];
   const citedSources = original
     ? [
@@ -365,9 +362,16 @@ function CustomerResult({
           ) : (
             <strong title={account.name}>{account.name}</strong>
           )}
-          {history && (history.suppressed || history.contacted || history.paused) && <small className="customer-company-history">
-            {history.suppressed ? "Suppressed · do not contact" : history.contacted ? "Already contacted" : "Outreach paused"}
-          </small>}
+          {history &&
+            (history.suppressed || history.contacted || history.paused) && (
+              <small className="customer-company-history">
+                {history.suppressed
+                  ? "Suppressed · do not contact"
+                  : history.contacted
+                    ? "Already contacted"
+                    : "Outreach paused"}
+              </small>
+            )}
         </th>
         <td className="customer-lead-email" role="cell">
           {primaryContact ? (
@@ -375,9 +379,20 @@ function CustomerResult({
               {primaryContact.email}
               <small className="customer-contact-kind">
                 {isSharedInbox(primaryContact.email) && "Shared inbox · "}
-                {primaryContact.source_url && publicSourceUrl(primaryContact.source_url)
-                  ? <a href={publicSourceUrl(primaryContact.source_url)!} title={`Contact observed ${account.researched_at || "at an unknown time"}`} target="_blank" rel="noreferrer">Source · {account.researched_at?.slice(0, 10) || "date unknown"}</a>
-                  : "Source unknown"}
+                {primaryContact.source_url &&
+                publicSourceUrl(primaryContact.source_url) ? (
+                  <a
+                    href={publicSourceUrl(primaryContact.source_url)!}
+                    title={`Contact observed ${account.researched_at || "at an unknown time"}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Source ·{" "}
+                    {account.researched_at?.slice(0, 10) || "date unknown"}
+                  </a>
+                ) : (
+                  "Source unknown"
+                )}
               </small>
             </span>
           ) : (
@@ -398,10 +413,15 @@ function CustomerResult({
           )}
         </td>
         <td className="customer-lead-actions" role="cell">
+          <PrepareOutreach
+            searchId={searchId}
+            accountIds={[account.id]}
+            companyName={account.name}
+          />
           <button
             ref={draftTrigger}
             type="button"
-            className="btn primary customer-draft-action"
+            className="btn customer-draft-action customer-draft-action-secondary"
             aria-busy={draftBusy}
             aria-haspopup="dialog"
             aria-label={`Draft message for ${account.name}`}
@@ -589,13 +609,20 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
   useEffect(() => {
     if (mode !== "local-demo" || !contactHistoryReady) return;
     const scope = new AbortController();
-    api<OutreachInsights>("/outreach/insights", { signal: scope.signal }).then(data => {
-      if (!scope.signal.aborted) {
-        if (!Array.isArray(data?.company_flags)) throw new Error("Prior contact status is unavailable; review saved conversations before outreach.");
-        setCompanyFlags(data.company_flags);
-        setHistoryError("");
-      }
-    }).catch(cause => { if (!scope.signal.aborted) setHistoryError(errorMessage(cause)); });
+    api<OutreachInsights>("/outreach/insights", { signal: scope.signal })
+      .then((data) => {
+        if (!scope.signal.aborted) {
+          if (!Array.isArray(data?.company_flags))
+            throw new Error(
+              "Prior contact status is unavailable; review saved conversations before outreach.",
+            );
+          setCompanyFlags(data.company_flags);
+          setHistoryError("");
+        }
+      })
+      .catch((cause) => {
+        if (!scope.signal.aborted) setHistoryError(errorMessage(cause));
+      });
     return () => scope.abort();
   }, [api, mode, searchId, contactHistoryReady]);
 
@@ -820,7 +847,7 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
                   </select>
                 </div>
                 <button
-                  className="btn primary"
+                  className="btn"
                   type="button"
                   disabled={!selectedCount}
                   onClick={download}
@@ -837,6 +864,10 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
                   ).map((account) => account.id)}
                 />
               </div>
+              <p className="customer-outreach-hint">
+                Choose a business to review its outreach. AI can help draft; you
+                approve every message. Email sending is not connected yet.
+              </p>
               <div className="customer-run-list-meta">
                 <p>{selectedCount} selected</p>
                 <p>
@@ -915,7 +946,14 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
                         searchId={searchId}
                         selected={selection.has(account.id)}
                         toggle={() => toggle(account.id)}
-                        history={companyFlags.find(item => item.domain === account.domain.toLowerCase().replace(/\.$/, "").replace(/^www\./, ""))}
+                        history={companyFlags.find(
+                          (item) =>
+                            item.domain ===
+                            account.domain
+                              .toLowerCase()
+                              .replace(/\.$/, "")
+                              .replace(/^www\./, ""),
+                        )}
                       />
                     ))}
                   </tbody>

@@ -1082,10 +1082,10 @@ describe("persisted manual outreach journey", () => {
       ),
     );
     expect(api).not.toHaveBeenCalled();
-    await click("Prepare outreach (2)");
+    await click("Start outreach (2)");
     const first = JSON.parse(api.mock.calls[0][1].body);
     api.mockResolvedValueOnce({ threads: [] });
-    await click("Prepare outreach (2)");
+    await click("Start outreach (2)");
     expect(JSON.parse(api.mock.calls[1][1].body)).toEqual(first);
     expect(first.account_ids).toEqual(["account_a", "account_b"]);
     expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a");

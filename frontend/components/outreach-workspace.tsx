@@ -447,8 +447,8 @@ export function OutreachWorkspace({
         ← Customer list
       </Link>
       <header className="outreach-heading">
-        <span className="eyebrow">YOUR NEXT CONVERSATIONS</span>
-        <h1 id="outreach-title">Turn a customer list into conversations.</h1>
+        <span className="eyebrow">OUTREACH ASSISTANT</span>
+        <h1 id="outreach-title">Review your outreach.</h1>
         <p>
           No mailbox is connected. Review here, send in your own email app, and
           record what happened.
@@ -506,7 +506,7 @@ export function OutreachWorkspace({
         <div className="outreach-empty">
           <h2>No businesses prepared yet.</h2>
           <p>
-            Select up to five businesses from your list, then choose Prepare
+            Select up to five businesses from your list, then choose Start
             outreach.
           </p>
           <Link
