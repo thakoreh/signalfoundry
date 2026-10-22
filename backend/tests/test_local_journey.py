@@ -78,6 +78,21 @@ class LocalJourneyTest(unittest.TestCase):
             self.assertEqual(duplicate.status_code, 409)
         self.assertEqual(len(self.repo.outreach_threads(parent.search_id)['threads']), 2)
 
+    def test_recipient_edit_cannot_refer_the_actual_original_referrer_to_itself(self):
+        parent = self.referral_parent()
+        received = parent.messages[-1].model_dump()
+        parent = self.edit(parent, recipient='changed@business.com')
+        with TestClient(create_app(self.path, testing=True)) as client:
+            bad = {**self.referral_body(parent), 'recipient': received['recipient']}
+            self.assertEqual(client.post(f'/api/outreach/{parent.id}/referrals', json=bad).status_code, 409)
+            self.assertEqual(len(self.repo.outreach_threads(parent.search_id)['threads']), 1)
+            # A genuine new contact still has its own fresh permission boundary.
+            good = client.post(f'/api/outreach/{parent.id}/referrals', json=self.referral_body(parent))
+            self.assertEqual(good.status_code, 200, good.text)
+            self.assertIsNone(good.json()['contact_basis'])
+            self.assertIsNone(good.json()['approval'])
+        self.assertEqual(self.repo.outreach_thread(parent.id).messages[-1].model_dump(), received)
+
     def test_claim_context_does_not_project_private_or_demo_source_links(self):
         valid = self.account.evidence[0]
         self.account.evidence += [valid.model_copy(update={'id': 'private_fact', 'url': 'http://127.0.0.1/admin'}),

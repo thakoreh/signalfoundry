@@ -1,5 +1,13 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Active continuation — independent lifecycle findings reproduced and repaired
+
+Exact23014d8 required source/container checks PASS in run39704999959, but two independent reviewers still reproduced four concrete issues: edited-parent self-referral to the actual inbound sender (both local and hosted), repeated unknown-provenance repair, erased earlier human replies after later OOO, and stale sibling company interest. Failed reports are preserved verbatim. New permanent RED controls reproduced all four hosted assertions and the local HTTP409 counterexample before repair; green CI was not used to dismiss them.
+
+Root repairs reject referral to either current or actual received recipient while allowing a genuine different contact with fresh basis/approval. Original received snapshots remain immutable: explicit effective classification history is stored separately on the thread; bounded version2 activity preserves earlier human replies and takes current company interest from the latest received message (stable timestamp/creation/id order), not later draft edits or any stale interested sibling. Legacy latest corrections migrate without inventing older lost corrections. Explicit null means reviewed unknown provenance, remains excluded/unready, and makes repeated repair a no-op. A new regression confirms legacy upgrade does not rewrite any original message. No broader company lock, provider, adapter opening or policy relaxation.
+
+Repair author evidence: backend236 PASS24.577s; Convex160 PASS, components135 and Node67 PASS; typecheck/lint and production webpack build PASS. Actual owned-loopback HTTP/fresh SQLite journey PASS with edited-parent self-referral denial plus genuine new referral, future OOO/past-meeting and zero paid attempts. Preflight5 PASS. Final standalone types ran after the build completed; no generated-type race. The new immutable checkpoint/review/CI follow; this repair is not yet independently reaccepted. Owner preview/data/env/profile/ports and main unchanged. Whole goal ACTIVE/INCOMPLETE; hosted privacy/adapter/global monetary authority/mailbox/operations and complete fresh Chrome acceptance remain useful outstanding work.
+
 ## Active continuation — hosted lifecycle and read-only returning work
 
 Author milestone: full235 backend,155 Convex,135 components,67 Node, type/lint and production webpack build PASS. Actual owned-socket/fresh SQLite HTTP journey also PASS with the new future-OOO plus already-due-meeting overlap asserted; zero paid attempts. New source now needs immutable checkpoint, fresh independent probes and its own required CI, not borrowed c1 green.

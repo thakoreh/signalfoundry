@@ -112,7 +112,11 @@ export const refer = internalAdminMutation({
     const recipient = p.email(args.recipient),
       contactName = p.line(args.contactName, "Contact name", 160, true),
       referrerName = p.line(args.referrerName, "Referrer name", 160);
-    if (recipient.toLowerCase() === row.recipient.toLowerCase())
+    if (
+      [row.recipient, received.recipient].some(
+        (address) => address.toLowerCase() === recipient.toLowerCase(),
+      )
+    )
       throw appError(
         "VALIDATION_ERROR",
         "Use a different referred contact; preserve original history",

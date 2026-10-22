@@ -711,7 +711,7 @@ class OutreachStore:
             latest = next((m for m in reversed(parent.messages) if m.direction == 'inbound'), None)
             if parent.suppressed or not latest or latest.id != body.referrer_message_id or parent.reply_state != 'referral':
                 raise OutreachError('Review a current referral reply before adding its contact. Suppression remains in effect.')
-            if body.recipient.lower() == parent.recipient.lower():
+            if body.recipient.lower() in {parent.recipient.lower(), latest.recipient.lower()}:
                 raise OutreachError('A referral must identify a different contact. The original history is preserved.')
             rows = db.execute('SELECT data FROM outreach_threads WHERE tenant_id=?', (self.tenant,)).fetchall()
             if len(rows) >= 100:

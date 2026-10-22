@@ -75,6 +75,19 @@ export const lifecycle = v.object({
   sale: saleState,
 });
 export const activity = v.object({
+  version: v.optional(v.literal(2)),
+  humanReplyCount: v.optional(v.number()),
+  latestReply: v.optional(
+    v.union(
+      v.object({
+        messageId: v.id("outreachMessages"),
+        receivedAt: v.number(),
+        creationTime: v.number(),
+        state: replyState,
+      }),
+      v.null(),
+    ),
+  ),
   outboundCount: v.number(),
   coldFollowupsSent: v.number(),
   hadInbound: v.boolean(),
@@ -90,6 +103,10 @@ export const sourceFact = v.object({
   excerpt: v.string(),
   url: v.string(),
   retrievedAt: v.string(),
+});
+export const replyClassification = v.object({
+  messageId: v.id("outreachMessages"),
+  state: replyState,
 });
 export const threadFields = {
   orgId: v.string(),
@@ -123,10 +140,12 @@ export const threadFields = {
   // Optional expansion for existing foundation rows. No historical snapshots change.
   lifecycle: v.optional(lifecycle),
   activity: v.optional(activity),
+  replyClassifications: v.optional(v.array(replyClassification)),
   eventCount: v.optional(v.number()),
   bookingLink: v.optional(v.string()),
   sourceFacts: v.optional(v.array(sourceFact)),
-  sourceIsDemo: v.optional(v.boolean()),
+  // null means reviewed but provenance unknown; absence means not repaired.
+  sourceIsDemo: v.optional(v.union(v.boolean(), v.null())),
   referral: v.optional(
     v.object({
       threadId: v.id("outreachThreads"),

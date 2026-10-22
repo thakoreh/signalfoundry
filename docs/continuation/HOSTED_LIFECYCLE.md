@@ -2,6 +2,8 @@
 
 These internal Convex functions extend HOSTED_LEDGER.md, using its same disabled-by-default flag, authenticated admin mutation/tenant read wrappers, organization intent, revision/idempotency and exact approval boundaries. No new service/dependency, provider operation, scheduler, deployment or account connection. Public hosted outreach REST remains503; this is **not complete hosted parity or rendered/provider acceptance**.
 
+Independent23014d8 review found referral/source-repair and funnel defects despite passing CI. Current repair rejects referral to the actual immutable inbound recipient even after editing the draft address, preserves explicit classification corrections separately on the thread without changing received records, and rebuilds version2 activity. All-time human replies survive a later nonhuman reply; current company interest uses the latest received message's effective classification across eligible contacts, ordered by received time, creation time and ID. Draft edits never make an older reply newer. Legacy latest correction survives migration; older absent corrections cannot be reconstructed. Reviewed unknown provenance is explicit null (excluded/unready), making identical repair a no-op rather than incrementing revisions forever. New immutable repair review/exact CI remain separate gates.
+
 ## Operations and facts
 
 - `outreachLifecycle.refer` requires the actual latest received referral and current parent revision. It creates a separate same-company, user-entered/unverified contact with referrer name/message/thread credit, copied public company context and fresh empty contact basis/approval. Canonical-company duplicate addresses, original recipient, bounced/suppressed targets and100-thread overflow are refused. Replays return the child's current safety state. Parent received text remains immutable.
@@ -28,7 +30,7 @@ Hosted start now applies the same explicit non-demo/customer-type≥60/no-exclus
 
 ## Evidence, limits and rollback
 
-New lifecycle36 + existing foundation43 controls pass within full155 Convex tests. Backend235, Node67, components135, type/lint pass on the author source; independent immutable review/current exact-head CI remain separate gates. The original tests retain their assertions; their manufactured setup now supplies company-type evidence required by the stronger predicate. No real JWT, remote OCC/cache/schema migration, hosted UI, actual provider/contact quality, Chrome/mobile/accessibility, delivery or calendar is certified.
+Current lifecycle41 + existing foundation43 controls pass within full160 Convex tests. Backend236, Node67, components135 and typecheck pass on the author source; independent immutable review/current exact-head CI remain separate gates. The original tests retain their assertions, including complete immutable received-record equality; their manufactured setup supplies company-type evidence required by the stronger predicate. No real JWT, remote OCC/cache/schema migration, hosted UI, actual provider/contact quality, Chrome/mobile/accessibility, delivery or calendar is certified.
 
 Still unbuilt: hosted privacy/export/closure/retention and fully mapped adapter/UI parity, shared hosted/local monetary authority, mailbox/OAuth/durable outbox/inbound/calendar/deliverability and production operations. Full14-step rendered Chrome acceptance remains pending. One local DB authority does not authorize a hosted paid request.
 

@@ -638,19 +638,16 @@ export const classifyReply = internalAdminMutation({
         latest.direction !== "inbound"
       )
         throw appError("CONFLICT", "Paste a reply before classifying it");
-      await save(
+      const patch = await applyReply(
         ctx,
         row,
-        await applyReply(
-          ctx,
-          row,
-          args.replyState,
-          latest.body,
-          latest.recipient,
-          args.revisitAt,
-          args.revisitTimezone,
-        ),
+        args.replyState,
+        latest.body,
+        latest.recipient,
+        args.revisitAt,
+        args.revisitTimezone,
       );
+      await save(ctx, row, patch);
       await record(ctx, row.orgId, args.idempotencyKey, admission, [row._id]);
     }
     return view(ctx, await requireThread(ctx, row.orgId, row._id));

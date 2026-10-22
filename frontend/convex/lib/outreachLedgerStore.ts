@@ -9,6 +9,7 @@ import * as p from "./outreachLedgerPolicy";
 import * as validators from "./outreachLedgerValidators";
 import {
   activityFromHistory,
+  classificationHistory,
   life,
   manualBlock,
 } from "./outreachLifecyclePolicy";
@@ -189,7 +190,11 @@ export async function view(
   row: Doc<"outreachThreads">,
 ): Promise<Infer<typeof validators.view>> {
   const messages = await history(ctx, row);
-  const projected = await context(ctx, row, activityFromHistory(messages));
+  const projected = await context(
+    ctx,
+    row,
+    activityFromHistory(messages, classificationHistory(row)),
+  );
   const events = await ctx.db
     .query("outreachEvents")
     .withIndex("by_orgId_and_threadId", (q) =>
@@ -304,11 +309,17 @@ export async function save(
   row: Doc<"outreachThreads">,
   patch: Partial<Doc<"outreachThreads">>,
 ) {
-  const updated = { ...row, ...patch };
+  const updated = {
+    ...row,
+    ...patch,
+    replyClassifications: classificationHistory(row),
+  };
   const messages = await history(ctx, updated);
+  const classifications = classificationHistory(updated);
   await ctx.db.patch(row._id, {
     ...patch,
-    activity: activityFromHistory(messages),
+    replyClassifications: classifications,
+    activity: activityFromHistory(messages, classifications),
     revision: row.revision + 1,
     updatedAt: Date.now(),
   });

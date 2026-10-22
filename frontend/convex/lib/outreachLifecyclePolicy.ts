@@ -3,9 +3,16 @@ import type { Infer } from "convex/values";
 import type { Doc } from "../_generated/dataModel";
 import type { WorkerAccount } from "../validators";
 import { normalizeWebsite } from "./validation";
-import { activity, lifecycle } from "./outreachLedgerValidators";
+import {
+  activity,
+  lifecycle,
+  replyClassification,
+} from "./outreachLedgerValidators";
 
 export const emptyActivity = (): Infer<typeof activity> => ({
+  version: 2,
+  humanReplyCount: 0,
+  latestReply: null,
   outboundCount: 0,
   coldFollowupsSent: 0,
   hadInbound: false,
@@ -28,6 +35,7 @@ export const life = (
   };
 export function activityFromHistory(
   messages: Doc<"outreachMessages">[],
+  classifications: Infer<typeof replyClassification>[] = [],
 ): Infer<typeof activity> {
   const outbound = messages.filter((m) => m.direction === "outbound");
   const firstInbound = messages.findIndex((m) => m.direction === "inbound");
@@ -41,7 +49,27 @@ export function activityFromHistory(
   const latestInboundIndex = messages.findLastIndex(
     (m) => m.direction === "inbound",
   );
+  const inbounds = messages.filter((m) => m.direction === "inbound");
+  const effective = (m: Doc<"outreachMessages">) =>
+    classifications.find((c) => c.messageId === m._id)?.state ??
+    m.reportedReplyState ??
+    "awaiting_review";
   return {
+    version: 2,
+    humanReplyCount: inbounds.filter(
+      (m) =>
+        !["awaiting_review", "uncertain", "auto_reply", "bounce"].includes(
+          effective(m),
+        ),
+    ).length,
+    latestReply: latestInbound
+      ? {
+          messageId: latestInbound._id,
+          receivedAt: latestInbound.createdAt,
+          creationTime: latestInbound._creationTime,
+          state: effective(latestInbound),
+        }
+      : null,
     outboundCount: outbound.length,
     coldFollowupsSent: Math.max(0, cold.length - 1),
     hadInbound: firstInbound >= 0,
@@ -66,6 +94,23 @@ export function activityFromHistory(
       ),
     ],
   };
+}
+// Keep explicit corrections outside immutable received-message snapshots.
+// For legacy rows only the latest correction survives; never invent older ones.
+export function classificationHistory(
+  row: Pick<
+    Doc<"outreachThreads">,
+    "replyClassifications" | "latestInboundId" | "replyState"
+  >,
+) {
+  return row.latestInboundId
+    ? [
+        ...(row.replyClassifications ?? []).filter(
+          (c) => c.messageId !== row.latestInboundId,
+        ),
+        { messageId: row.latestInboundId, state: row.replyState },
+      ]
+    : (row.replyClassifications ?? []);
 }
 export function qualifiedAccount(account: WorkerAccount) {
   return (

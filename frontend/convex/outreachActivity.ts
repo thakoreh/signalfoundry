@@ -6,6 +6,7 @@ import * as s from "./lib/outreachLedgerStore";
 import * as p from "./lib/outreachLedgerPolicy";
 import {
   activityFromHistory,
+  classificationHistory,
   life,
   qualifiedAccount,
 } from "./lib/outreachLifecyclePolicy";
@@ -79,7 +80,7 @@ export const nextUp = internalTenantQuery({
         updatedAt: row.updatedAt,
         dueAt: null,
       };
-      if (!row.activity) {
+      if (row.activity?.version !== 2) {
         tasks.push({
           priority: 0,
           item: { ...base, action: "review_history" },
@@ -246,6 +247,15 @@ export const insights = internalTenantQuery({
       meetingsHeld: new Set<string>(),
       customers: new Set<string>(),
     };
+    const latestReplies = new Map<
+      string,
+      {
+        receivedAt: number;
+        creationTime: number;
+        messageId: string;
+        state: string;
+      }
+    >();
     const companies = new Map<
       string,
       {
@@ -265,7 +275,7 @@ export const insights = internalTenantQuery({
     let pendingApprovals = 0,
       unknownHistory = 0;
     for (const row of rows) {
-      const a = row.activity,
+      const a = row.activity?.version === 2 ? row.activity : undefined,
         l = life(row);
       if (!a) unknownHistory++;
       const state = a ? await s.context(ctx, row, a) : null;
@@ -284,15 +294,20 @@ export const insights = internalTenantQuery({
       if (state?.readyForManualAction) pendingApprovals++;
       if (a && row.sourceIsDemo === false) {
         if (a.outboundCount) metrics.contacted.add(row.companyKey);
-        if (
-          row.latestInboundId &&
-          !["awaiting_review", "uncertain", "auto_reply", "bounce"].includes(
-            row.replyState,
+        if ((a.humanReplyCount ?? 0) > 0) metrics.replied.add(row.companyKey);
+        if (a.latestReply) {
+          const previous = latestReplies.get(row.companyKey),
+            next = a.latestReply;
+          if (
+            !previous ||
+            next.receivedAt > previous.receivedAt ||
+            (next.receivedAt === previous.receivedAt &&
+              (next.creationTime > previous.creationTime ||
+                (next.creationTime === previous.creationTime &&
+                  next.messageId.localeCompare(previous.messageId) > 0)))
           )
-        )
-          metrics.replied.add(row.companyKey);
-        if (row.latestInboundId && row.replyState === "interested")
-          metrics.interested.add(row.companyKey);
+            latestReplies.set(row.companyKey, next);
+        }
         if (l.meeting?.state === "attended_reported")
           metrics.meetingsHeld.add(row.companyKey);
         if (l.sale === "won_reported") metrics.customers.add(row.companyKey);
@@ -334,6 +349,8 @@ export const insights = internalTenantQuery({
           timezone: l.meeting.timezone,
         });
     }
+    for (const [companyKey, latest] of latestReplies)
+      if (latest.state === "interested") metrics.interested.add(companyKey);
     return {
       source: "reported_by_you" as const,
       contacted: metrics.contacted.size,
@@ -366,12 +383,13 @@ export const repairActivity = internalAdminMutation({
     let repaired = 0;
     for (const row of page.page) {
       if (
-        row.activity &&
+        row.activity?.version === 2 &&
         row.sourceFacts !== undefined &&
         row.sourceIsDemo !== undefined
       )
         continue;
       const messages = await s.history(ctx, row);
+      const classifications = classificationHistory(row);
       const search = await ctx.db.get(row.searchId);
       const account =
         search?.orgId === row.orgId
@@ -382,12 +400,13 @@ export const repairActivity = internalAdminMutation({
         : null;
       const valid = account && qualifiedAccount(account);
       await ctx.db.patch(row._id, {
-        activity: activityFromHistory(messages),
+        activity: activityFromHistory(messages, classifications),
+        replyClassifications: classifications,
         sourceFacts:
           parent?.sourceFacts ?? (valid ? p.sourceFacts(account) : []),
         sourceIsDemo:
           parent?.sourceIsDemo ??
-          (valid ? false : account?.is_demo === true ? true : undefined),
+          (valid ? false : account?.is_demo === true ? true : null),
         approvalId: null,
         revision: row.revision + 1,
         updatedAt: Date.now(),

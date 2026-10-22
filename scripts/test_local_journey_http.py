@@ -138,6 +138,12 @@ def run():
                                                 'revisit_at': followup.isoformat(), 'revisit_timezone': 'UTC'})
                 assert first['next_followup_at'] is None and not first['approval']
                 first = mutate(first, 'reply-state', {'reply_state': 'referral'}, 'PATCH')
+                received = first['messages'][-1].copy()
+                first = mutate(first, 'draft', {'recipient': 'changed@' + first['domain'], 'subject': first['subject'],
+                               'body': first['body'], 'booking_link': ''}, 'PUT')
+                mutate(first, 'referrals', {'recipient': received['recipient'], 'contact_name': 'Original Fixture',
+                       'referrer_name': 'Original Fixture Contact', 'referrer_message_id': received['id']}, expected=409)
+                assert first['messages'][-1] == received, 'Recipient edits never rewrite actual received history'
                 child = mutate(first, 'referrals', {'recipient': 'jordan@' + first['domain'], 'contact_name': 'Jordan Fixture',
                                'referrer_name': 'Original Fixture Contact', 'referrer_message_id': first['messages'][-1]['id']})
                 assert child['id'] != first['id'] and not child['contact_basis'] and child['recipient_status'] == 'user_entered'

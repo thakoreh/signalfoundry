@@ -204,6 +204,200 @@ async function meeting(
 }
 
 describe("hosted lifecycle, return queue and reported outcomes (isolated offline fixtures)", () => {
+  it("rejects referral to the actual inbound referrer after a draft recipient edit, but permits a distinct contact", async () => {
+    const s = await setup();
+    let parent = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(s.rows[0]),
+      body: "Please talk to another colleague.",
+      replyState: "referral",
+    });
+    const original = parent.messages.at(-1)!;
+    parent = await s.admin.mutation(internal.outreachLedger.edit, {
+      ...revision(parent),
+      recipient: "changed@example.com",
+      subject: "",
+      body: "",
+    });
+    const args = {
+      ...revision(parent),
+      recipient: original.recipient,
+      contactName: "Test Contact",
+      referrerName: "Original Test",
+      referrerMessageId: original._id,
+    };
+    await expect(
+      s.admin.mutation(internal.outreachLifecycle.refer, args),
+    ).rejects.toThrow("different referred contact");
+    expect(
+      await s.t.run((ctx) => ctx.db.query("outreachThreads").take(101)),
+    ).toHaveLength(3);
+    const child = await s.admin.mutation(internal.outreachLifecycle.refer, {
+      ...args,
+      idempotencyKey: key(),
+      recipient: "new@example.com",
+    });
+    expect(child.thread.contactBasis).toBeNull();
+    expect(child.approval).toBeNull();
+    expect((await get(s, parent)).messages.at(-1)).toEqual(original);
+  });
+  it("keeps earlier human replies after later OOO and honors explicit correction of the same message", async () => {
+    const s = await setup();
+    let row = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(s.rows[0]),
+      body: "What does it do?",
+      replyState: "question",
+    });
+    const original = row.messages.at(-1)!;
+    row = await s.admin.mutation(internal.outreachLedger.classifyReply, {
+      ...revision(row),
+      replyState: "auto_reply",
+      revisitAt: "2026-10-28T11:00:00-04:00",
+      revisitTimezone: "America/Toronto",
+    });
+    expect((await insights(s)).replied).toBe(0);
+    row = await s.admin.mutation(internal.outreachLedger.classifyReply, {
+      ...revision(row),
+      replyState: "question",
+    });
+    expect((await insights(s)).replied).toBe(1);
+    vi.advanceTimersByTime(1000);
+    row = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(row),
+      body: "Away this week",
+      replyState: "auto_reply",
+      revisitAt: "2026-10-28T11:00:00-04:00",
+      revisitTimezone: "America/Toronto",
+    });
+    expect((await insights(s)).replied).toBe(1);
+    expect(row.messages[0]).toMatchObject({
+      body: original.body,
+      recipient: original.recipient,
+      reportedReplyState: "question",
+    });
+  });
+  it("uses the latest company inbound for interest and ignores later draft edits on older sibling replies", async () => {
+    const s = await setup();
+    let first = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(s.rows[0]),
+      body: "Interested",
+      replyState: "interested",
+    });
+    expect((await insights(s)).interested).toBe(1);
+    vi.advanceTimersByTime(1000);
+    const second = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(s.rows[1]),
+      body: "Not for our team",
+      replyState: "not_interested",
+    });
+    expect(await insights(s)).toMatchObject({ replied: 1, interested: 0 });
+    vi.advanceTimersByTime(1000);
+    first = await s.admin.mutation(internal.outreachLedger.edit, {
+      ...revision(first),
+      recipient: first.thread.recipient,
+      subject: "Saved private draft",
+      body: "Private note",
+    });
+    expect(first.thread.replyState).toBe("interested");
+    expect((await insights(s)).interested).toBe(0);
+    await s.admin.mutation(internal.outreachLedger.classifyReply, {
+      ...revision(second),
+      replyState: "interested",
+    });
+    expect((await insights(s)).interested).toBe(1);
+  });
+  it("repairs unknown-source rows once without inventing provenance or counting them as real companies", async () => {
+    const s = await setup();
+    const row = s.rows[0];
+    await s.t.run(async (ctx) => {
+      await ctx.db.patch(s.searchId, { accounts: [] });
+      await ctx.db.patch(row.thread._id, {
+        activity: undefined,
+        sourceFacts: undefined,
+        sourceIsDemo: undefined,
+      });
+    });
+    expect(
+      (
+        await s.admin.mutation(internal.outreachActivity.repairActivity, {
+          ...scope,
+          cursor: null,
+        })
+      ).repaired,
+    ).toBe(1);
+    const repaired = await get(s, row);
+    expect(repaired.readyForManualAction).toBe(false);
+    expect(repaired.thread.sourceIsDemo).not.toBe(false);
+    expect(repaired.thread.sourceFacts).toEqual([]);
+    expect(
+      (
+        await s.admin.mutation(internal.outreachActivity.repairActivity, {
+          ...scope,
+          cursor: null,
+        })
+      ).repaired,
+    ).toBe(0);
+    expect(await get(s, row)).toEqual(repaired);
+    expect(await insights(s)).toMatchObject({
+      contacted: 0,
+      replied: 0,
+      interested: 0,
+    });
+  });
+  it("migrates the surviving legacy correction once and preserves immutable messages when another inbound arrives", async () => {
+    const s = await setup();
+    let row = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(s.rows[0]),
+      body: "An ambiguous received note",
+      replyState: "uncertain",
+    });
+    const original = row.messages[0];
+    row = await s.admin.mutation(internal.outreachLedger.classifyReply, {
+      ...revision(row),
+      replyState: "question",
+    });
+    const legacy = { ...row.thread.activity! };
+    delete legacy.version;
+    delete legacy.humanReplyCount;
+    delete legacy.latestReply;
+    await s.t.run((ctx) =>
+      ctx.db.patch(row.thread._id, {
+        activity: legacy,
+        replyClassifications: undefined,
+      }),
+    );
+    expect((await insights(s)).unknownHistory).toBe(1);
+    expect(
+      (
+        await s.admin.mutation(internal.outreachActivity.repairActivity, {
+          ...scope,
+          cursor: null,
+        })
+      ).repaired,
+    ).toBe(1);
+    row = await get(s, row);
+    expect(row.messages[0]).toEqual(original);
+    expect(row.thread.replyClassifications).toEqual([
+      { messageId: original._id, state: "question" },
+    ]);
+    expect((await insights(s)).replied).toBe(1);
+    row = await s.admin.mutation(internal.outreachLedger.pasteReply, {
+      ...revision(row),
+      body: "Away this week",
+      replyState: "auto_reply",
+      revisitAt: "2026-10-28T11:00:00-04:00",
+      revisitTimezone: "America/Toronto",
+    });
+    expect((await insights(s)).replied).toBe(1);
+    expect(row.messages[0]).toEqual(original);
+    expect(
+      (
+        await s.admin.mutation(internal.outreachActivity.repairActivity, {
+          ...scope,
+          cursor: null,
+        })
+      ).repaired,
+    ).toBe(0);
+  });
   it("keeps every new function internal/default-off with no external calls or writes on reads", async () => {
     for (const fn of [
       ...Object.values(lifecycleExports),
