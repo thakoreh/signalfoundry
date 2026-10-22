@@ -65,6 +65,19 @@ export async function mountGrain(
     };
   } catch {
     // A blocked context or unsupported GPU must leave the solid poster intact.
+    // A constructor can throw before returning its controller. Release any
+    // context it already attached, rather than waiting for browser collection.
+    if (!mount) {
+      try {
+        host
+          .querySelector("canvas")
+          ?.getContext("webgl2")
+          ?.getExtension("WEBGL_lose_context")
+          ?.loseContext();
+      } catch {
+        // Context creation itself may be denied by the browser.
+      }
+    }
     dispose();
     return null;
   }

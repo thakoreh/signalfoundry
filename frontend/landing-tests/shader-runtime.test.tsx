@@ -12,6 +12,7 @@ const mock = vi.hoisted(() => ({
   removeGeometry: vi.fn(),
   removeProgram: vi.fn(),
   float: true,
+  paperFails: false,
 }));
 vi.mock("@paper-design/shaders", () => ({
   getShaderNoiseTexture: () => undefined,
@@ -24,6 +25,7 @@ vi.mock("@paper-design/shaders", () => ({
     constructor(host: HTMLElement, ...args: unknown[]) {
       mock.paper(...args);
       host.append(this.canvasElement);
+      if (mock.paperFails) throw new Error("GPU initialization failed");
     }
     setSpeed = mock.speed;
     dispose() {
@@ -101,6 +103,7 @@ let nextFrame: number;
 beforeEach(() => {
   vi.clearAllMocks();
   mock.float = true;
+  mock.paperFails = false;
   host = document.createElement("div");
   document.body.append(host);
   vi.spyOn(host, "getBoundingClientRect").mockReturnValue({
@@ -167,6 +170,17 @@ it("falls back and cleans up when the grain context is lost", async () => {
   expect(host.dataset.shaderState).toBe("static");
   controller!.dispose();
   expect(mock.dispose).toHaveBeenCalledTimes(1);
+});
+
+it("releases an attached GPU context when initialization fails before a controller exists", async () => {
+  mock.paperFails = true;
+  vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue({
+    getExtension: () => ({ loseContext: mock.lose }),
+  } as unknown as WebGL2RenderingContext);
+  expect(await mountGrain(host, new AbortController().signal)).toBeNull();
+  expect(mock.lose).toHaveBeenCalledTimes(1);
+  expect(host.querySelector("canvas")).toBeNull();
+  expect(host.dataset.shaderState).toBe("static");
 });
 
 it("avoids mounting either GPU effect after a cancelled import", async () => {

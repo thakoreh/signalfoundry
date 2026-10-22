@@ -2535,7 +2535,7 @@
   font-size: 12px;
   line-height: 1.65;
   border-top: 1px solid var(--line);
-  background: #252238a3;
+  background: var(--surface-tint);
 }
 .sf-landing .sf-tour-controls {
   display: flex;

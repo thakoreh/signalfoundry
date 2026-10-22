@@ -1,3 +1,7 @@
+## October 22 shader/theme rendered milestone - caption repair in progress
+
+Application37fa69c optimized webpack build PASS. Real Chrome shows native Paper and OGL canvases ready, shared pause works, phones remove OGL and preserve static grain, reduced-motion controls are disabled, and390/320 have no page overflow. Reviewed actual setup/leads/Echo modal/dashboard/Settings with fictional fixture only; Escape restores focus. A P2 dark-on-dark workflow caption was found in17-desktop-workflow.png and repaired to shared light surface; re-build/capture is next. Added cleanup for a Paper constructor failing before its controller returns, with a regression. Node67 PASS; production npm audit0; dev audit6high identical names/count to126f376a baseline. No paid/provider/send/owner-data action.
+
 ## October 22 shader/theme milestone — source checks pass, rendered QA pending
 
 Owner explicitly requested real OGL Flowmap poster distortion plus Paper GrainGradient and a consistent whole-site theme. Scope/roles/boundaries: docs/continuation/SHADER_THEME.md. Broad goal stays paused. Changed only frontend visual code, pinned two libraries, and added 13 lifecycle cases. Current commands: full Vitest landing 187/187 PASS; nonincremental tsc PASS; focused ESLint PASS. No paid/provider/send/account/deploy/main action. Chrome reconnect now succeeds; production build and fresh desktop/phone verification are next. Do not reuse the earlier component-polish screenshots as shader proof.
