@@ -1,5 +1,9 @@
 # SignalFoundry / ClientRove continuation handoff
 
+## October22 approved component polish — current focused scope
+
+The owner reviewed Teknium component recommendations and authorized the first three treatments. Application `bd99967` adds a labelled animated landing pipeline, an actual-analysis-only input halo, and exact selected-business review in a retained native modal. [PREMIUM_COMPONENT_POLISH.md](PREMIUM_COMPONENT_POLISH.md) records174 component passes, exact production build/TypeScript, focused lint, fresh real Chrome desktop/390/320 and the focus/resize repairs. Root `design-qa.md` passes this adaptation only; it is not independent or whole-product acceptance. Sending stays disconnected, no model/paid call was made, and the broad release goal remains paused. Latest pushed-head CI requires separate readback; historical green checks do not transfer.
+
 **Latest owner overlay:** the broad release goal is PAUSED. Subsequent explicit authorization covers landing/workspace feedback and mailbox research only. Current application f65fa80 includes the minimal dashboard, Settings data controls and exact selected-customer Review routing; see [WORKSPACE_FEEDBACK.md](WORKSPACE_FEEDBACK.md), [latest provider decision](INSTANTLY_PILOT_OPTIONS_20261022.md) and current PROGRESS. The owner excludes customers' main inboxes; Instantly exceeds the25USD total cap and no provider is selected. Actual sending-agent implementation is gated. Earlier landing/CI/active-work statements are historical; obtain exact-head check readback. No whole-product acceptance or permission to resume the backlog is implied.
 
 **Verdict: INCOMPLETE. Continue the existing app; do not rebuild or describe it as finished.** This bundle makes the project handoff independent of the previous AI's private memory, local chat history, gateway, and task board.

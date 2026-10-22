@@ -1,111 +1,66 @@
-# Clientrove landing design QA
+# Component polish QA — October 22, 2026
 
-Date: October 19, 2026. Scope: the existing production app's public landing page and website/manual intake handoff. Explee is an inspiration reference, not a request for a pixel-identical clone or its commercial claims.
+Scope: the owner-approved adaptation of three Teknium interaction patterns. This passes only this focused UI slice. The whole-app goal stays paused/incomplete; no provider or production acceptance is implied. Reviewer: implementing agent's browser/visual QA, not a separate independent review.
 
-## Visual evidence
+## Source visual truth and comparison contract
 
-- Source visual truth: `../work/explee-final-reference.png`, captured from https://explee.com/ in Chrome.
-- Implementation hero used in comparison: `../work/clientrove-comparison-capture.png`, the unscaled 2545 x 1215 common crop retained from the right half of the combined comparison. Captured from http://127.0.0.1:3000/ in Chrome. The later warm-server final proof is `../outputs/clientrove-landing-v2.png`; `../outputs/clientrove-landing-review.png` is its centered, unscaled review crop retaining navigation and the hero.
-- Implementation walkthrough: `../outputs/clientrove-workflow-v2.png`.
-- Full-view comparison: `../work/landing-design-comparison.png` contains both source and implementation in one image.
-- Focused form comparison: `../work/landing-form-comparison.png` contains both actual website-entry regions in one image.
-- Source capture pixels: 2560 x 1215. Implementation capture pixels: 2545 x 1264; implementation CSS viewport width 2545. The common desktop comparison crops to 2545 x 1215 without rescaling either source. The 15-pixel right-edge and 49-pixel bottom differences are excluded from judgment. Layouts are compared at the top-of-page state after intro motion settles.
-- This is a desktop browser pass. Mobile typography and overflow behavior were reviewed in CSS and independent source review; the Playwright responsive scenarios were authored but not executed. No mobile browser result is claimed.
+Source directory: `C:\Users\Hiren\Documents\Codex\2026-10-19\https-github-com-thakoreh-signalfoundry-https\work\review-probes\teknium-review-20261022\`.
+
+- `01-animated-pipeline.png` (2560×1249) / `01-pipeline-detail.png` (620×470): [Magic UI beams demo](https://webdev.teknium.io/d/react/demos/magicui-beams/).
+- `02-ai-border.png` (2560×1249) / `02-border-detail.png` (680×395): [Paper pulsing border demo](https://webdev.teknium.io/d/paper/demos/paper-pulsing-border/).
+- `03-expanding-dialog.png` (2560×1249): [Motion morph demo](https://webdev.teknium.io/d/react/demos/motion-primitives-morph/).
+
+Intentional differences: Clientrove retains its warm paper/white/green palette, existing system typography, functional company/message content and icons. The source demonstrates dark shader artwork, invented sample metrics and a small art card. Those are not Clientrove assets or approved product claims. Compare the beam/halo/focused-reveal patterns and readability, not pixel equality, source art recreation or fake statistics. No source artwork was replaced with a purported faithful custom drawing; source artwork is not part of this adaptation.
+
+## Browser-rendered implementation
+
+Application `bd99967c0e3d614df9c0b2f6d031d5e999b978f6`, real Next standalone + FastAPI + fictional SQLite, Chrome only, providers off. Implementation directory: `C:\Users\Hiren\Documents\Codex\2026-10-19\https-github-com-thakoreh-signalfoundry-https\work\review-probes\premium-polish-20261022\`.
+
+| Evidence | CSS viewport/state | Returned image pixels |
+| --- | --- | --- |
+| 12-final-desktop-pipeline.png | 1440×1000, landing scrolled to pipeline | 1425×990 |
+| 02-phone390-pipeline.png | 390×844, paused pipeline | 375×812 |
+| 03-phone320-pipeline.png | 320×844, reduced motion pipeline | 305×804 |
+| 10-final-analysis-active.png | 1440×1000, actual local Reading state | 1425×990 |
+| 14-final-resize390-review.png | 390×844, exact Echo review after resize | 390×844 |
+| 15-final-reduced320-actions.png | 320×844, lower actions, reduced motion | 320×844 |
+| 17-final-native-desktop-review.png | 2560×1249 native desktop, exact Echo review | 2560×1249 |
+| 18-final-review-detail.png | native desktop dialog crop with16px surround | 1112×932 |
+
+Chrome deviceScaleFactor1/native DPR1. Some page captures returned a scrollbar/capture-region raster smaller than the requested CSS viewport; record both rather than inferring pixel drift. No downsampling/editing was applied to source files or implementation captures. The image viewer resized2560px images for display equally; no numerical pixel-fidelity claim is made. Analysis/pipeline CSS is identical across the initial and final application checkpoints; the last patch handles native transition promise cancellation only.
+
+Full-view comparisons put source01 with implementation12, source02 with implementation10, and source03 with implementation17 in the same image-tool input. Focused comparison put source03 and implementation18 together. Source01/detail13 was also examined but13 clips its right edge and is excluded; full12 and phone captures show the whole pipeline. Source02/detail already resolves the halo target;10 visibly resolves the input/busy button. No separate raster mock existed for Clientrove's theme, phone grid or compliance fields; those are judged against the approved adaptation and existing product requirements.
+
+## Findings and iteration history
+
+- P1, retained dialog close: initial component test exposed focus landing on hidden Close after React commit. Restored opener after close commit; component regression and Chrome Escape/Close now return to the selected row. Body/page scroll unlock. Fixed in initial source checkpoint.
+- P2, backward Tab: CSS-hidden embedded activity summary left its descendants in the custom focus boundary. Removed the subtree/request in `f9c9ef6`; retained standalone summary. Final14/15 and real forward/backward Tab confirm visible last control→Close wrapping, no hidden summary DOM. Original captures04–06 precede this repair.
+- P2, native animation cancellation: viewport change rejected `ready`, causing an app error despite catching `finished`. `bd99967` catches visual cancellation; new rejected-promise regression passes. Fresh final Chrome resize leaves the exact-company review open with no app error log.14/15/17/18 are post-fix.
+- Evidence corrections, not product defects:09 is a stale pre-busy frame, replaced by10.13 clips the focused pipeline crop, replaced by full12.16 contains a viewport-change capture artifact, replaced by native17/readable18. Do not count rejected captures as passing evidence.
+
+No actionable P0/P1/P2 finding remains established in this focused slice after the rechecks.
 
 ## Required fidelity surfaces
 
-1. Fonts/typography: centered, large two-line headline and short explanatory copy convey the task; green emphasis matches the existing accepted onboarding style. System product fonts are intentionally retained instead of importing Explee's branding. The primary action is visibly labeled, and the website field has a persistent label. Small mobile text was increased; see iteration history.
-2. Spacing/layout rhythm: a single centered intake replaces the old split hero. The decorative edges leave the form unobstructed. The next section introduces a concrete profile-to-list walkthrough. Desktop measurement reports page width equal to viewport width, with no horizontal overflow.
-3. Colors/tokens: existing pale-neutral/forest-green Clientrove tokens remain consistent with onboarding. Focus, error, and contact-status treatments are distinct. No full contrast/compliance certification is claimed.
-4. Image quality: original decorative WebP background is 1738 x 905 and 18,510 bytes, generated with the built-in image tool and visually inspected. It contains no text or UI. The actual form, preview table, navigation, and copy are semantic HTML. The existing logo/icon system is reused.
-5. Copy/content: company examples use reserved `.example` domains and explicit fictional/illustrative labeling. No Explee customer counts, success statistics, free-credit offers, outreach sending, or verified-contact claims are borrowed. The task is website -> editable business profile -> sourced candidate businesses -> selected CSV.
+- **Fonts/typography:** existing `ui-sans-serif, -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif`; pipeline14px/600 headings and12px supporting text. Intentional departure from source display/monospace/serif treatments. Long fictional company wraps in phone modal heading; no clipped title/action. Secondary copy remains smaller than primary form text as in current brand.
+- **Spacing/layout:** four equal desktop cards, two phone columns,17px card radius; icon/number hierarchy and unobstructed connectors. Modal retains white fixed header/footer, scrollable body;44×44 Close, no duplicate editor IDs or horizontal page/dialog overflow at tested widths. Native desktop1080px panel is deliberately larger than the source art card because it contains a real editable workflow.
+- **Colors/tokens:** existing forest text rgb25/58/50, white surfaces; pipeline caption rgb103/121/108; green connectors/halo. Decorative step numerals and connectors are aria-hidden; content meaning is in labelled text. Existing disabled-control colors are not presented as enabled actions. Visual contrast/focus checked; not a full automated accessibility certification.
+- **Image/asset quality:** no bitmap generation or new asset package. Existing crisp functional icon set is reused. No source shader art, brand marks, fake counters or testimonials copied. The interface itself is semantic live content, not a screenshot reconstruction.
+- **Copy/content:** clear website→businesses→message→conversation labels, explicit manual availability, real busy label only during analysis, selected fictional company matches editor. No auto-send/verification/customer proof claim. Existing evidence/footer/approval wording remains. Fixture re-analysis changed only its fictional seller name; current stored message with old footer stays approval-blocked, correctly.
 
-## Browser interaction evidence
+## Interaction checks and limits
 
-- Invalid website: clear inline error, `aria-invalid`, associated message, and focus returned to the field; no navigation.
-- Valid `cal.com` example: signup handoff leads to setup with `https://cal.com/` prefilled. No analysis or saved-profile write occurs.
-- Manual option: signup handoff opens the short manual-details view directly.
-- Saved business profile: independently compared with the pre-change snapshot; unchanged.
-- Native section link reaches `#workflow`; the full preview renders without a carousel.
-- FAQ expands with Enter and its answer is visible.
-- Warm-server final browser error log: no errors. One earlier cold-server reload in the user's extension-enabled Chrome profile produced an attribute hydration warning whose diff consisted of injected `fdprocessedid` attributes on the input and buttons; no application-rendered property difference was shown. Extension console warnings were also present. The clean final tab has no error or development-issue badge.
-- Linked CSS and decorative asset return HTTP 200 after restart.
+Actual Chrome: page pause/system reduced motion, website reading/completion through fictional provider, exact Echo/Delta/Echo and retained private message, native close/Escape/trigger focus, Tab both directions, no duplicate IDs, action reachability390/320, resize cancellation, scroll unlocking. Final native and repaired-review error logs empty; earlier MetaMask extension warnings were excluded from product findings. Component suite174/25files, focused lint and exact-source production build/TypeScript pass. No automatic AI-generation or external send occurred.
 
-## Comparison history and findings
-
-- [P2, fixed] Mobile supporting copy had been reduced to 8-11 pixels. Increased body, label, and error copy to at least 14px, website input to 16px, supporting/table metadata to at least 12px, and small kickers to at least 11px. The example table retains readable row text and an internal, named keyboard-focusable scroll region instead of shrinking to fit. Independent Spec/UX review includes these overrides.
-- [P2, fixed] Product-preview reveal animations initially ran during page load, before the user reached the below-fold walkthrough. The final correction observes the preview body and requires 15% visibility before triggering the same finite sequence once. Content stays visible without JavaScript, and the observer disconnects after entry/unmount. Chrome proof at the top of the page: preview body top 1261px, viewport height 1271px, motion attribute absent, profile animation `none`. After following How it works: motion attribute `true`, profile animation `sf-intro`, duration 0.7s. The whole stagger completes in 1.25 seconds. Three observer tests and the final independent Standards review pass.
-- Accepted differences: stronger explicit Analyze action, existing Clientrove logo/palette, shorter header, no fabricated social proof, no quantified lead promise, and a static readable semantic product example rather than Explee's stacked sales/outreach demonstration.
-
-## Validation and remaining scope
-
-Independent Standards/security and Spec/UX reviews passed, including the scroll-trigger adjustment; Standards also cleared the final body-visibility threshold. TypeScript, full lint, 107 backend tests, 67 Convex tests, 50 Node tests, 16 landing component tests, and five production source gates passed. The final production build passed after the last motion change, and the local server was restarted successfully. Tests using fixtures do not establish provider quality. One authorized real DeepSeek request returned four researched businesses and one blocked website; the saved example was requalified using its captured pages without another provider request. One published email remains unverified. Live Hunter verification, hosted SaaS operation, physical/mobile browser QA, and actual container runtime were not part of this local evidence.
+Physical phone, screen reader, browser200%zoom, entire14-step product, live provider/hosted/inbox tests and an independent final-diff review were not performed in this slice. Those remain release acceptance gaps, not claims supplied by this design pass. Web animation timing is verified by interaction/computed state and scoped regressions; screenshots alone do not prove timing.
 
 ## Implementation checklist
 
-- [x] Centered functional website entry and manual alternative.
-- [x] Private expiring tab-scoped draft handoff; no automatic analysis.
-- [x] Plain copy, source/contact-status examples, legal navigation.
-- [x] Finite intro/interaction motion and reduced-motion CSS.
-- [x] Desktop visual comparison, primary flow, FAQ, and console checks.
-- [x] Verify final viewport-triggered walkthrough motion and obtain final reviewer refresh.
+- [x] Adapt first three recommended patterns without a dependency or false claims.
+- [x] Inspect full/focused source and rendered result together; classify theme/content departures.
+- [x] Fix and recheck retained-focus, hidden-focus-target and animation cancellation findings.
+- [x] Capture desktop/390/320, relevant real states, keyboard and reduced motion.
+- [x] Preserve private edits and existing manual/approval/provider boundaries.
+- [x] Record evidence exclusions and broader acceptance limits.
 
 final result: passed
-
-## Customer-search follow-up: October 19, 2026
-
-The search form now lives at `/workspace/customers`; starting a search navigates to `/workspace/customers/[searchId]` for progress and results. Default and maximum remain five, with a 1–5 selector. Refresh, polling, and status retry only read the existing job. Contact ordering distinguishes verified email, published unverified email, and no email, then uses score/name/id ties. Selected CSV rows follow the displayed order. Partial research uses a quiet summary and optional plain-language details.
-
-Blocked, excluded, and redirected-duplicate sites free slots for remaining candidates from the same search response. The engine attempts at most ten public sites using three workers, retains at most the requested five businesses, and enriches contacts only after final-domain deduplication and admission. It does not bypass blocked access or make another search request for backfill.
-
-Independent security/standards and spec/UX reviewers cleared the final changes after fixing verified-first ranking, a StrictMode session startup failure, and optional history loading that could stall polling. Genuine unmount and organization changes still abort requests; old organization API closures cannot revive an aborted session.
-
-Validation passed: 112 backend tests, 67 Convex tests, 56 Node tests, 25 component tests, five production source checks, full lint, and the production build including both new routes. Managed local servers were restarted. Both new routes return HTTP 200; DeepSeek reports ready, the contact verifier remains unconfigured, and the saved workspace exactly matches the pre-change snapshot.
-
-Chrome desktop evidence uses the user's existing saved search `search_3701fff82d9348bcbf7035cfe89344af`: published email first, explicit unverified label, alternative sorting, selection/sort restoration after refresh, quiet expanded research details, and fixed checkbox alignment. Final warm-server browser error log is empty. Screenshot: `../outputs/customer-results-reviewed.png`.
-
-Progress rendering and refresh were checked using one explicitly labeled temporary local interface fixture, with no provider requests or fabricated leads. Screenshot: `../outputs/search-progress-interface-qa.png`. Only that fixture row was removed afterward; hashes confirmed every pre-existing search and the workspace were unchanged. No additional live search/contact provider calls were made for this iteration. Actual paid-provider yield, Hunter deliverability, hosted SaaS deployment, and mobile-browser rendering remain outside this evidence.
-
-The agent workflow and monetization research is a proposal, not implemented autonomous outreach or a price change: `docs/AGENT_PRODUCT_AND_PRICING.md`, also copied to `../outputs/agent-product-and-pricing.md`. It distinguishes supported broader SaaS embedding from supplier restrictions requiring confirmation for Clientrove's exact sharing/export use, and labels all margin scenarios as illustrative.
-
-## Compact results and AI draft trial
-
-User approved a working visual trial of compact cards and personalized drafts. The main card now shows company/domain, one sourced match observation, one prioritized contact status, and Draft message. Research details contain the remaining facts, source links, score, contacts, and unknowns. The run-level partial note is one line with expandable details; the completed page no longer displays the internal provider query.
-
-Eligibility now requires non-demo public-source evidence and an explicit company-type identity match. Incidental body mentions, zero category matches, and geography points alone do not qualify. This conservative wording check is still rules-based; it does not establish semantic need or buying intent. New searches backfill rejected candidates before contact lookup. Existing saved runs are filtered for display/selection/export without rewriting their stored accounts. The current four-candidate example shows only Flowout; three weaker candidates are left out.
-
-Optional message drafting uses the real DeepSeek language model with bounded source excerpts and the sender's saved offering. There is no automatic generation, tool execution, recipient selection, copying, or sending. The editor permits local edits and reset to the cached original. Known evidence IDs and output format/destinations/numeric claims are checked mechanically; prose still needs human review. Privacy and current-capability documentation describe the new data flow.
-
-Independent security and spec reviews passed after fixing provenance cache invalidation, generated destination checks, admission parity, failed-attempt retry, stale pending recovery, and cached-read alias limits. Same-key retries cannot add another model attempt. Only an explicit new key after confirmed terminal failure can retry; attempts count toward quotas. Expired pending work is marked failed after 90 seconds without an automatic retry, and stale completions cannot overwrite a new attempt. Cached request aliases have a 100/hour retrieval bound, rather than a permanent lifetime lockout.
-
-Final integrated checks passed: 128 backend tests, 76 Convex tests, 59 Node tests, 34 component tests, five production source checks, full lint, and a production build. The managed local server was restarted with explicitly enabled drafting; both search and drafts report configured. Hosted deployment, production auth/provider configuration, actual container runtime, and mobile browser QA are not established by these local checks.
-
-One live model request through the Chrome Draft message action produced a 96-word editable introduction using the saved Explee example offering and Flowout source claims. Cited stored excerpts support its company description and quoted company metrics; the proposed benefit is conditional. Reopening after refresh returned the cached original, with the local attempt ledger still showing only one generation attempt. Subject editing and local Reset edits were verified in Chrome. Copy behavior was covered by mocked component tests; the user's clipboard was not changed. No new discovery request or external message was sent. Provider cash billing was not audited.
-
-Hashes confirm every pre-existing saved search and the workspace were unchanged. The new AI original remains saved for user review. Final warm-server Chrome error log is empty. Screenshots: `../outputs/compact-customer-trial.png` and `../outputs/ai-draft-trial.png`; the marked Chrome tab remains open on the actual draft editor. `docs/AGENT_PRODUCT_AND_PRICING.md` and its outputs copy now distinguish implemented assisted drafting from future autonomous research/CRM/sending proposals.
-
-## Dense results, phone layouts, and landing alignment
-
-The latest user request replaces the earlier cards and research disclosures with a dense company/email/verification/action table. Research details and generic why-fit lines are removed from the main results. Drafting opens a separate modal/drawer; the native dialog traps focus, Escape closes it, and focus returns to the row. Selection/export and contact-first sorting are preserved. The testing limit remains five.
-
-Fresh Chrome phone checks exposed real horizontal page overflow and hidden primary actions. At widths up to 800px the same semantic table now reflows into compact lead rows. Company, email/status, selection and Draft are available together; narrower rows put the action below. Copy/Reset live in a persistent dialog footer outside the editor scroller. At 390px and 320px the inspected results have no horizontal page overflow; Copy fits inside the captured viewport. Website/manual inputs use 16px phone text. Viewport overrides were reset afterward. These are Chrome viewport checks, not physical Safari, virtual-keyboard or screen-reader evidence.
-
-Three roles reviewed positioning, conversion and UI/UX against fresh screenshots. The landing identifies founders selling SaaS to businesses, describes the currently built shortlist/contact/draft/CSV outcome, uses Get started before account/setup and retains Analyze at actual website analysis. Its fictional .example product illustration now shows compact contacts and a native draft disclosure. Five-result testing limits, variable contact availability and no sending are explicit. The removed research panels were not restored. Broader outreach, reply handling and meeting booking remain proposed work rather than landing claims about implemented features.
-
-Independent UI/UX review passed the captured desktop/390px/320px states, with no blocking finding. Optional refinements are a shorter phone seller-profile example and less repeated website wording. Root validation passed all 37 component tests, 59 Node tests, full ESLint and the optimized production build. The managed local server was restarted and a fresh Chrome result page loaded with an empty error log; the landing was opened for user review. Existing cached drafts were reused, with no new charged generation attempt or discovery search. Workspace and saved search data remain unchanged.
-
-Evidence: `../outputs/landing-revised-desktop.png`, `../outputs/landing-revised-workflow.png`, `../outputs/mobile-landing-reviewed.png`, `../outputs/mobile-landing-draft-example-reviewed.png`, `../outputs/customer-lead-table.png`, `../outputs/mobile-leads-reviewed.png`, `../outputs/mobile-draft-reviewed.png`, and the 320px variants. Reports: `../outputs/landing-conversion-review.md`, `../outputs/landing-product-positioning-review.md`, `../outputs/landing-ux-review.md`. The first two describe the pre-change audit; the independent UX report includes the revision signoff.
-
-The user approved a US$25 total monthly early-testing planning ceiling, including existing DeepSeek usage. No new subscription was purchased. A cross-provider spending ledger and enforceable account-wide cap are not implemented and are not established by existing per-hour request limits.
-
-## Persistent supervised outreach and complete landing story
-
-The private local app now persists Review, Conversations and Meetings at `/workspace/outreach/[searchId]`. Prepare outreach creates/reopens selected eligible businesses, reuses matching cached initial drafts without a new model request, and keeps exact-recipient/message approval, manual external-send records, pasted replies/classifications, sticky opt-outs, pauses and reported meeting/customer outcomes. There is no mailbox transport, automatic inbox reading, AI reply generation or calendar confirmation. Hosted outreach intentionally returns unavailable until tenant-backed parity exists.
-
-Independent review corrected booking-link copy/history alignment, suppression of the original inbound recipient after editing, initial approval gating and sidebar status accuracy. Root also corrected primary-button contrast to the onboarding forest green (white on #234f40 computes to 9.28:1). Full current verification: 142 backend tests, 76 Convex tests, 45 component tests, 60 Node tests, five production source checks, full ESLint and a successful production build. The source checks do not establish deployment readiness.
-
-Chrome opened actual saved results, selected two businesses, prepared outreach, inspected all three views and refreshed the new route successfully. The saved original drafts survived refresh; no new AI generation was triggered. No approval, external-send event, received reply, meeting or customer outcome was fabricated in the real workspace for QA. State-changing workflow cases are covered in isolated offline tests. The warm-route browser error log was empty. At 390px and 320px outreach reflow showed no page overflow, and inspected phone fields were 16px. A full-page capture timed out; viewport captures were retained instead. Physical-device keyboard/Safari checks remain unverified.
-
-Fresh local evidence: `../outputs/outreach-01-review.png`, `../outputs/outreach-02-conversations.png`, `../outputs/outreach-03-meetings.png`, `../outputs/outreach-mobile-review.png`, and `../outputs/outreach-mobile-meetings.png`. These local output artifacts are not committed screenshots. The expanded landing now explains discovery through manually recorded conversations/meetings and separately labels connected inbox/automatic follow-ups as planned. Ads budget allocation versus the US$25 testing ceiling remains unresolved; no ads or new services were purchased.
-
-The final whole-journey landing hero was captured separately as `../outputs/landing-whole-journey-desktop.png`; earlier landing screenshots predate that copy expansion. A read-only database comparison confirmed existing workspace and search records were unchanged and charged draft attempts remained four before/after this review. Two pending outreach threads were added by the explicit Prepare outreach action, with no fabricated sends or outcomes. The overnight entry point is `docs/OVERNIGHT_AGENT_PROMPT.md`, with product, technical, and design requirements linked from it. These requirements describe remaining work, not completed launch evidence.

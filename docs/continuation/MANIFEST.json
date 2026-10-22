@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "f65fa8069a9cce3047c12e238ab89e0d6ebed516",
+  "application_checkpoint": "bd99967c0e3d614df9c0b2f6d031d5e999b978f6",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff, failed and passing scoped reviews, and labelled partial real Chrome evidence; no runtime/customer data or whole-product acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -76,8 +76,8 @@
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 14808,
-      "sha256": "e96c64d2743faa52b678d12d2a2aea7a18fdaf6cfacab78ed295c70afa9b25ad"
+      "bytes": 15627,
+      "sha256": "98fb7a70e6ec9158fdc7b2bc41894423dc8801e6332b7f447e18012647971ccd"
     },
     {
       "path": "OUTREACH_AGENT_RESEARCH_20261022.md",
@@ -90,9 +90,14 @@
       "sha256": "001cd93044bc51e0fdddac33249b43b1425e4f73be5009367cb99bc49674ad59"
     },
     {
+      "path": "PREMIUM_COMPONENT_POLISH.md",
+      "bytes": 8223,
+      "sha256": "e2bb3a1bae0ad77fa5f58190aee45e0ecf9a1d7635d39ff292e6f01903d82d64"
+    },
+    {
       "path": "README.md",
-      "bytes": 9671,
-      "sha256": "8624f3ea12cef1ed50670cb3f6f740efd96d45aa44054e287cd62be2cf86d8d1"
+      "bytes": 10490,
+      "sha256": "69fdd9ed82e981f8fed9d65c87a07203631ee489dc0ee8e4c2dc0da8d1de9ee4"
     },
     {
       "path": "RELEASE_HANDOFF.md",
@@ -106,8 +111,8 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 26172,
-      "sha256": "10f96d50310024d4e4766d8310fb4174e84bf3bf967306b0ada62b3b27d45ec9"
+      "bytes": 26991,
+      "sha256": "0c1fa03b1cf3c458a77eef493794ff9e7530a4dd9d29676888e7b4b795af1004"
     },
     {
       "path": "WORKSPACE_FEEDBACK.md",
@@ -485,5 +490,5 @@
       "sha256": "15c6badd8dcee4b829b153a68c358c7e9fb57f85121bbfe29de4a89f121e0724"
     }
   ],
-  "application_checkpoint_scope": "Broad release goal paused. Owner-authorized landing/workspace feedback only: minimal dashboard/Settings/exact selected Review; repaired compact summary contract; scoped tests, exact builds, independent rechecks and partial connected Chrome proof. Failed or ambiguous captures labelled. Actual transport unconnected; latest separate-inbox Instantly option exceeds25USD; provider, spending and rights unresolved. Final pushed-head checks require independent readback; no whole-product acceptance."
+  "application_checkpoint_scope": "Broad release goal paused. Owner-authorized Teknium component adaptation: labelled landing pipeline, analysis-only halo, exact selected-company retained modal; local174 component cases/build/type/lint and partial real Chrome desktop390/320, focus and animation-cancellation repairs. Design QA scoped and not independent; actual sending disconnected, spending unresolved, final pushed-head checks need separate readback. No whole-product or production acceptance."
 }

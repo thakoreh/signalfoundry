@@ -1,5 +1,9 @@
 # Current continuation status — October22,2026
 
+## October22 approved component polish — current focused scope
+
+The owner reviewed Teknium component recommendations and authorized the first three treatments. Application `bd99967` adds a labelled animated landing pipeline, an actual-analysis-only input halo, and exact selected-business review in a retained native modal. [PREMIUM_COMPONENT_POLISH.md](PREMIUM_COMPONENT_POLISH.md) records174 component passes, exact production build/TypeScript, focused lint, fresh real Chrome desktop/390/320 and the focus/resize repairs. Root `design-qa.md` passes this adaptation only; it is not independent or whole-product acceptance. Sending stays disconnected, no model/paid call was made, and the broad release goal remains paused. Latest pushed-head CI requires separate readback; historical green checks do not transfer.
+
 ## Current focused workspace feedback — f65fa80; whole-app goal stays paused
 
 After the landing revision, the owner explicitly authorized a minimal workspace and outreach research. [WORKSPACE_FEEDBACK.md](WORKSPACE_FEEDBACK.md) records the implemented dashboard/Settings/selected-customer flow, original failed review, repaired real summary contract, 240 backend/165 component passes, exact-source production builds and partial real Chrome evidence. Independent repair review passes19 distinct cases; responsive/CSS review passes within its stated scope. Failed/clipped39 and filter-ambiguous45 captures are excluded from specific-state proof. No whole-product, hosted, physical-device or production acceptance.
