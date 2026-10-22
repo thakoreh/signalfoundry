@@ -29,6 +29,7 @@ On Windows, run backend tests from backend with `..\.venv\Scripts\python.exe -m 
 |BACKEND_PORT / FRONTEND_PORT / API_BASE_URL|Private selected service ports; frontend allowed3000/3001. Launcher supplies matching API_BASE_URL; production Next rewrites are build-time. Do not reuse owner preview ports/build assets.|
 |CLIENTROVE_LOCAL_OUTREACH_ENABLED|Default true locally for compatibility. Set false and restart to deny the outreach adapter, including fresh Copy/mailto preflight, while retaining saved records/research. Hosted/public preview remains denied regardless.|
 |CLIENTROVE_LOCAL_EXPORT_ENABLED|Default true only for private local export. Set false to deny export; no deletion occurs. Public/hosted export stays denied.|
+|SIGNALFOUNDRY_HOSTED_OUTREACH_PERSISTENCE_ENABLED|Default off. Tests alone set true for the new internal Convex manual-ledger prerequisites. It does not open the closed hosted adapter, deploy anything or permit paid/send operations. Leave unset in owner configuration. Off retains records; see HOSTED_LEDGER.md for incomplete parity and rollback.|
 |CLIENTROVE_SEARCH_PROVIDER|Existing deepseek/brave selection; does not grant paid permission.|
 |CLIENTROVE_DEEPSEEK_ENABLED / CLIENTROVE_BRAVE_SEARCH_ENABLED / CLIENTROVE_HUNTER_ENABLED|Existing explicit provider activation flags, default off. Keep off for QA; never put real keys in fixtures.|
 |CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED / DEEPSEEK_API_KEY|Existing initial AI draft opt-in+private key. Keys alone do not activate. Monetary admission must also allow every request.|

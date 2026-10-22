@@ -15,6 +15,8 @@ Current continuation source/status is docs/continuation/STATUS.md. The shared mo
 
 ## Work order
 
+Current hosted implementation overlay: HOSTED_LEDGER.md (under docs/continuation) describes the default-off internal Convex manual-ledger prerequisites and their tests. They cover tenant/admin/expected-org, revision/idempotency, immutable approval/actual snapshots, sticky stops and manual reply/company review. This is partial source implementation only; complete lifecycle, privacy, global monetary coordination and adapter parity are still required. The public hosted outreach adapter remains closed, no live deployment/account test is claimed, and no offline flag grants deployment/spend/send authority.
+
 ### P0 — Hosted ownership and complete persistence
 
 1. Implement hosted outreach parity in Convex before changing the closed adapter: organization-scoped threads, messages, immutable approvals/sent snapshots, suppression records, reply review, pause, reported meetings/outcomes, revision checks, and idempotent operation records. Keep local code isolated. Do not remove a 503 by forwarding to SQLite or accepting client organization IDs.

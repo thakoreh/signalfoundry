@@ -6,7 +6,7 @@ import {
   customMutation,
   customQuery,
 } from "convex-helpers/server/customFunctions";
-import { action, mutation, query } from "../_generated/server";
+import { action, mutation, query, internalMutation, internalQuery } from "../_generated/server";
 
 export type Principal = {
   orgId: string;
@@ -87,3 +87,7 @@ export const tenantAction = customAction(action, customCtx(tenantContext));
 export const adminQuery = customQuery(query, customCtx(adminContext));
 export const adminMutation = customMutation(mutation, customCtx(adminContext));
 export const adminAction = customAction(action, customCtx(adminContext));
+// Internal staging surfaces still derive scope and role from the verified JWT.
+// A caller-supplied organization is an intent check, never authorization.
+export const internalTenantQuery = customQuery(internalQuery, customCtx(tenantContext));
+export const internalAdminMutation = customMutation(internalMutation, customCtx(adminContext));

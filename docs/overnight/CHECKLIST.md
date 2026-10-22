@@ -2,6 +2,8 @@
 
 ## Current continuation matrix
 
+Hosted foundation update: internal gated manual-ledger prerequisites are partly built/offline tested (docs/continuation/HOSTED_LEDGER.md). Full hosted lifecycle/privacy/projections/monetary/adapter acceptance remains unmet. No live Convex push, account connection or browser/provider verification is claimed. Existing local work is preserved.
+
 Reply update at eea1d6c: local optional copilot logic is now built/offline tested, under separate default-off activation, explicit v2 context review and the shared dollar ledger. Both independent review rechecks pass within their source/mock/component scopes. It remains live/provider/Chrome unverified; it is not an inbox or autonomous sender. Historical rows below describing this code as wholly absent are superseded by STATUS.md/REPLY_COPILOT.md.
 
 The authoritative current14-step and cross-cutting P0/P1 built/tested/blocked/deferred map is `docs/continuation/STATUS.md`. It supersedes the historical c929/S3-only pending rows below. Local referrals, bounded followups, timed meetings, company activity/next batch, returning work/mailto, monetary admission and logical data/restore controls now exist with scoped local tests/reviews. Full fresh Chrome journey, physical-device/screen-reader, hosted parity, live account/history/pricing/provider/billing, reply-AI/mailbox/calendar and production operations acceptance remain incomplete. Read latest `PROGRESS.md` and actual Git/PR HEAD; no old check or screenshot certifies the new whole product.

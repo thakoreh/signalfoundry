@@ -46,7 +46,18 @@ export const saveProfile = adminMutation({
   returns: validators.workspace,
   handler: async (ctx, args) => {
     const row = await requireWorkspace(ctx, ctx.principal.orgId);
-    const profile = validateProfile(args.profile);
+    const submitted = { ...args.profile };
+    // Older clients omit sender fields. Preserve saved identity unless explicitly
+    // edited/cleared, just as the local profile contract does.
+    for (const name of [
+      "sender_name",
+      "mailing_address",
+      "sender_contact",
+    ] as const) {
+      if (submitted[name] === undefined && row.profile?.[name] !== undefined)
+        submitted[name] = row.profile[name];
+    }
+    const profile = validateProfile(submitted);
     const patch = {
       profile,
       name: profile.company_name,

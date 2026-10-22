@@ -86,10 +86,29 @@ function profile(value: unknown): Record<string, unknown> {
     "keywords",
     "exclusions",
   ];
-  keys(p, ["company_name", "description", ...fields]);
+  const senderFields = [
+    ["sender_name", 240],
+    ["mailing_address", 1000],
+    ["sender_contact", 320],
+  ] as const;
+  keys(p, [
+    "company_name",
+    "description",
+    ...fields,
+    ...senderFields.map(([name]) => name),
+  ]);
+  const sender: Record<string, string> = {};
+  for (const [name, max] of senderFields) {
+    if (!(name in p)) continue;
+    const value = p[name];
+    if (typeof value !== "string" || value.length > max)
+      fail(400, "Invalid sender identity field.");
+    sender[name] = value.trim(); // Explicit empty clears; omission is preserved by Convex.
+  }
   return {
     company_name: string(p.company_name),
     description: string(p.description, 4000),
+    ...sender,
     ...Object.fromEntries(fields.map((name) => [name, list(p[name])])),
   };
 }

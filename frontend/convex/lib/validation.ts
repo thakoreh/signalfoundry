@@ -26,6 +26,9 @@ export function validateProfile(value: Profile): Profile {
   };
   return {
     company_name: text(value.company_name, "Company name"),
+    ...(value.sender_name !== undefined ? { sender_name: value.sender_name.trim() ? text(value.sender_name, "Sender name", 240) : "" } : {}),
+    ...(value.mailing_address !== undefined ? { mailing_address: value.mailing_address.trim() ? text(value.mailing_address, "Mailing address", 1000) : "" } : {}),
+    ...(value.sender_contact !== undefined ? { sender_contact: value.sender_contact.trim() ? text(value.sender_contact, "Sender contact", 320) : "" } : {}),
     description: text(value.description, "Description", 3000),
     industries: list(value.industries, "Industries", 12),
     company_sizes: list(value.company_sizes, "Company sizes", 12),
