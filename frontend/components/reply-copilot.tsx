@@ -43,7 +43,9 @@ export function ReplyCopilot({ thread, disabled, onApply }: {
   const [notice, setNotice] = useState("");
   const controller = useRef<AbortController | null>(null);
   const requestKey = useRef<string | null>(null);
-  useLayoutEffect(() => () => controller.current?.abort(), [api, mode, thread, disabled]);
+  // An equivalent freshly fetched object is not a context change. Parent keys
+  // include suspension/reload and the actual saved/private context boundaries.
+  useLayoutEffect(() => () => controller.current?.abort(), [api, mode, thread.id, thread.revision, disabled]);
   const latest = thread.messages.at(-1);
   const eligible = latest?.direction === "inbound" &&
     latest.recipient.toLowerCase() === thread.recipient.toLowerCase() &&
@@ -60,7 +62,7 @@ export function ReplyCopilot({ thread, disabled, onApply }: {
     try {
       const value = await api<unknown>(`/outreach/${encodeURIComponent(thread.id)}/reply-draft`, {
         method: "POST", body: jsonBody({ expected_revision: thread.revision, idempotency_key: requestKey.current,
-          context_confirmed: true, context_version: "reply-context-v1" }), signal: flight.signal,
+          context_confirmed: true, context_version: "reply-context-v2" }), signal: flight.signal,
       });
       if (flight.signal.aborted) return;
       if (!isSuggestion(value, thread)) throw new Error("The suggestion could not be checked. Keep writing manually.");
@@ -95,7 +97,7 @@ export function ReplyCopilot({ thread, disabled, onApply }: {
   if (mode !== "local-demo" || !eligible) return null;
   return <section className="outreach-reply-copilot" aria-label="Optional AI reply help" aria-busy={!!busy}>
     <h4>Need a starting point?</h4>
-    <p>Optional AI help uses your saved offering, public company excerpts and the last six manually recorded messages, including the latest received reply. Email, link and phone patterns are removed; this does not guarantee anonymization. Review the conversation above and exclude private or sensitive information.</p>
+    <p>Optional AI help uses your saved offering, public company excerpts and excerpts from the last six manually recorded messages, plus the full latest received reply within its supported record limit. Email, link and phone patterns are removed; this does not guarantee anonymization. Review the conversation above and exclude private or sensitive information.</p>
     <label className="outreach-ai-consent"><input type="checkbox" checked={confirmed} disabled={disabled || !!busy}
       onChange={event => setConfirmed(event.target.checked)} />
       I reviewed this context and agree to share it with DeepSeek when I request help.

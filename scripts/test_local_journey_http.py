@@ -143,7 +143,7 @@ def run():
                 assert child['id'] != first['id'] and not child['contact_basis'] and child['recipient_status'] == 'user_entered'
                 child = mutate(child, 'replies', {'body': 'Please unsubscribe me.', 'reply_state': 'opt_out'})
                 assert child['suppressed']
-                mutate(child, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v1'}, expected=409)
+                mutate(child, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v2'}, expected=409)
                 assert request('GET', f"/outreach/{first['id']}")['suppressed'], 'Company stop survives across contacts'
                 mutate(child, 'reply-state', {'reply_state': 'interested'}, 'PATCH')
                 assert request('GET', f"/outreach/{child['id']}")['suppressed'], 'Status correction never clears an opt-out'
@@ -151,7 +151,7 @@ def run():
                 second = mutate(draft(threads[1]), 'approve')
                 second = mutate(second, 'sent')
                 second = mutate(second, 'replies', {'body': 'Yes, let us discuss it.', 'reply_state': 'interested'})
-                mutate(second, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v1'}, expected=409)
+                mutate(second, 'reply-draft', {'context_confirmed': True, 'context_version': 'reply-context-v2'}, expected=409)
                 request('POST', f"/outreach/{second['id']}/reply-draft/check", {'expected_revision': second['revision'],
                         'snapshot_key': '0' * 64}, expected=409)
                 past = datetime.now(timezone.utc) - timedelta(hours=1)

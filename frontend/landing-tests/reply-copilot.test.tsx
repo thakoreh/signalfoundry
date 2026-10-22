@@ -51,7 +51,7 @@ describe("explicit grounded reply suggestion", () => {
     await consent(); await click("Request reply suggestion");
     expect(api).toHaveBeenCalledTimes(1);
     const body = JSON.parse(api.mock.calls[0][1].body);
-    expect(body).toMatchObject({ context_confirmed: true, context_version: "reply-context-v1", expected_revision: 4 });
+    expect(body).toMatchObject({ context_confirmed: true, context_version: "reply-context-v2", expected_revision: 4 });
     expect(apply).not.toHaveBeenCalled();
     expect(container.textContent).toContain(suggestion().draft.body);
   });

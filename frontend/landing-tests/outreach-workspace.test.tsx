@@ -612,6 +612,42 @@ it("preserves private typing when a reply suggestion ignores abort and returns l
   expect(button("Use as editable reply")).toBeUndefined();
   expect(thread.body).toBe("A reviewed factual message.");
 });
+it("cancels delayed AI Apply while the workspace is suspended for business repair", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/reply-draft/check")) return late;
+    if (path.endsWith("/reply-draft")) return Promise.resolve(replySuggestionFixture());
+    return original(path, options);
+  });
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion"); await click("Use as editable reply");
+  const signal = api.mock.calls.find(([path]) => path.endsWith("/reply-draft/check"))![1].signal;
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" suspended />));
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ current: true, snapshot_key: "a".repeat(64) }));
+  expect(field("Message").value).toBe(thread.body);
+  expect(button("Use as editable reply")).toBeUndefined();
+});
+it("returns from suspended AI work without a stranded busy state or a late editor overwrite", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => path.endsWith("/reply-draft") ? late : original(path, options));
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion");
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" suspended />));
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
+  await act(async () => finish(replySuggestionFixture()));
+  expect(button("Preparing suggestion…")).toBeUndefined();
+  expect(field("Message").value).toBe(thread.body);
+  expect(button("Request reply suggestion")).toBeTruthy();
+});
 it("creates a separate referred contact only on explicit action and preserves its parent", async () => {
   thread.reply_state = "referral";
   thread.messages = [{ id: "referral_inbound", direction: "inbound", recipient: thread.recipient,

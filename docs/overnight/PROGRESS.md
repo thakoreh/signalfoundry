@@ -1,5 +1,15 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Reply copilot independent review rework — not yet reaccepted
+
+Pushed working48ccb1f90657b07c9bf87636ad73519308724b4b; exact-head required source/container/GitGuardian checks PASS in run39696841168. Fresh independent immutable reviews still found actionable defects despite green CI: security probe6PASS/2FAIL showed the latest received question could be silently truncated and prospect digits could pass as unapproved numeric pricing; UX actual-parent probes reproduced hidden Apply during sender repair and a stranded busy state after suspend/resume. Verbatim reports are preserved in continuation/reports, not treated as cleared by author assertions.
+
+Permanent new regressions reproduced RED (two backend tests/four assertions and two real-parent component tests). Rework now includes the full valid6000-character latest received message after pattern removal, marks historical excerpts, rejects unsupported oversized legacy records before reservation without changing their saved text, and blocks plain numeric pricing language even when the digit occurs in prospect evidence. The prompt/cache and disclosure versions advance to v2; old v1 consent cannot authorize the expanded context and stale cached v1 results cannot silently reopen. The parent remounts/disables reply scope across suspension/reload/readiness changes; an equivalent fetched thread object alone no longer aborts and strands its request. Private text remains in the parent.
+
+Author reply24 tests PASS, including full-length end-question and pre-reservation legacy denial; focused component70 PASS after the suspend/refresh repair. Initial typecheck exposed the missing optional company_conflict declaration, now added to match the existing backend response. Full current-source checks, new immutable repair checkpoint and independent re-review are next. No paid/provider/browser/owner-data or external-message operation occurred. Overall objective remains active/incomplete.
+
+Rework full checks: backend234 PASS26.649s; all135 component22files, typecheck/lint and Next webpack production build PASS; real isolated HTTP+SQLite journey and preflight5 PASS. Earlier unchanged Node66/Convex76 remain passing at48ccb1f and will run again in required exact-head CI. No scoped finding is called independently closed until the new immutable repair checkpoint is rechecked.
+
 ## Active continuation — local reply copilot implementation
 
 Reread pasted objective and fetched actual branch/main/PR at7e815a8: clean writer, same existing PR7 draft, main unchanged. Prior turn made concrete progress (packaging privacy plus actual exact-head CI); it did not complete the whole goal. Browser-method permission remains unanswered, but safe implementation continues instead of treating that as a whole-task blocker.

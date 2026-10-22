@@ -84,6 +84,7 @@ export type OutreachThread = {
   body: string;
   booking_link: string;
   sender_footer?: string;
+  company_conflict?: boolean;
   paused: boolean;
   suppressed: boolean;
   suppression_reason: string | null;

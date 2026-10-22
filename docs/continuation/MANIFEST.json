@@ -66,13 +66,13 @@
     },
     {
       "path": "REPLY_COPILOT.md",
-      "bytes": 5646,
-      "sha256": "2d41090258182418f5277b8fc95c32009de6430cdbb0f6882e3b7d312bad52c1"
+      "bytes": 6357,
+      "sha256": "8f27e4ed8b6a9ebfd40690f613c72966b8c6594d9b2a878ff1d78259c1baf29a"
     },
     {
       "path": "STATUS.md",
-      "bytes": 19644,
-      "sha256": "2c911536c222749f35881da9bb58683a3aa8c43c40aaf354b72526aa791edf12"
+      "bytes": 19824,
+      "sha256": "8a14416fde6f36815efe607e334de1e414574251a5cbb71ce3163a112b2e5c4e"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -126,8 +126,8 @@
     },
     {
       "path": "reports/CONTINUATION_EVIDENCE.md",
-      "bytes": 2378,
-      "sha256": "012b29de89d63cfb60d518a0f8524311f337dc504a102c0b98f85125a2559b7a"
+      "bytes": 2892,
+      "sha256": "bd17b4178ad12d83c4845b1201f42f32c1734493d2067a7d3ff8cdb7b27c6dc4"
     },
     {
       "path": "reports/COST_REVIEW_ca43048.md",
@@ -200,6 +200,11 @@
       "sha256": "519309a6f4cc9111cc2fd862c8c7602c7a5d1e36e0846c12f5c77d47713e53ef"
     },
     {
+      "path": "reports/SECURITY_REVIEW_REPLY_48ccb1f.md",
+      "bytes": 8393,
+      "sha256": "276fc0b4b8b565a3d96165c2b75a6f46ec98969faa937cd3afc3490c4d1f6308"
+    },
+    {
       "path": "reports/SECURITY_REVIEW_ab04a85.md",
       "bytes": 6857,
       "sha256": "c9b740dce63cc597c8d9d8225976114891471d01a11623f3b357e5f0babd9b38"
@@ -208,6 +213,11 @@
       "path": "reports/SECURITY_REVIEW_ce37b6c.md",
       "bytes": 5297,
       "sha256": "37bd42549a640e5e36ff7fae4fa76316e73331b9c2f96ac0ebea68a706db6cd6"
+    },
+    {
+      "path": "reports/UX_SPEC_REVIEW_REPLY_48ccb1f.md",
+      "bytes": 8319,
+      "sha256": "101f53bed16ed2a44917d106ee674409d0111f80bfc9405a6d5b7f3153988c29"
     },
     {
       "path": "reports/UX_SPEC_REVIEW_ab04a85.md",
@@ -220,5 +230,5 @@
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ],
-  "application_checkpoint_scope": "Previous fully checked application freeze. Active reply copilot after7e815a8 is described in PROGRESS/STATUS and awaits exact-source independent review; inspect current branch head."
+  "application_checkpoint_scope": "Previous fully checked pre-reply freeze. Current v2 reply rework follows48ccb1f; inspect current branch head and PROGRESS for exact independent re-review/CI state."
 }

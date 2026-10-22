@@ -20,15 +20,15 @@ from .models import StrictModel, Workspace
 from .outreach import OutreachError, OutreachStore, RevisionRequest, blocked, contact_basis_ready
 from .primitives import now
 
-VERSION = 'grounded-reply-v1'
-CONTEXT_VERSION = 'reply-context-v1'
+VERSION = 'grounded-reply-v2'
+CONTEXT_VERSION = 'reply-context-v2'
 Hash = Annotated[str, StringConstraints(pattern=r'^[a-f0-9]{64}$')]
 Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=1800)]
 
 
 class ReplyDraftRequest(RevisionRequest):
     context_confirmed: StrictBool
-    context_version: Literal['reply-context-v1']
+    context_version: Literal['reply-context-v2']
 
     @field_validator('context_confirmed')
     @classmethod
@@ -60,12 +60,12 @@ def reply_enabled():
     return os.environ.get('CLIENTROVE_DEEPSEEK_REPLIES_ENABLED') == 'true' and bool(os.environ.get('DEEPSEEK_API_KEY', '').strip())
 
 
-def minimize(text, limit):
+def minimize(text, limit=None):
     """Best-effort pattern removal, NOT a guarantee of anonymization."""
     text = re.sub(r'[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}', '[email removed]', text)
     text = re.sub(r'https?://\S+|www\.\S+', '[link removed]', text, flags=re.I)
     text = re.sub(r'\+?\d[\d(). -]{6,}\d', '[phone removed]', text)
-    return text[:limit]
+    return text if limit is None else text[:limit]
 
 
 def snapshot(repository, db, thread_id, revision):
@@ -79,6 +79,8 @@ def snapshot(repository, db, thread_id, revision):
     if not thread.messages or thread.messages[-1].direction != 'inbound':
         raise OutreachError('Save and classify a new received reply before requesting AI help.')
     inbound = thread.messages[-1]
+    if len(inbound.body) > 6000:
+        raise OutreachError('This older reply exceeds the supported AI context limit. Its full saved text is preserved; answer it manually.')
     if inbound.recipient.lower() != thread.recipient.lower():
         raise OutreachError('This reply belongs to an earlier recipient. Review the contact manually.')
     if not contact_basis_ready(thread) or not thread.sender_footer or not thread.subject.strip():
@@ -93,7 +95,11 @@ def snapshot(repository, db, thread_id, revision):
     # Only actual user-reported messages, never an unsent approved/draft text.
     history = [{'direction': m.direction, 'body': minimize(m.body.split('\n\n--\n')[0], 1000)}
                for m in thread.messages[-6:]]
-    context = {'facts': facts, 'history': history, 'latest_received': minimize(inbound.body, 2400),
+    # The latest allowed received message is complete after pattern removal.
+    # Never silently lose its final question to an excerpt boundary. The
+    # monetary payload bound rejects excessive encoded context before IO.
+    context = {'facts': facts, 'history': history, 'history_is_excerpt': True,
+               'latest_received': minimize(inbound.body),
                'classification': thread.reply_state,
                'limitations': 'No approved price catalogue, availability or integration guarantees are supplied.'}
     key = digest([VERSION, MODEL, repository.tenant_id, workspace.profile.model_dump(), thread.model_dump(), context])
@@ -132,7 +138,8 @@ def validate_reply(data, current):
         raise DraftError('AI included a destination or contact detail. Keep writing manually.')
     # No structured, approved price catalogue exists in Profile. Do not infer
     # permission to quote a price from a prospect page or a pasted assertion.
-    if re.search(r'[$€£]|\b(?:USD|CAD|dollars?|discounts?|free)\b|\d\s*%', value.body, re.I):
+    price_language = re.search(r'\b(?:pric(?:e|es|ing)|rates?|fees?|costs?|charg(?:e|es|ing)|subscriptions?|monthly|annually)\b|\bper\s+(?:month|year|user|seat)\b', value.body, re.I)
+    if re.search(r'[$€£]|\b(?:USD|CAD|dollars?|discounts?|free)\b|\d\s*%', value.body, re.I) or (price_language and re.search(r'\d', value.body)):
         raise DraftError('AI suggested unapproved pricing or discounts. Confirm terms manually.')
     support = ' '.join(item['excerpt'] for item in current['facts'] if item['id'] in value.evidence_ids)
     numbers = set(re.findall(r'\b\d+(?:[.,]\d+)*\b', support))

@@ -68,10 +68,11 @@ export default function PrivacyPage() {
           <p>
             Optional local AI reply help has a separate opt-in. After you review
             its disclosure and explicitly request a suggestion, it sends your
-            saved offering, limited public company excerpts and up to six
-            manually recorded messages, including the latest received reply,
-            to DeepSeek. Contact-list fields and saved sender address are not
-            included. Recognizable email, link and phone patterns in text are
+            saved offering, limited public company excerpts, excerpts from up to
+            six manually recorded messages and the full latest received reply
+            within the supported saved-record limit,
+            to DeepSeek. Structured contact-list and sender-address fields are
+            omitted. Recognizable email, link and phone patterns in text are
             removed, but this does not guarantee anonymization or remove all
             private information. Review what you paste before requesting help.
             Suggestions are saved locally and never approve or send a response.

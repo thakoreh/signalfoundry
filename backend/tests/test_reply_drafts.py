@@ -59,7 +59,7 @@ class ReplyDraftTests(unittest.TestCase):
                 reference='fictional-offline-reconciled', enabled=True, catalog=catalog)
 
     def request(self, **changes):
-        fields = dict(**self.f.fields(self.thread), context_confirmed=True, context_version='reply-context-v1')
+        fields = dict(**self.f.fields(self.thread), context_confirmed=True, context_version='reply-context-v2')
         fields.update(changes)
         return ReplyDraftRequest(**fields)
 
@@ -119,6 +119,7 @@ class ReplyDraftTests(unittest.TestCase):
             self.assertEqual(self.client.post(f'/api/outreach/{self.thread.id}/reply-draft', json=value).status_code, 422)
         for value in [False, 1, 'true']:
             self.assertEqual(self.client.post(f'/api/outreach/{self.thread.id}/reply-draft', json={**body, 'context_confirmed': value}).status_code, 422)
+        self.assertEqual(self.client.post(f'/api/outreach/{self.thread.id}/reply-draft', json={**body, 'context_version': 'reply-context-v1'}).status_code, 422)
         self.assertEqual(self.client.post(f'/api/outreach/{self.thread.id}/reply-draft', json={}).status_code, 503)
         generate.assert_not_called()
 
@@ -282,6 +283,38 @@ class ReplyDraftTests(unittest.TestCase):
             self.repo.finish_customer_draft(key, request)
         self.assertEqual(self.post().status_code, 409)
         self.assertEqual(self.calls, [])
+
+    def test_latest_received_tail_is_present_before_any_paid_dispatch(self):
+        self.policy()
+        question = 'Does your offering work with unusual property workflows?'
+        self.thread = self.repo.mutate_outreach(self.thread.id, 'reply', PasteReply(**self.f.fields(self.thread),
+            body=('Background context. ' * 300)[:6000 - len(question)] + question, reply_state='question'))
+        response = self.post()
+        self.assertEqual(response.status_code, 200, response.text)
+        context = json.loads(json.loads(self.calls[0].content)['messages'][1]['content'])
+        self.assertIn('Does your offering work with unusual property workflows?', context['latest_received'])
+        self.assertEqual(len(context['latest_received']), 6000)
+
+    def test_oversized_legacy_reply_is_retained_and_denied_before_reservation(self):
+        self.policy()
+        legacy = self.thread.model_copy(deep=True)
+        legacy.messages[-1].body = 'x' * 6001
+        with self.repo.connect() as db:
+            db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?',
+                       (legacy.model_dump_json(), self.repo.tenant_id, legacy.id))
+        self.assertEqual(self.post().status_code, 409)
+        self.assertEqual(len(self.repo.outreach_thread(legacy.id).messages[-1].body), 6001)
+        with self.repo.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM customer_draft_requests').fetchone()[0], 0)
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM paid_attempts').fetchone()[0], 0)
+        self.assertEqual(self.calls, [])
+
+    def test_a_prospect_number_is_not_a_seller_price(self):
+        current = self.current()
+        current['facts'].append({'id': 'prospect:fictional', 'excerpt': 'This company operates 49 properties.'})
+        for body in ['Our pricing is 49 per month.', 'The monthly fee is 49.', 'Our rate is 49 per year.']:
+            with self.subTest(body=body), self.assertRaises(DraftError):
+                validate_reply({'body': body, 'evidence_ids': ['prospect:fictional']}, current)
 
     def test_duplicate_requests_in_flight_dispatch_once(self):
         self.policy()

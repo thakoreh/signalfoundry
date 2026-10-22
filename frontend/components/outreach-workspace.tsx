@@ -838,8 +838,10 @@ export function OutreachWorkspace({
                         Optional AI help gives you an editable starting point; you review and approve what you use.
                       </p>
                       <ReplyCopilot
-                        key={JSON.stringify([thread.id, thread.revision, profileRefresh, profile, dirty, basisDirty, incomingDirty, timingDirty, pendingReplyReview, !!busy])}
-                        thread={thread} disabled={!!busy || dirty || basisDirty || incomingDirty || timingDirty || pendingReplyReview}
+                        key={JSON.stringify([thread.id, thread.revision, thread.recipient, thread.reply_state, thread.paused, thread.suppressed,
+                          thread.company_conflict, thread.recipient_status, thread.messages.at(-1)?.id, reload, suspended,
+                          profileRefresh, profile, dirty, basisDirty, incomingDirty, timingDirty, pendingReplyReview, !!busy])}
+                        thread={thread} disabled={suspended || !!busy || dirty || basisDirty || incomingDirty || timingDirty || pendingReplyReview}
                         onApply={suggestion => {
                           cancelCopy();
                           setDrafts(current => ({ ...current, [thread.id]: { ...threadDraft(thread),
