@@ -17,11 +17,14 @@ export function TimingFields({ value, onChange, kind, disabled }: {
   </div>;
 }
 
+export function meetingTimeLabel(at: string, zone: string | null | undefined) {
+  try {
+    if (!zone) return `${at} (saved timestamp; timezone unknown)`;
+    const time = new Intl.DateTimeFormat("en-CA", { timeZone: zone, dateStyle: "full", timeStyle: "short" }).format(new Date(at));
+    return `${time} (${zone})`;
+  } catch { return `${at} (saved timestamp; timezone unavailable)`; }
+}
 export function SavedMeeting({ thread }: { thread: OutreachThread }) {
   if (!thread.meeting_at) return <p>No meeting time recorded. A booking link is not a booking.</p>;
-  let time = thread.meeting_at;
-  try {
-    time = new Intl.DateTimeFormat(undefined, { timeZone: thread.meeting_timezone || "UTC", dateStyle: "full", timeStyle: "short" }).format(new Date(time));
-  } catch { /* Show the saved ISO value if a legacy zone is unreadable. */ }
-  return <p><strong>Reported meeting:</strong> {time} ({thread.meeting_timezone || "timezone unknown"}). Reported by you; no calendar is connected.</p>;
+  return <p><strong>Reported meeting:</strong> {meetingTimeLabel(thread.meeting_at, thread.meeting_timezone)}. Reported by you; no calendar is connected.</p>;
 }

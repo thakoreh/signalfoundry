@@ -438,3 +438,5 @@
 .outreach-ai-consent { display: flex; align-items: flex-start; gap: 10px; }
 .outreach-ai-consent input { flex: 0 0 auto; width: auto; margin-top: 4px; }
 .outreach-ai-suggestion { white-space: pre-wrap; overflow-wrap: anywhere; }
+.outreach-editor [id^="outreach-"] { scroll-margin-top: 24px; }
+.outreach-editor [tabindex="-1"]:focus { outline: 2px solid var(--green, #1e4d3a); outline-offset: 4px; }

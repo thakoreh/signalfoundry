@@ -27,7 +27,7 @@ export function SavedOutreach() {
   const recent = expanded || query.trim() ? matches : matches.slice(0, 10);
   return <section className="workspace-saved" aria-labelledby="saved-work-title">
     <div className="next-up-heading"><h2 id="saved-work-title">Saved conversations</h2>
-      <button type="button" onClick={() => setRevision(value => value + 1)}>Refresh saved work</button></div>
+      <button className="btn" type="button" onClick={() => setRevision(value => value + 1)}>Refresh saved work</button></div>
     {error && <p role="alert">{error}</p>}
     {!threads && !error && <p role="status">Opening saved conversations…</p>}
     {threads && !threads.length && <p>Your prepared outreach will stay here. Start with up to five relevant businesses.</p>}

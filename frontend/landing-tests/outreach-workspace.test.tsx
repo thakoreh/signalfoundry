@@ -375,9 +375,12 @@ it("keeps the untouched footer repair explicit and leaves approval fail-closed",
 it("shows a persistent safe next action and scopes pause to this outreach", async () => {
   await mount();
   expect(container.textContent).toContain("Next: save your sender details in Edit business before approval.");
-  expect(container.querySelector('a[href="#outreach-actions"]')?.textContent).toContain(
+  // Missing sender details must lead to their repair, not the disabled approval bar.
+  expect(container.querySelector('a[href="#outreach-sender-footer"]')?.textContent).toContain(
     "Jump to next safe action",
   );
+  await act(async () => container.querySelector<HTMLAnchorElement>('a[href="#outreach-sender-footer"]')!.click());
+  expect(document.activeElement?.id).toBe("outreach-sender-footer");
   expect(button("Pause this outreach")).toBeTruthy();
 });
 
@@ -681,6 +684,104 @@ it("creates a separate referred contact only on explicit action and preserves it
   expect(parent.messages).toHaveLength(1);
   expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
 });
+function completeReviewContext() {
+  thread.sender_footer = "\n\n--\nFictional sender footer";
+  thread.body += thread.sender_footer;
+  thread.contact_basis = {
+    version: 1, basis_type: "conspicuous_publication", published_email: thread.recipient,
+    source_url: "https://example.org/team", captured_at: "2026-10-21T10:00:00Z",
+    publisher_attribution: "recipient", notice_status: "clear", recipient_role: "Founder",
+    message_relevance: "Fictional role-relevant offering", recipient_country: "CA", recipient_timezone: "UTC",
+  };
+}
+it.each([
+  ["awaiting_review", "review the received reply", "outreach-reply-review"],
+  ["referral", "referred contact", "outreach-referral"],
+] as const)("guides %s to a real focused review control without a write", async (state, text, id) => {
+  completeReviewContext();
+  thread.reply_state = state;
+  thread.messages = [{ id: "received", direction: "inbound", recipient: thread.recipient,
+    subject: "An actual received fixture", body: "Fictional received text", source: "user_reported",
+    reply_state: state, created_at: "2026-10-21T12:00:00Z" }];
+  await mount();
+  const status = container.querySelector('[aria-label="Current outreach step"]')!;
+  expect(status.textContent?.toLowerCase()).toContain(text);
+  const jump = status.querySelector<HTMLAnchorElement>("a")!;
+  expect(jump.getAttribute("href")).toBe("#" + id);
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe(id);
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(field("Message").value).toBe(thread.body);
+});
+it("focuses an existing meeting outcome target rather than a missing approval bar", async () => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = "2020-01-01T12:00:00Z";
+  thread.meeting_timezone = "UTC";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  const status = container.querySelector('[aria-label="Current outreach step"]')!;
+  expect(status.textContent).toContain("meeting");
+  const jump = status.querySelector<HTMLAnchorElement>("a")!;
+  expect(jump.getAttribute("href")).toBe("#outreach-meetings");
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-meetings");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it("uses the saved meeting's local time in a confirmation rather than labelling UTC as Toronto time", async () => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = "2030-11-05T15:00:00+00:00";
+  thread.meeting_timezone = "America/Toronto";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  await click("Prepare a confirmation for review");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/meeting-confirmation"));
+  const body = JSON.parse(call![1].body).body;
+  expect(body).toContain("10:00");
+  expect(body).toContain("America/Toronto");
+  expect(body).not.toContain("15:00");
+  expect(body.endsWith(thread.sender_footer)).toBe(true);
+  expect(api.mock.calls.some(([path]) => path.endsWith("/approve") || path.endsWith("/sent"))).toBe(false);
+});
+it("guides an active company conflict to contacts without pretending resume resolves ownership", async () => {
+  completeReviewContext();
+  thread.company_conflict = true;
+  await mount();
+  expect(button("Resume this outreach")).toBeUndefined();
+  expect(button("Pause this outreach")).toBeTruthy();
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-company-contacts"]')!;
+  expect(jump).toBeTruthy();
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-company-contacts");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it.each([
+  { recipient_country: "other" }, { notice_status: "unknown" }, { published_email: "different@example.org" },
+] as const)("guides contradictory saved contact evidence to its actual editor: %j", async (change) => {
+  completeReviewContext();
+  thread.contact_basis = { ...thread.contact_basis!, ...change };
+  await mount();
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-contact-basis"]')!;
+  expect(jump).toBeTruthy();
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-contact-basis");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it("keeps private incoming text while guiding outgoing edits to save first", async () => {
+  completeReviewContext();
+  await mount();
+  await click("Conversations");
+  await change("Message", "Private edited answer");
+  await change("Paste a received reply", "Private unsaved inbound");
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-save"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-save");
+  expect(field("Message").value).toBe("Private edited answer");
+  expect(field("Paste a received reply").value).toBe("Private unsaved inbound");
+  expect(button("Save received reply").disabled).toBe(true);
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   session.mode = "local-demo";

@@ -24,7 +24,7 @@ export function OutreachInsights({ revision = 0 }: { revision?: number }) {
   if (mode !== "local-demo") return null;
   return <section className="outreach-insights" aria-labelledby="activity-title">
     <div className="outreach-insights-heading"><h2 id="activity-title">Your progress and what’s next</h2>
-      <button type="button" onClick={() => setRefresh(value => value + 1)}>Refresh activity</button></div>
+      <button className="btn" type="button" onClick={() => setRefresh(value => value + 1)}>Refresh activity</button></div>
     {error && <p role="alert">{error}</p>}
     {!data && !error && <p role="status">Reading saved activity…</p>}
     {data && <>

@@ -18,13 +18,14 @@ import { ContactBasisEditor, emptyContactBasis } from "./contact-basis-editor";
 import { isCustomerMessageDraft } from "./customer-result-view";
 import { useWorkspaceSession } from "./workspace-session";
 import { useUnsavedChanges } from "./use-unsaved-changes";
-import { TimingFields, SavedMeeting, type TimingInput } from "./outreach-timing";
+import { TimingFields, SavedMeeting, meetingTimeLabel, type TimingInput } from "./outreach-timing";
 import { OutreachInsights } from "./outreach-insights";
 import { isSharedInbox } from "../lib/customer-search";
 import { RecipientTime } from "./recipient-time";
 import { manualEmailLink, requestEmailApp } from "../lib/manual-email";
 import { DraftClaimReview } from "./draft-claim-review";
 import { ReplyCopilot } from "./reply-copilot";
+import { outreachNextStep } from "../lib/outreach-next-step";
 import "./outreach-workspace.css";
 
 type Step = "Review" | "Conversations" | "Meetings";
@@ -47,6 +48,17 @@ export function OutreachWorkspace({
   const [threads, setThreads] = useState<OutreachThread[]>([]);
   const [active, setActive] = useState("");
   const [step, setStep] = useState<Step>(initialView || "Review");
+  const [jump, setJump] = useState<{threadId: string; target: string} | null>(null);
+  const appliedJump = useRef<typeof jump>(null);
+  useEffect(() => {
+    if (!jump || appliedJump.current === jump) return;
+    appliedJump.current = jump;
+    if (!suspended && active === jump.threadId) {
+      const target = document.getElementById(jump.target);
+      target?.focus();
+      target?.scrollIntoView?.({block: "start"});
+    }
+  }, [jump, step, active, suspended]);
   const [drafts, setDrafts] = useState<Record<string, OutreachDraft>>({});
   const [bases, setBases] = useState<Record<string, ContactBasis>>({});
   const basisGeneration = useRef(0);
@@ -185,33 +197,13 @@ export function OutreachWorkspace({
           ? "published but not verified"
           : thread?.recipient_status === "user_entered"
             ? "user-entered · verification unknown"
+          : thread?.recipient_status === "invalid"
+            ? "invalid address · recorded as bounced"
             : "unknown";
-  const nextAction =
-    !thread || !draft
-      ? ""
-      : thread.suppressed
-        ? "This outreach is blocked by an opt-out. Do not contact this recipient."
-        : thread.paused
-          ? "This outreach is paused. Resume this outreach only when appropriate."
-          : dirty
-            ? "Next: save your message edits. Approval stays off until the exact saved version is reviewed."
-            : incomingDirty
-              ? "Next: save and review the received reply. Copy and email handoff stay off while this reply is unsaved."
-            : timingDirty || pendingReplyReview
-              ? "Next: save or cancel the date review before approving or handing off a message."
-            : footerMissing
-              ? "Next: restore the required sender footer, then save changes before approval."
-              : !thread.sender_footer
-                ? "Next: save your sender details in Edit business before approval."
-                : !thread.contact_basis
-                  ? "Next: review and save recipient evidence before approval."
-                  : thread.manual_action_block
-                    ? thread.manual_action_block
-                  : !thread.approval
-                    ? "Next: approve the exact saved message after review."
-                    : canAct
-                      ? "Next: copy the approved message, then record what you sent externally."
-                      : "Review the current outreach state before taking action.";
+  const nextAction = thread && draft ? outreachNextStep(thread, draft, {
+    view: step, dirty, incomingDirty, basisDirty, footerMissing, pendingReplyReview, canAct,
+    timingView: timings[thread.id + ":meeting"] ? "Meetings" : timings[thread.id + ":followup"] ? "Review" : null,
+  }) : null;
   function edit(field: keyof OutreachDraft, value: string) {
     if (!thread || !draft) return;
     cancelCopy();
@@ -525,7 +517,7 @@ export function OutreachWorkspace({
         </div>
       ) : (
         <div className="outreach-layout">
-          <aside className="outreach-leads" aria-label="Prepared businesses">
+          <aside className="outreach-leads" aria-label="Prepared businesses" id="outreach-company-contacts" tabIndex={-1}>
             {threads.map((item) => (
               <button
                 key={item.id}
@@ -565,7 +557,7 @@ export function OutreachWorkspace({
               className="outreach-editor"
               aria-labelledby="outreach-company"
             >
-              <header className="outreach-company">
+              <header className="outreach-company" id="outreach-thread-controls" tabIndex={-1}>
                 <div>
                   <h2 id="outreach-company">{thread.company_name}</h2>
                   <p>{thread.domain}</p>
@@ -591,12 +583,16 @@ export function OutreachWorkspace({
               <section className="outreach-next-action" aria-label="Current outreach step">
                 <div>
                   <strong>Current state and next safe action</strong>
-                  <p>{nextAction}</p>
+                  <p>{nextAction?.message}</p>
                 </div>
-                <a href="#outreach-actions">Jump to next safe action</a>
+                {nextAction && <a href={"#" + nextAction.target} onClick={event => {
+                  event.preventDefault();
+                  setStep(nextAction.view);
+                  setJump({threadId: thread.id, target: nextAction.target});
+                }}>Jump to next safe action</a>}
               </section>
               {step === "Meetings" ? (
-                <div className="outreach-meetings">
+                <div className="outreach-meetings" id="outreach-meetings" tabIndex={-1}>
                   <h3>Track what happened</h3>
                   <p>
                     These are your records. A booking link or a sent message
@@ -613,7 +609,7 @@ export function OutreachWorkspace({
                   {thread.meeting_state === "booked_reported" && thread.meeting_at && (
                     <button className="btn" type="button" disabled={!!busy || dirty || timingDirty || thread.suppressed || thread.paused}
                       onClick={() => void mutate("meeting-confirmation", "POST", {
-                        subject: "Confirming our meeting", body: `Confirming our meeting at ${thread.meeting_at} (${thread.meeting_timezone}). Please reply if this time no longer works.${thread.sender_footer || ""}`,
+                        subject: "Confirming our meeting", body: `Confirming our meeting at ${meetingTimeLabel(thread.meeting_at!, thread.meeting_timezone)}. Please reply if this time no longer works.${thread.sender_footer || ""}`,
                       })}>Prepare a confirmation for review</button>
                   )}
                   <label>
@@ -677,7 +673,7 @@ export function OutreachWorkspace({
               ) : (
                 <>
                   {!thread.messages.some(message => message.direction === "inbound") && thread.messages.some(message => message.direction === "outbound") && thread.meeting_state === "not_recorded" && (
-                    <section className="outreach-followup" aria-label="Manual followup plan">
+                    <section className="outreach-followup" aria-label="Manual followup plan" id="outreach-followup" tabIndex={-1}>
                       <h3>Plan a reminder</h3>
                       <p>{thread.followups_sent || 0} of 2 followups recorded. Check your inbox first. Every received reply stops the cold sequence.</p>
                       {thread.next_followup_at && <p>Next review: {thread.next_followup_at} ({thread.followup_timezone}). Approval is required when due.</p>}
@@ -700,7 +696,7 @@ export function OutreachWorkspace({
                       <p><strong>Geographies:</strong> {profile?.geographies.length ? profile.geographies.join(", ") : "Unknown"}</p>
                       <p><strong>Price or integration details:</strong> Unknown</p>
                     </section>
-                    <section className="outreach-conversation">
+                    <section className="outreach-conversation" id="outreach-history" tabIndex={-1}>
                     <h3>Conversation history</h3>
                       {!thread.messages.length && (
                         <p>No messages recorded yet.</p>
@@ -732,7 +728,7 @@ export function OutreachWorkspace({
                         </div>
                       ))}
                       {thread.reply_state === "referral" && !thread.suppressed && (
-                        <section className="outreach-referral" aria-label="Referred contact">
+                        <section className="outreach-referral" aria-label="Referred contact" id="outreach-referral" tabIndex={-1}>
                           <h3>Add the referred contact</h3>
                           <p>The original thread stays intact. This is your explicit choice to review a new contact at this company; its own basis and approval are required.</p>
                           {([['recipient', 'Referred email'], ['contact_name', 'Referred name · optional'], ['referrer_name', 'Person who referred you']] as const).map(([name, label]) => (
@@ -759,6 +755,7 @@ export function OutreachWorkspace({
                             }));
                           }}
                           rows={3}
+                          id="outreach-incoming"
                         />
                       </label>
                       <button
@@ -791,6 +788,7 @@ export function OutreachWorkspace({
                           <select
                             value={replySelections[thread.id] || thread.reply_state || "awaiting_review"}
                             disabled={!!busy}
+                            id="outreach-reply-review"
                             onChange={(event) => {
                               const value = event.target.value;
                               if (value === "not_now" || value === "auto_reply") {
@@ -815,7 +813,7 @@ export function OutreachWorkspace({
                           <button type="button" disabled={!!busy} onClick={() => { cancelCopy(); setReplySelections(current => ({ ...current, [thread.id]: thread.reply_state! })); }}>Set or change the return date</button>
                         </div>}
                         {(replySelections[thread.id] === "not_now" || replySelections[thread.id] === "auto_reply") && (
-                          <section className="outreach-revisit-controls" aria-label="Revisit date controls">
+                          <section className="outreach-revisit-controls" aria-label="Revisit date controls" id="outreach-revisit" tabIndex={-1}>
                             <label>
                               Return date and time (include numeric offset)
                               <input disabled={!!busy} placeholder="2026-11-05T10:00:00-05:00" value={revisitAtDrafts[thread.id] || ""} onChange={(event) => { cancelCopy(); setRevisitAtDrafts((current) => ({ ...current, [thread.id]: event.target.value })); }} />
@@ -851,7 +849,7 @@ export function OutreachWorkspace({
                     </section>
                     </>
                   )}
-                  <div className="outreach-draft-fields">
+                  <div className="outreach-draft-fields" id="outreach-draft-fields" tabIndex={-1}>
                     <label>
                       Recipient
                       <input
@@ -922,10 +920,10 @@ export function OutreachWorkspace({
                       />
                     </label>
                   </div>
-                  {basis && <ContactBasisEditor value={basis} disabled={!!busy && busy !== "contact-basis"}
+                  {basis && <div id="outreach-contact-basis" tabIndex={-1}><ContactBasisEditor value={basis} disabled={!!busy && busy !== "contact-basis"}
                     dirty={basisDirty} recipientChanged={recipientChanged}
                     onChange={(value) => { cancelCopy(); basisGeneration.current++; setBases(current => ({ ...current, [thread.id]: value })); setNotice(""); }}
-                    onSave={() => void mutate("contact-basis", "PUT", { contact_basis: normalizeContactBasisForApi(basis) })} />}
+                    onSave={() => void mutate("contact-basis", "PUT", { contact_basis: normalizeContactBasisForApi(basis) })} /></div>}
                   {step === "Review" && !thread.messages.length && (
                     <p className="outreach-review-note">
                       The first cold message must not include a booking link.
@@ -941,6 +939,7 @@ export function OutreachWorkspace({
                       )}
                       <button
                         type="button"
+                        id="outreach-sender-footer"
                         disabled={!!busy}
                         onClick={() => {
                           if (!draft.body.endsWith(thread.sender_footer!))
@@ -954,7 +953,7 @@ export function OutreachWorkspace({
                       </button>
                     </>
                   ) : (
-                    <p>
+                    <p id="outreach-sender-footer" tabIndex={-1}>
                       Before approval,{" "}
                       <Link href="/workspace/setup">Edit business</Link> to save
                       your sender name, company, mailing address and reachable
@@ -970,7 +969,7 @@ export function OutreachWorkspace({
                         : ""}
                     </p>
                   )}
-                  <div className="outreach-edit-actions">
+                  <div className="outreach-edit-actions" id="outreach-save" tabIndex={-1}>
                     <button
                       className="btn"
                       type="button"

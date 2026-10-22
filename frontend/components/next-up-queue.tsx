@@ -49,12 +49,12 @@ export function NextUpQueue() {
           <h2 id="next-up-title">Next up</h2>
             <p>Replies to answer, messages to review and meetings to report. Check your own inbox for new replies.</p>
         </div>
-        <button type="button" onClick={() => void load()} disabled={loading}>
+        <button className="btn" type="button" onClick={() => void load()} disabled={loading}>
           {loading ? "Checking…" : "Refresh"}
         </button>
       </div>
       {loading && <p role="status">Checking saved conversations…</p>}
-      {error && <div className="notice error" role="alert"><p>{error}</p><button type="button" onClick={() => void load()}>Try again</button></div>}
+      {error && <div className="notice error" role="alert"><p>{error}</p><button className="btn" type="button" onClick={() => void load()}>Try again</button></div>}
       {!loading && !error && !items.length && (
         <div className="next-up-empty"><strong>You’re caught up.</strong><p>There is no saved reply, meeting, or approved manual action waiting for you.</p></div>
       )}
