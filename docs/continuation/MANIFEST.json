@@ -1,9 +1,14 @@
 {
-  "application_checkpoint": "82c8f2848057064ad5d7f44bdf8c507517e32466",
+  "application_checkpoint": "5c861c77cbff4b5da31df2d4d8a58a6e0bff1bf3",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
-  "scope": "Current continuation handoff and scoped reviews plus labelled historical evidence; no runtime/customer data or new complete Chrome acceptance.",
+  "scope": "Current continuation handoff, failed and passing scoped reviews, and labelled partial real Chrome evidence; no runtime/customer data or whole-product acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
   "files": [
+    {
+      "path": "CHROME_LOCAL_REVIEW_5c861c7.md",
+      "bytes": 8359,
+      "sha256": "50309371fb56d2eb009fac5d38f630e6fa693fd383571d481263a522519512cb"
+    },
     {
       "path": "COMPANY_RESUME_ADJUDICATION.md",
       "bytes": 2772,
@@ -46,8 +51,8 @@
     },
     {
       "path": "LOCAL_SETUP.md",
-      "bytes": 9437,
-      "sha256": "1a300626069202f056d415f17d9dbdc1557dbd58d5b395a55f9a00bf6cf5900c"
+      "bytes": 9692,
+      "sha256": "e60422d71c54e7e44c4fec0c30c6608246769f7e5fa9cc4afe94bd566c050b2d"
     },
     {
       "path": "MONETARY_SAFEGUARDS.md",
@@ -56,8 +61,8 @@
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 13174,
-      "sha256": "a2383c2215c9eaf7c9c04432ac96a59c204371773a42778aa40c0babf766dcdf"
+      "bytes": 13978,
+      "sha256": "cbc1571c7a6349230d22c3ed485401fddf55410620ce7441290e1a590da8abe9"
     },
     {
       "path": "OWNER_CONTRACT.md",
@@ -66,13 +71,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 8410,
-      "sha256": "01d12fee927c25b7fbdd06683a780e110a3bb84d5f817989bdc0f08be4470cfc"
+      "bytes": 8926,
+      "sha256": "89d57030cc4aae51f817b84fd6355526e89bb69e0378bda87c1605b84d23ec4c"
     },
     {
       "path": "RELEASE_HANDOFF.md",
-      "bytes": 13076,
-      "sha256": "dc9b7d771a0918744a3b03b937db7d124a53beeac401a2383c6eb4dcfdf741e4"
+      "bytes": 14113,
+      "sha256": "e5996f4fe63cb075c6ea7eedd93893224021e6fd9178bc579fbeaafd89cb7d0d"
     },
     {
       "path": "REPLY_COPILOT.md",
@@ -81,8 +86,13 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 22301,
-      "sha256": "fc392e60ffa8e307f034713fbd5c78f07f737b0e79cc12a8908aad3d33aa7c8f"
+      "bytes": 24111,
+      "sha256": "28dd3b76c579d7235e6679241aef6c18dc1ef173e3766b2c289089ed6c98f990"
+    },
+    {
+      "path": "evidence/backend/CHROME_AGGREGATE_5c861c7.json",
+      "bytes": 288,
+      "sha256": "af30a7d4067ca5eac1c0ee605af3942f1a3fc308edde1761d31bd3ba0a72f178"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -108,6 +118,36 @@
       "path": "evidence/frontend/focused_returning_flow.mjs",
       "bytes": 4737,
       "sha256": "c3af1dcfe8341735beba6772dd11f17ea209c377911de74873bd029687bf7c68"
+    },
+    {
+      "path": "evidence/screenshots/20261021/25-private-date-recovery-390.jpg",
+      "bytes": 41818,
+      "sha256": "ee9d71c41725615daf1b9ccbf5290fdf5db209fb6f383d98bd32f076ab247c9a"
+    },
+    {
+      "path": "evidence/screenshots/20261021/26-fold-confirmation-320.jpg",
+      "bytes": 38160,
+      "sha256": "53710feb581e9973bbcf67fcf52b6fc6fad62748df7e4ca8005304c6b3217e47"
+    },
+    {
+      "path": "evidence/screenshots/20261021/27-reduced-motion-landing-320.jpg",
+      "bytes": 32825,
+      "sha256": "6d205a232bd749a338d6036fcbd646841bd2420049b551c949184a059d6587b4"
+    },
+    {
+      "path": "evidence/screenshots/20261021/28-repaired-return-1440.jpg",
+      "bytes": 72059,
+      "sha256": "44bcac157e855d36ff57fc43e0115d830bd967e70c9b3f3bdfad18c96960669b"
+    },
+    {
+      "path": "evidence/screenshots/20261021/29-repaired-return-390.jpg",
+      "bytes": 34410,
+      "sha256": "155c126f338b2a3721a1b034c49011b26e5fee5ca05891c2aa05a7e4e2a1cc15"
+    },
+    {
+      "path": "evidence/screenshots/20261021/30-repaired-return-320.jpg",
+      "bytes": 34122,
+      "sha256": "15b9db5cfddf945e0cff3d951406df49fb342e6a7d7e2dac5fa81dfaa4ff937c"
     },
     {
       "path": "evidence/screenshots/returning-next-up-viewport-1440.png",
@@ -190,6 +230,11 @@
       "sha256": "7d06c9c91ca1068624a09b363c5b98d930a9c4eee5b0e4670a7f2c55d41e3cdf"
     },
     {
+      "path": "reports/SECURITY_RECHECK_5c861c7.md",
+      "bytes": 6782,
+      "sha256": "95c916b7a74e83bc7dad78e796e48e1f0bc75dab9dff6f92ff472ba78c05bac6"
+    },
+    {
       "path": "reports/SECURITY_RECHECK_LIFECYCLE_82c8f28.md",
       "bytes": 7627,
       "sha256": "7b97ef049dff1999b0099a9b44bce6628357da1290276e27b4d97ffb2857f43c"
@@ -245,6 +290,11 @@
       "sha256": "c9b740dce63cc597c8d9d8225976114891471d01a11623f3b357e5f0babd9b38"
     },
     {
+      "path": "reports/SECURITY_REVIEW_c118b3f.md",
+      "bytes": 5674,
+      "sha256": "5f05e52a2ad957e0e942bcbc1409db930db1475aee5e959321b4d91de930d0c4"
+    },
+    {
       "path": "reports/SECURITY_REVIEW_ce37b6c.md",
       "bytes": 5297,
       "sha256": "37bd42549a640e5e36ff7fae4fa76316e73331b9c2f96ac0ebea68a706db6cd6"
@@ -270,6 +320,21 @@
       "sha256": "300a203a2fc775fc8962818879f55763adb085c78402c98f64db89639685bd1a"
     },
     {
+      "path": "reports/UX_NEXT_ACTION_626093d.md",
+      "bytes": 11486,
+      "sha256": "888610dd4cf98c55c7419aadd6506167a135f17fbf14d28e4261ac4efa8d2d92"
+    },
+    {
+      "path": "reports/UX_RECHECK_5c861c7.md",
+      "bytes": 6404,
+      "sha256": "62d1bcc84afff62ef70e394a1d3301a1bdaf23ac4d9ca016cd0ef632161a5994"
+    },
+    {
+      "path": "reports/UX_RECHECK_c118b3f.md",
+      "bytes": 5286,
+      "sha256": "455d1a5bbcdeb7298774ad6296659a37f544653467b599ecee5879802cf57a5b"
+    },
+    {
       "path": "reports/UX_SPEC_REVIEW_REPLY_48ccb1f.md",
       "bytes": 8319,
       "sha256": "101f53bed16ed2a44917d106ee674409d0111f80bfc9405a6d5b7f3153988c29"
@@ -290,5 +355,5 @@
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ],
-  "application_checkpoint_scope": "Internal default-off hosted ledger/lifecycle and independently rechecked actual-source referral, unknown-source idempotency and effective reply/company metrics repairs. Application exact source/container CI passes; full hosted privacy/shared monetary/adapter/UI parity, fresh Chrome/live and production acceptance remain incomplete."
+  "application_checkpoint_scope": "Reviewed actionable navigation, private-date recovery, explicit local meeting offsets and corrected-stop returning queue. Exact production build and scoped independent offline rechecks pass; partial real Chrome evidence captured. Required source CI fails at existing proxy-readiness probe; container passes. Full local/hosted/live and production acceptance remain incomplete."
 }

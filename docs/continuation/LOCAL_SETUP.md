@@ -60,7 +60,7 @@ Export, backup, restore drill and destructive erase-and-close commands are docum
 
 ## Browser and review limits
 
-Use Chrome only, never the in-app browser. Current connected tool exposes the owner's personal profile; the continuation contract forbids using it. A separate temporary Chrome automation method/profile needs explicit approval before fresh UI testing. No new full-journey screenshots are claimed until that is resolved. Existing CI Chromium regressions and earlier narrow Chrome captures are distinct evidence; neither proves the new whole journey on a physical phone/screen reader.
+Use Chrome only, never the in-app browser. Latest explicit owner answer "use my chrome" permits dedicated app-testing tabs through the connected tool. Do not read other owner tabs, profile files or saved data; this grants no standalone automation exception. CHROME_LOCAL_REVIEW_5c861c7.md records fresh partial local evidence and remaining full-journey/CSV/dialog/zoom gaps. Current CI and scoped captures are distinct from physical-phone/screen-reader or provider verification. For standalone local review, set matching modes and the owned API_BASE_URL **at build time**, then validate the built rewrite before launch; a runtime-only override cannot change a baked rewrite. Keep generated assets/builds separate from the owner preview.
 
 ## Rollback
 

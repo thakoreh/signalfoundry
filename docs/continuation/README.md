@@ -2,6 +2,8 @@
 
 **Verdict: INCOMPLETE. Continue the existing app; do not rebuild or describe it as finished.** This bundle makes the project handoff independent of the previous AI's private memory, local chat history, gateway, and task board.
 
+Latest source5c861c7 has scoped independent repair passes plus partial real connected-Chrome evidence; see CHROME_LOCAL_REVIEW_5c861c7.md. Owner permission "use my chrome" now allows dedicated fictional test tabs, with other owner tabs/profile files/data protected. Full acceptance remains unfinished, and required source CI fails in the real proxy-readiness probe despite passing tests/build/container. Continue its diagnosis and safe implementation; no new permission question for Chrome or false green-CI claim.
+
 Current continuation overlay: local referrals, bounded followups, timed meetings, activity/next-batch, monetary admission, returning workspace/mailto and logical local data controls have since been implemented/tested. The remaining work is not the original c929-only backlog. Start with the current matrix in STATUS.md and latest PROGRESS.md. Consolidated setup/off switches are LOCAL_SETUP.md, monetary setup is MONETARY_SAFEGUARDS.md, and closure/restore limits are LOCAL_DATA_OPERATIONS.md. New complete Chrome journey verification remains pending; no production acceptance is implied.
 
 Read RELEASE_HANDOFF.md first for the current verdict, human inputs, exact tested source/checks and remaining acceptance limits.
