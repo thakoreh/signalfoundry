@@ -14,9 +14,9 @@ The original typographic poster says “Less search. More hello.” beside the w
 
 ## Current evidence
 
-187 component tests across 27 files PASS, including 13 new shader lifecycle tests. Nonincremental TypeScript and focused ESLint PASS. The first test run exposed an intermediate dynamic-module mock issue; the component now imports only the lightweight controller module and that module retains the heavyweight lazy library imports. Existing 174 cases are unchanged.
+188 component tests across 27 files PASS, including 14 new shader lifecycle tests. Nonincremental TypeScript and focused ESLint PASS. The first test run exposed an intermediate dynamic-module mock issue; the component now imports only the lightweight controller module and that module retains the heavyweight lazy library imports. Existing 174 cases are unchanged.
 
-The connected Chrome outage is resolved after the owner's reconnect. Production build and fresh rendered desktop/390/320 verification are next. This document does not claim current shader visual acceptance, provider acceptance, or production readiness. Root `design-qa.md` will record the actual final outcome and screenshots.
+Application0473a85 optimized webpack build/typecheck PASS, Node67 and focused lint PASS. Fresh connected Chrome desktop/390/320 verifies the native contexts, shared pause, static phone/reduced fallback, selected-business modal focus and working-page colors. A dark workflow caption was repaired and recaptured. Root `design-qa.md` passes this focused adaptation, with explicit physical-device/screen-reader/200%-zoom/provider limits; it is not independent or whole-product acceptance. No app console errors. Production npm audit0; six development-only advisories match the pre-change126f376a baseline. No provider or production-readiness claim.
 
 ## Primary references
 

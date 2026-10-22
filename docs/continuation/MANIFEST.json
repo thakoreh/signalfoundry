@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "1d8a5f9480cff8baab895967e96048235ad94197",
+  "application_checkpoint": "0473a859b83b46b59fa6295b6a5948caaf998264",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff, failed and passing scoped reviews, and labelled partial real Chrome evidence; no runtime/customer data or whole-product acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -13,6 +13,11 @@
       "path": "COMPANY_RESUME_ADJUDICATION.md",
       "bytes": 2772,
       "sha256": "b943b1ee131ed9fef2bc71d0f0076c6ebe5bb0c8b233a0a21b3ccbdf12e0a103"
+    },
+    {
+      "path": "COMPONENT_POLISH_DESIGN_QA.md",
+      "bytes": 8934,
+      "sha256": "6746be05353154d9b161bb563253fb9efd3eb0daccd926ef20fc76398ef0ec24"
     },
     {
       "path": "DATE_REVIEW_ADJUDICATION.md",
@@ -51,8 +56,8 @@
     },
     {
       "path": "LOCAL_DECISIONS.md",
-      "bytes": 8585,
-      "sha256": "86bab1bddac3aa806599aad7c3e05bf90b0f660693d8f1446854a04c947fcc6c"
+      "bytes": 9279,
+      "sha256": "2d11b5f66eb91844ee3278660c0612e384f94bc0e98ee2a6a01881152da1c9dd"
     },
     {
       "path": "LOCAL_LOOP_CONTRACT.md",
@@ -76,8 +81,8 @@
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 15627,
-      "sha256": "1446bf71c786c90b7e65433e97fd4582c71e7e86d8c1aafe5297ee311a902c5f"
+      "bytes": 16321,
+      "sha256": "a7582169a90ff24c2986299901036f941ce1c0262bc94f4cdc485a3e04255ae2"
     },
     {
       "path": "OUTREACH_AGENT_RESEARCH_20261022.md",
@@ -86,8 +91,8 @@
     },
     {
       "path": "OWNER_CONTRACT.md",
-      "bytes": 20228,
-      "sha256": "001cd93044bc51e0fdddac33249b43b1425e4f73be5009367cb99bc49674ad59"
+      "bytes": 20834,
+      "sha256": "39912080a8d0820944ccc4bcfa3810e4c6477af771acf09328f6873dc1b81d83"
     },
     {
       "path": "PREMIUM_COMPONENT_POLISH.md",
@@ -96,8 +101,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 10490,
-      "sha256": "f18f7fba2f2cc1cf522574cab82e7373d62da7cab2dce9e562c1df89441316ed"
+      "bytes": 11184,
+      "sha256": "ada5ab17e47deda5bd278b0bbabfb9999d85533aa212e8b9160e910fb26463cb"
     },
     {
       "path": "RELEASE_HANDOFF.md",
@@ -110,9 +115,14 @@
       "sha256": "8f27e4ed8b6a9ebfd40690f613c72966b8c6594d9b2a878ff1d78259c1baf29a"
     },
     {
+      "path": "SHADER_THEME.md",
+      "bytes": 3491,
+      "sha256": "74e2f5398374605ae1c45fd11d916479a2e322d0f02a2bf65c1fa0adcce03647"
+    },
+    {
       "path": "STATUS.md",
-      "bytes": 26991,
-      "sha256": "e45e68625681bf88279e9d5fcd64821918bd104aa1f0e35caedd8dc221083e7e"
+      "bytes": 27685,
+      "sha256": "3ba79aa50f34255ea815ab96031fc9fd18e95d4362eeab4723390166b1b7368b"
     },
     {
       "path": "WORKSPACE_FEEDBACK.md",
@@ -490,5 +500,5 @@
       "sha256": "15c6badd8dcee4b829b153a68c358c7e9fb57f85121bbfe29de4a89f121e0724"
     }
   ],
-  "application_checkpoint_scope": "Broad release goal paused. Owner-authorized Teknium component adaptation: labelled landing pipeline, analysis-only halo, exact selected-company retained modal; local174 component cases/build/type/lint and partial real Chrome desktop390/320, focus, animation-cancellation and measured contrast repairs. Design QA scoped and not independent; actual sending disconnected, spending unresolved, final pushed-head checks need separate readback. No whole-product or production acceptance."
+  "application_checkpoint_scope": "Broad goal paused. Owner-approved actual OGL Flowmap poster and Paper GrainGradient with shared pearl/lilac/ink theme. Application0473a85 optimized build/types,188 components,67 Node,focused lint PASS; real Chrome1440/390/320 author QA with caption-contrast repair. Root design-qa.md passes this slice only. No independent or whole-app/provider/production acceptance; sending disconnected. Exact final pushed-head CI requires readback."
 }

@@ -1,3 +1,7 @@
+## October 22 later owner amendment - visual scope only
+
+The owner explicitly requested real OGL Flowmap poster distortion plus Paper GrainGradient and allowed changing the whole-site theme for consistency. Current selected palette is pearl/lilac/dark ink; earlier warm cream/forest-green instructions are superseded for visual styling only. Keep effects confined to meaningful landing artwork; working screens remain readable/static. See docs/continuation/SHADER_THEME.md and root design-qa.md. The whole-product goal remains paused, and no sending/provider/spend/account/deploy/main authority is added.
+
 # SignalFoundry release-candidate owner goal
 
 Owner contract captured from the original instructions. Messaging transport metadata is removed; product requirements and restrictions are preserved. This is the original contract, not a new deadline. The continuation prompt explains how to resume the existing branch rather than creating it again.

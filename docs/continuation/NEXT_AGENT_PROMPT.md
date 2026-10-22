@@ -1,6 +1,6 @@
 ## Latest owner scope — native shader poster and shared theme
 
-The owner authorized real OGL Flowmap distortion and Paper GrainGradient on a meaningful landing poster, plus a consistent pearl/lilac/ink site theme. This supersedes the earlier cream/green styling only. Read [SHADER_THEME.md](SHADER_THEME.md). The broad release goal stays paused; outreach remains manual/disconnected. Current shader code passes187 component cases, types and focused lint; build and fresh Chrome visual acceptance are pending. Historical passes below do not apply automatically.
+The owner authorized real OGL Flowmap distortion and Paper GrainGradient on a meaningful landing poster, plus a consistent pearl/lilac/ink site theme. This supersedes the earlier cream/green styling only. Read [SHADER_THEME.md](SHADER_THEME.md). Application0473a85 passes188 components,67 Node, focused lint and optimized build/types; fresh connected Chrome desktop/390/320 and caption repair pass scoped root design-qa.md. This is author QA with stated limits, not independent or whole-product acceptance. The broad release goal stays paused; outreach remains manual/disconnected. Exact latest-head CI needs separate readback.
 
 # Copy-paste continuation prompt
 
