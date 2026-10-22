@@ -63,16 +63,24 @@ describe("website-first customer discovery landing", () => {
     expect(html).toMatch(/id="main-content"[^>]*tabindex="-1"/);
   });
 
-  it("shows a complete semantic product example without swipe or autoplay gates", () => {
+  it("sells the complete journey without exposing a dashboard, fabricated results or autoplay gates", () => {
     const { html, text } = renderLanding();
-    expect(text).toContain("Fictional product example");
-    expect(text).toContain("Illustrative layout, not live results.");
-    expect(text).toContain("The example businesses and email are fictional");
-    expect(text).toContain("Unverified");
+    expect(text).toContain("Turn what you do into a reason to talk.");
+    for (const stage of [
+      "Start with you",
+      "Find your people",
+      "Make it personal",
+      "Keep moving",
+    ])
+      expect(text).toContain(stage);
     expect(text).toContain(
-      "Real searches may return fewer than five businesses; contact details vary.",
+      "You approve every message. You send from your own email tool.",
     );
-    expect(html).toContain('<th role="columnheader" scope="col">Company</th>');
+    expect(html).toContain(
+      'aria-label="From your offering to a customer conversation"',
+    );
+    expect(html).not.toMatch(/<table\b|sf-demo-draft|sf-preview-profile/);
+    expect(html).toContain('class="sf-hero-art" aria-hidden="true"');
     expect(html).not.toMatch(
       /role="tab(?:panel|list)?"|aria-roledescription="carousel"|inert=/,
     );
@@ -98,7 +106,8 @@ describe("website-first customer discovery landing", () => {
     expect(text).toContain("enter your business details manually");
     for (const route of ["privacy", "terms", "contact"])
       expect(html).toContain(`href="/${route}"`);
-    expect(html.match(/<details[ >]/g)).toHaveLength(6);
+    // Five FAQs remain; the removed dashboard demo used a sixth draft disclosure.
+    expect(html.match(/<details[ >]/g)).toHaveLength(5);
     expect(text).not.toMatch(/\$\d|free trial/i);
   });
 });

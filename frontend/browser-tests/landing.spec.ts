@@ -35,7 +35,7 @@ async function noOverflow(page: Page) {
   );
 }
 
-test("responsive landing shows website entry and a complete semantic product example without overflow", async ({
+test("responsive landing sells the journey without dashboard content or overflow", async ({
   page,
 }, info) => {
   await openLanding(page);
@@ -45,14 +45,17 @@ test("responsive landing shows website entry and a complete semantic product exa
   await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
   await noOverflow(page);
   const preview = page.getByRole("region", {
-    name: "From discovery to the next conversation",
+    name: "Turn what you do into a reason to talk.",
   });
   await expect(preview).toBeVisible();
   await expect(preview.locator("ol > li")).toHaveCount(4);
-  await expect(preview.getByRole("columnheader")).toHaveCount(3);
-  await expect(preview.locator("tbody tr")).toHaveCount(2);
-  await expect(preview).toContainText("Illustrative layout, not live results");
-  await expect(preview.getByText("Unverified", { exact: true })).toHaveCount(1);
+  await expect(preview.getByRole("heading", { level: 4 })).toHaveCount(4);
+  await expect(preview.getByRole("table")).toHaveCount(0);
+  await expect(preview).toContainText(
+    "You approve every message. You send from your own email tool.",
+  );
+  await expect(preview).toContainText("saved company facts");
+  await expect(preview).toContainText("Record replies and meetings");
   await expect(page.getByRole("tab")).toHaveCount(0);
   const before = await preview.boundingBox();
   await page.clock.install();
@@ -202,7 +205,7 @@ test("motion is finite and reduced motion retains the complete page", async ({
     "transition-duration",
     "0s",
   );
-  await expect(page.locator(".sf-preview-profile")).toHaveCSS(
+  await expect(page.locator(".sf-story-stages > li").first()).toHaveCSS(
     "animation-name",
     "none",
   );
@@ -215,7 +218,7 @@ test("motion is finite and reduced motion retains the complete page", async ({
   const noJs = await context.newPage();
   try {
     await openLanding(noJs);
-    await expect(noJs.locator(".sf-preview-path > li")).toHaveCount(4);
+    await expect(noJs.locator(".sf-story-stages > li")).toHaveCount(4);
     await noJs.locator(".sf-faq-list summary").first().click();
     await expect(
       noJs.locator(".sf-faq-list details").first().locator("p"),
@@ -226,12 +229,12 @@ test("motion is finite and reduced motion retains the complete page", async ({
   }
 });
 
-test("small screens reflow the readable customer list and retain the keyboard draft action", async ({
+test("small screens keep the selling story readable and the website action reachable", async ({
   page,
 }) => {
   test.skip(
     (page.viewportSize()?.width ?? 1000) > 560,
-    "Mobile typography and list reflow",
+    "Mobile typography and story reflow",
   );
   await openLanding(page);
   for (const [selector, minimum] of [
@@ -240,9 +243,9 @@ test("small screens reflow the readable customer list and retain the keyboard dr
     ["#business-website", 16],
     [".sf-manual-option", 14],
     [".sf-intake-hint", 12],
-    [".sf-preview-profile dd", 14],
-    [".sf-preview td > strong", 14],
-    [".sf-preview td .sf-email-status", 12],
+    [".sf-story-stages h4", 18],
+    [".sf-story-stages p", 14],
+    [".sf-story-note", 12],
     [".sf-steps p", 14],
     [".sf-value-grid p", 14],
     [".sf-faq-list summary", 14],
@@ -254,19 +257,17 @@ test("small screens reflow the readable customer list and retain the keyboard dr
     expect(size, selector).toBeGreaterThanOrEqual(minimum);
   }
   const preview = page.getByRole("region", {
-    name: "From discovery to the next conversation",
+    name: "Turn what you do into a reason to talk.",
   });
   await preview.scrollIntoViewIfNeeded();
   expect(
     await preview
-      .locator("table")
+      .locator("ol")
       .evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
-  const draft = preview.locator(".sf-demo-draft summary");
-  await expect(draft).toBeVisible();
-  await draft.focus();
-  await expect(draft).toBeFocused();
-  await draft.press("Enter");
-  await expect(preview.locator(".sf-demo-draft")).not.toHaveAttribute("open");
+  const website = page.getByRole("textbox", { name: "Your business website" });
+  await website.focus();
+  await expect(website).toBeFocused();
+  await expect(page.getByRole("button", { name: "Get started" })).toBeVisible();
   await noOverflow(page);
 });

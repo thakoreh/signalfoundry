@@ -100,4 +100,18 @@ describe("once-only preview entry motion", () => {
     expect(preview.textContent).toBe("Always accessible example content");
     expect(observe).not.toHaveBeenCalled();
   });
+  it("reveals the marketing journey once without hiding server-rendered stages", async () => {
+    const preview = container.querySelector<HTMLElement>(".sf-preview")!;
+    preview.className = "sf-story";
+    const content = preview.querySelector<HTMLElement>(".sf-preview-body")!;
+    content.className = "sf-story-stages";
+    await act(async () => root.render(<LandingPreviewMotion />));
+    expect(observe).toHaveBeenCalledExactlyOnceWith(content);
+    expect(preview.textContent).toBe("Always accessible example content");
+    expect(preview.hasAttribute("hidden")).toBe(false);
+    await intersect(content, true, 0.15);
+    expect(preview.dataset.motionEntered).toBe("true");
+    await intersect(content, true);
+    expect(disconnect).toHaveBeenCalledTimes(1);
+  });
 });

@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { PRODUCT_NAME } from "../lib/product";
 import { LandingIntake } from "./landing-intake";
-import LandingDemo from "./landing-demo";
 import { LandingPreviewMotion } from "./landing-preview-motion";
 import { SignalBrand } from "./signal-brand";
 import { Icon } from "./icons";
@@ -44,7 +43,21 @@ export default function LandingPage() {
         className="sf-hero"
         aria-labelledby="hero-title"
       >
-        <div className="sf-hero-art" aria-hidden="true" />
+        <div className="sf-hero-art" aria-hidden="true">
+          <svg
+            className="sf-hero-flow"
+            viewBox="0 0 1440 640"
+            fill="none"
+            preserveAspectRatio="xMidYMid slice"
+          >
+            <path d="M-80 540C210 540 160 100 435 180S870 640 1520 120" />
+            <path d="M-80 190C240 190 270 590 610 490S1110 40 1520 350" />
+            <path d="M-80 370C260 700 410 0 810 200S1150 660 1520 480" />
+          </svg>
+          <span className="sf-flow-dot sf-flow-dot-one" />
+          <span className="sf-flow-dot sf-flow-dot-two" />
+          <span className="sf-flow-dot sf-flow-dot-three" />
+        </div>
         <div className="sf-hero-copy sf-shell">
           <p className="sf-hero-eyebrow">
             <span aria-hidden="true" /> For founders selling SaaS to businesses
@@ -55,9 +68,9 @@ export default function LandingPage() {
             <span>to your next sales conversation.</span>
           </h1>
           <p className="sf-hero-lede">
-            Find businesses, approve an AI introduction, and keep your
-            <br className="sf-desktop-break" /> outreach, replies, and meetings
-            in one place.
+            Your next customer starts with the right conversation.
+            <br className="sf-desktop-break" /> Find businesses, approve an AI
+            introduction, and keep the next step in view.
           </p>
           <LandingIntake />
           <ul
@@ -89,7 +102,9 @@ export default function LandingPage() {
         aria-labelledby="workflow-title"
       >
         <div className="sf-section-intro">
-          <p className="sf-kicker">Less switching. A clearer next step.</p>
+          <p className="sf-kicker">
+            Your business. Your next customer. One connected journey.
+          </p>
           <h2 id="workflow-title">
             A list is the beginning.
             <br />
@@ -101,7 +116,64 @@ export default function LandingPage() {
             and update replies and outcomes yourself.
           </p>
         </div>
-        <LandingDemo />
+        <section className="sf-story" aria-labelledby="story-title">
+          <div className="sf-story-heading">
+            <p className="sf-kicker">
+              A little context. A more personal approach.
+            </p>
+            <h3 id="story-title">Turn what you do into a reason to talk.</h3>
+          </div>
+          <ol
+            className="sf-story-stages"
+            aria-label="From your offering to a customer conversation"
+          >
+            <li>
+              <span className="sf-story-icon">
+                <Icon name="globe" size={26} />
+              </span>
+              <span className="sf-story-step">Start with you</span>
+              <h4>Your business has a story.</h4>
+              <p>Add your website. Review what you sell and who it helps.</p>
+            </li>
+            <li>
+              <span className="sf-story-icon">
+                <Icon name="target" size={26} />
+              </span>
+              <span className="sf-story-step">Find your people</span>
+              <h4>Give that story a direction.</h4>
+              <p>
+                Find businesses to approach, with available contact details
+                clearly labeled.
+              </p>
+            </li>
+            <li>
+              <span className="sf-story-icon">
+                <Icon name="mail" size={26} />
+              </span>
+              <span className="sf-story-step">Make it personal</span>
+              <h4>Start with a reason to talk.</h4>
+              <p>
+                Edit an AI introduction based on your offer and saved company
+                facts.
+              </p>
+            </li>
+            <li>
+              <span className="sf-story-icon">
+                <Icon name="clock" size={26} />
+              </span>
+              <span className="sf-story-step">Keep moving</span>
+              <h4>Know where to pick up.</h4>
+              <p>
+                Record replies and meetings. Return to the next step, with the
+                context saved.
+              </p>
+            </li>
+          </ol>
+          <p className="sf-story-note">
+            <Icon name="check" size={16} /> You approve every message. You send
+            from your own email tool.
+          </p>
+        </section>
         <LandingPreviewMotion />
         <ol className="sf-steps">
           <li>
