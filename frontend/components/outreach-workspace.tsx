@@ -36,6 +36,7 @@ export function OutreachWorkspace({
   profile,
   profileRefresh = 0,
   suspended = false,
+  embedded = false,
 }: {
   searchId: string;
   initialThreadId?: string;
@@ -43,11 +44,18 @@ export function OutreachWorkspace({
   profile?: Profile | null;
   profileRefresh?: number;
   suspended?: boolean;
+  embedded?: boolean;
 }) {
   const { api, mode } = useWorkspaceSession();
   const [threads, setThreads] = useState<OutreachThread[]>([]);
   const [active, setActive] = useState("");
   const [step, setStep] = useState<Step>(initialView || "Review");
+  const [requestedThread, setRequestedThread] = useState(initialThreadId);
+  if (embedded && requestedThread !== initialThreadId) {
+    setRequestedThread(initialThreadId);
+    setActive(initialThreadId || "");
+    setStep("Review");
+  }
   const [jump, setJump] = useState<{threadId: string; target: string} | null>(null);
   const appliedJump = useRef<typeof jump>(null);
   useEffect(() => {
@@ -126,8 +134,8 @@ export function OutreachWorkspace({
           return next;
         });
         setActive((current) =>
-          initialThreadId && data.threads.some((t) => t.id === initialThreadId)
-            ? initialThreadId
+          initialThreadId
+            ? data.threads.some((t) => t.id === initialThreadId) ? initialThreadId : ""
             : data.threads.some((t) => t.id === current)
               ? current
               : data.threads[0]?.id || "",
@@ -439,16 +447,16 @@ export function OutreachWorkspace({
       </section>
     );
   return (
-    <section className="outreach-workspace" aria-labelledby="outreach-title">
-      <Link
+    <section className={`outreach-workspace${embedded ? " outreach-workspace--embedded" : ""}`} aria-labelledby="outreach-title">
+      {!embedded && <Link
         className="outreach-back"
         href={`/workspace/customers/${encodeURIComponent(searchId)}`}
       >
         ← Customer list
-      </Link>
+      </Link>}
       <header className="outreach-heading">
         <span className="eyebrow">OUTREACH ASSISTANT</span>
-        <h1 id="outreach-title">Review your outreach.</h1>
+        {embedded ? <h2 id="outreach-title">A personal message. Your approval.</h2> : <h1 id="outreach-title">Review your outreach.</h1>}
         <p>
           No mailbox is connected. Review here, send in your own email app, and
           record what happened.
@@ -518,7 +526,7 @@ export function OutreachWorkspace({
         </div>
       ) : (
         <div className="outreach-layout">
-          <aside className="outreach-leads" aria-label="Prepared businesses" id="outreach-company-contacts" tabIndex={-1}>
+          {!embedded && <aside className="outreach-leads" aria-label="Prepared businesses" id="outreach-company-contacts" tabIndex={-1}>
             {threads.map((item) => (
               <button
                 key={item.id}
@@ -552,7 +560,8 @@ export function OutreachWorkspace({
                 </small>
               </button>
             ))}
-          </aside>
+          </aside>}
+          {!thread && <p role="status">The selected business is unavailable. Close this review and try opening it again from your list.</p>}
           {thread && draft && (
             <article
               className="outreach-editor"

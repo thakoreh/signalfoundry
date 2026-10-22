@@ -440,3 +440,11 @@
 .outreach-ai-suggestion { white-space: pre-wrap; overflow-wrap: anywhere; }
 .outreach-layout [id^="outreach-"] { scroll-margin-top: 24px; }
 .outreach-layout [tabindex="-1"]:focus { outline: 2px solid var(--green, #1e4d3a); outline-offset: 4px; }
+.outreach-workspace--embedded { padding:0!important; }
+.outreach-workspace--embedded .outreach-heading { margin-bottom:20px; }
+.outreach-workspace--embedded .outreach-heading .eyebrow { display:none; }
+.outreach-workspace--embedded .outreach-heading h2 { font-size:23px; letter-spacing:-.6px; font-weight:550; margin:0 0 9px; }
+.outreach-workspace--embedded .outreach-layout { grid-template-columns:minmax(0,1fr); }
+.outreach-workspace--embedded .outreach-editor { min-width:0; padding:22px; }
+.outreach-workspace--embedded .outreach-return-summary { display:none; }
+@media(max-width:640px) { .outreach-workspace--embedded .outreach-editor { padding:16px; } }

@@ -435,7 +435,16 @@
   color: #345e49;
 }
 /* Brief decorative motion; no layout movement or continuous attention loop. */
+.business-onboarding-field[data-analysis-active="true"] {
+  border-color: #4c8965;
+  box-shadow:
+    0 0 0 4px #a9e6c826,
+    0 0 24px #6baf8426;
+}
 @media (prefers-reduced-motion: no-preference) {
+  .business-onboarding-field[data-analysis-active="true"] {
+    animation: business-analysis-halo 2.2s ease-in-out infinite;
+  }
   .business-onboarding-intro {
     animation: business-content-in 180ms ease-out both;
   }
@@ -445,6 +454,19 @@
   .business-onboarding-card
     .business-onboarding-submit:is(:hover, :focus-visible):not(:disabled) {
     animation: business-button-frame-hover 1.8s linear 1;
+  }
+}
+@keyframes business-analysis-halo {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 3px #a9e6c81a,
+      0 0 14px #6baf841a;
+  }
+  50% {
+    box-shadow:
+      0 0 0 5px #a9e6c838,
+      0 0 28px #6baf8433;
   }
 }
 @keyframes business-button-frame {

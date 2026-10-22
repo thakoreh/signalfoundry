@@ -3,12 +3,13 @@
 import Link from "next/link";
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import type { Account, WorkspaceData } from "../lib/types";
 import { errorMessage, jsonBody } from "../lib/api";
 import {
@@ -34,6 +35,7 @@ import { Icon } from "./icons";
 import { drawerFocusBoundaryTarget } from "../lib/utils";
 import { PrepareOutreach } from "./prepare-outreach";
 import type { CompanyFlag, OutreachInsights } from "../lib/outreach";
+import { OutreachWorkspace } from "./outreach-workspace";
 import "./customer-search.css";
 
 function CustomerDraftDialog({
@@ -43,6 +45,9 @@ function CustomerDraftDialog({
   onClose,
   children,
   footer,
+  open = true,
+  outreach = false,
+  transitionTitle = false,
 }: {
   id: string;
   title: string;
@@ -50,15 +55,25 @@ function CustomerDraftDialog({
   onClose: () => void;
   children: ReactNode;
   footer?: ReactNode;
+  open?: boolean;
+  outreach?: boolean;
+  transitionTitle?: boolean;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const closeRef = useRef(onClose);
   useEffect(() => {
     closeRef.current = onClose;
   }, [onClose]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     const dialog = dialogRef.current;
     if (!dialog) return;
+    if (!open) {
+      // Retained editors keep their DOM. Restore focus after React's commit,
+      // which can otherwise restore the now-hidden close button.
+      if (opener.current?.isConnected)
+        opener.current.focus({ preventScroll: true });
+      return;
+    }
     const openerElement = opener.current;
     const bodyOverflow = document.body.style.overflow;
     const pageOverflow = document.documentElement.style.overflow;
@@ -114,12 +129,12 @@ function CustomerDraftDialog({
       if (openerElement?.isConnected)
         openerElement.focus({ preventScroll: true });
     };
-  }, [opener]);
+  }, [opener, open]);
   return createPortal(
     <dialog
       ref={dialogRef}
       id={id}
-      className="customer-search customer-draft-dialog"
+      className={`customer-search customer-draft-dialog${outreach ? " customer-outreach-dialog" : ""}`}
       role="dialog"
       aria-modal="true"
       aria-labelledby={`${id}-title`}
@@ -131,8 +146,15 @@ function CustomerDraftDialog({
     >
       <header className="customer-draft-dialog-header">
         <div>
-          <span>MESSAGE DRAFT</span>
-          <h2 id={`${id}-title`}>{title}</h2>
+          <span>{outreach ? "OUTREACH REVIEW" : "MESSAGE DRAFT"}</span>
+          <h2
+            id={`${id}-title`}
+            style={{
+              viewTransitionName: transitionTitle ? "outreach-company" : "none",
+            }}
+          >
+            {title}
+          </h2>
         </div>
         <button
           type="button"
@@ -158,12 +180,20 @@ function CustomerResult({
   selected,
   toggle,
   history,
+  onPrepareOutreach,
+  morphSource = false,
 }: {
   account: Account;
   searchId: string;
   selected: boolean;
   toggle: () => void;
   history?: CompanyFlag;
+  onPrepareOutreach: (
+    account: Account,
+    path: string,
+    opener: HTMLButtonElement | null,
+  ) => void;
+  morphSource?: boolean;
 }) {
   const { api } = useWorkspaceSession();
   const [draftOpen, setDraftOpen] = useState(false);
@@ -181,6 +211,7 @@ function CustomerResult({
   const draftScope = useRef<AbortController | null>(null);
   const subjectField = useRef<HTMLInputElement>(null);
   const draftTrigger = useRef<HTMLButtonElement>(null);
+  const outreachTrigger = useRef<HTMLButtonElement>(null);
   const panelId = `customer-draft-${account.id}`;
   useEffect(() => () => draftScope.current?.abort(), []);
 
@@ -340,7 +371,14 @@ function CustomerResult({
             </span>
           </label>
         </td>
-        <th scope="row" role="rowheader" className="customer-lead-company">
+        <th
+          scope="row"
+          role="rowheader"
+          className="customer-lead-company"
+          style={{
+            viewTransitionName: morphSource ? "outreach-company" : "none",
+          }}
+        >
           {website ? (
             <a
               className="customer-lead-company-link"
@@ -417,6 +455,10 @@ function CustomerResult({
             searchId={searchId}
             accountIds={[account.id]}
             companyName={account.name}
+            triggerRef={outreachTrigger}
+            onPrepared={(path) =>
+              onPrepareOutreach(account, path, outreachTrigger.current)
+            }
           />
           <button
             ref={draftTrigger}
@@ -602,6 +644,51 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
   const [storageKey, setStorageKey] = useState<string | null>(null);
   const [companyFlags, setCompanyFlags] = useState<CompanyFlag[]>([]);
   const [historyError, setHistoryError] = useState("");
+  const [seller, setSeller] = useState<WorkspaceData["profile"]>(null);
+  const [outreachTarget, setOutreachTarget] = useState<{
+    searchId: string;
+    threadId: string;
+    companyName: string;
+  } | null>(null);
+  const [outreachOpen, setOutreachOpen] = useState(false);
+  const [morphingSource, setMorphingSource] = useState<string | null>(null);
+  const outreachOpener = useRef<HTMLButtonElement | null>(null);
+  function revealOutreach(
+    account: Account,
+    path: string,
+    opener: HTMLButtonElement | null,
+  ) {
+    const url = new URL(path, window.location.origin);
+    const threadId = url.searchParams.get("thread");
+    if (
+      url.origin !== window.location.origin ||
+      url.pathname !== `/workspace/outreach/${encodeURIComponent(searchId)}` ||
+      !threadId ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(threadId)
+    )
+      throw new Error("The selected business could not be opened. Try again.");
+    outreachOpener.current = opener;
+    const show = () =>
+      flushSync(() => {
+        setOutreachTarget({ searchId, threadId, companyName: account.name });
+        setOutreachOpen(true);
+      });
+    if (
+      typeof document.startViewTransition === "function" &&
+      !window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      flushSync(() => setMorphingSource(account.id));
+      try {
+        const transition = document.startViewTransition(show);
+        void transition.finished
+          .catch(() => {})
+          .finally(() => setMorphingSource(null));
+      } catch {
+        setMorphingSource(null);
+        show();
+      }
+    } else show();
+  }
   const selectionTouched = useRef(false);
   const selectAll = useRef<HTMLInputElement>(null);
   const contactHistoryReady = !!search && !searchInProgress(search);
@@ -666,6 +753,7 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
           signal: scope.signal,
         });
         if (scope.signal.aborted || !workspace?.id) return;
+        setSeller(workspace.profile);
         const key = `clientrove:customer-results:${mode}:${workspace.id}:${searchId}`;
         let saved: { ids?: unknown; sort?: unknown } | null = null;
         try {
@@ -954,6 +1042,10 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
                               .replace(/\.$/, "")
                               .replace(/^www\./, ""),
                         )}
+                        onPrepareOutreach={revealOutreach}
+                        morphSource={
+                          morphingSource === account.id && !outreachOpen
+                        }
                       />
                     ))}
                   </tbody>
@@ -1003,6 +1095,32 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
         verification status doesn’t establish buying intent. Nothing is sent.
       </p>
       {historyError && <p role="status">{historyError}</p>}
+      {outreachTarget?.searchId === searchId && (
+        <CustomerDraftDialog
+          id="selected-outreach-review"
+          title={outreachTarget.companyName}
+          opener={outreachOpener}
+          onClose={() => setOutreachOpen(false)}
+          open={outreachOpen}
+          outreach
+          transitionTitle={!!morphingSource && outreachOpen}
+          footer={
+            <p className="customer-outreach-retention">
+              Closing keeps your edits on this page. Save changes before leaving
+              the page.
+            </p>
+          }
+        >
+          <OutreachWorkspace
+            searchId={searchId}
+            initialThreadId={outreachTarget.threadId}
+            initialView="Review"
+            profile={seller}
+            suspended={!outreachOpen}
+            embedded
+          />
+        </CustomerDraftDialog>
+      )}
     </section>
   );
 }

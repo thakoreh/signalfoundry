@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { errorMessage, jsonBody } from "../lib/api";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -12,11 +13,13 @@ export function PrepareOutreach({
   accountIds,
   onPrepared,
   companyName,
+  triggerRef,
 }: {
   searchId: string;
   accountIds: string[];
   onPrepared?: (path: string) => void;
   companyName?: string;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { api, mode } = useWorkspaceSession();
   const [busy, setBusy] = useState(false);
@@ -82,6 +85,7 @@ export function PrepareOutreach({
       className={`customer-prepare-outreach${companyName ? " customer-prepare-outreach-row" : ""}`}
     >
       <button
+        ref={triggerRef}
         className="btn primary"
         type="button"
         disabled={

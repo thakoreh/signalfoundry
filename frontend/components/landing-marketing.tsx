@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Icon } from "./icons";
 import { LandingMotionProvider, MotionToggle } from "./landing-motion-provider";
+import { LandingPipeline } from "./landing-pipeline";
 
 const scenes = [
   {
@@ -160,6 +161,7 @@ export function LandingMarketing() {
   };
   return (
     <LandingMotionProvider>
+      <LandingPipeline />
       <section
         className="sf-workflow sf-shell sf-marketing-workflow"
         id="workflow"

@@ -2286,3 +2286,83 @@
   margin-top: 0.25rem;
   overflow-wrap: anywhere;
 }
+
+/* A selected lead expands into the existing review without losing list context. */
+.customer-outreach-dialog.customer-search {
+  inset: 0;
+  width: min(1080px, calc(100vw - 64px));
+  height: min(900px, calc(100dvh - 64px));
+  max-height: calc(100dvh - 64px);
+  margin: auto;
+  border: 1px solid #dce6d8;
+  border-radius: 22px;
+  box-shadow: 0 24px 100px #18372426;
+}
+.customer-outreach-dialog[open] {
+  animation: customer-outreach-reveal 220ms ease-out both;
+}
+.customer-outreach-dialog:not([open]) {
+  display: none;
+}
+.customer-outreach-dialog .customer-draft-dialog-header {
+  padding: 22px 28px;
+}
+.customer-outreach-dialog .customer-draft-dialog-scroll {
+  background: #f7f8f5;
+  padding: 24px 28px;
+}
+.customer-outreach-retention {
+  margin: 0;
+  padding: 14px 28px;
+  font-size: 12px;
+  line-height: 1.7;
+  color: #5d7263;
+  background: white;
+}
+::view-transition-group(outreach-company) {
+  animation-duration: 280ms;
+  animation-timing-function: cubic-bezier(0.22, 0.8, 0.2, 1);
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+@keyframes customer-outreach-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (max-width: 640px) {
+  .customer-outreach-dialog.customer-search {
+    width: 100vw;
+    height: 96dvh;
+    max-height: 96dvh;
+    inset: auto 0 0;
+    margin: 0;
+    border-radius: 20px 20px 0 0;
+  }
+  .customer-outreach-dialog .customer-draft-dialog-header {
+    padding: 19px 20px;
+  }
+  .customer-outreach-dialog .customer-draft-dialog-scroll {
+    padding: 18px 16px;
+  }
+  .customer-outreach-retention {
+    padding: 13px 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .customer-outreach-dialog[open] {
+    animation: none;
+  }
+  ::view-transition-group(outreach-company),
+  ::view-transition-old(outreach-company),
+  ::view-transition-new(outreach-company) {
+    animation: none;
+  }
+}

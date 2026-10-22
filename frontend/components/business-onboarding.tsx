@@ -132,7 +132,9 @@ export function BusinessOnboarding({
             </button>
             <BillingPanel />
           </>
-        ) : home ? home : (
+        ) : home ? (
+          home
+        ) : (
           <>
             <div
               key={reviewing ? "review" : manual ? "manual" : "website"}
@@ -280,7 +282,10 @@ export function BusinessOnboarding({
                     <label htmlFor="business-website">
                       Your business website
                     </label>
-                    <div className="business-onboarding-field">
+                    <div
+                      className="business-onboarding-field"
+                      data-analysis-active={analyzing && !loading && !error}
+                    >
                       <Icon name="globe" size={18} />
                       <input
                         id="business-website"
