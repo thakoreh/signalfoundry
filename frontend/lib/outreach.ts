@@ -107,6 +107,26 @@ export type OutreachThread = {
   created_at: string;
   updated_at: string;
 };
+export type OutreachSummary = Pick<
+  OutreachThread,
+  | "id"
+  | "search_id"
+  | "account_id"
+  | "company_name"
+  | "domain"
+  | "recipient"
+  | "reply_state"
+  | "paused"
+  | "suppressed"
+  | "ready_for_manual_action"
+  | "meeting_state"
+  | "sale_state"
+  | "updated_at"
+  | "recipient_status"
+  | "meeting_at"
+  | "meeting_timezone"
+> & { has_inbound: boolean; has_outbound: boolean; has_approval: boolean };
+
 export type OutreachDraft = Pick<
   OutreachThread,
   "recipient" | "subject" | "body" | "booking_link"

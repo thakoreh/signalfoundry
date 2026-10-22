@@ -1,5 +1,7 @@
 # Cheapest credible first email/reply transport
 
+**October22 update:** the owner wants a cheap permitted mailbox chosen before building the actual sending engine. The [current mailbox comparison](continuation/MAILBOX_PILOT_OPTIONS_20261022.md) supersedes older shortlist/pricing inferences below: existing owner Outlook is a conditional consented-test candidate; Microsoft365 Basic without Teams has a6.48USD month-to-month option. No reviewed provider is verified to permit the planned cold campaign, and no account is connected. US25includes historical DeepSeek usage; remaining funds are unknown and Ads has no allocation. See also [official-source agent research](continuation/OUTREACH_AGENT_RESEARCH_20261022.md). Historical comparison follows.
+
 Checked October 19, 2026 against primary vendor documentation. Prices below are public US-dollar list prices, before taxes, domains, hosting, AI, verification, and advertising. No account, key, mailbox, purchase, or sending was configured. Monid discovery was attempted but its CLI was unavailable; official sources were used directly.
 
 **Recommendation:** first test permitted conversations using an existing authorized mailbox, with manual send/reply entry in the app. That avoids buying transport before learning whether the workflow is useful. For a subsequent integrated pilot, connect that same mailbox with delegated OAuth and explicit send approval. The user's existing mailbox/license and permitted use are still unknown; no provider is approved here for unsolicited prospect-list emailing.

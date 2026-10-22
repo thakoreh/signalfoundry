@@ -7,14 +7,14 @@ import {
   replyLabels,
   type NextUpResponse,
   type OutreachInsights,
-  type OutreachThread,
+  type OutreachSummary,
 } from "../lib/outreach";
 import { useWorkspaceSession } from "./workspace-session";
 import { meetingTimeLabel } from "./outreach-timing";
 import "./outreach-dashboard.css";
 
 type Snapshot = {
-  threads: OutreachThread[];
+  threads: OutreachSummary[];
   activity: OutreachInsights;
   actions: NextUpResponse["items"];
 };
@@ -30,16 +30,16 @@ const actions = {
   plan_followup: "Plan follow-up",
 };
 
-function status(thread: OutreachThread) {
+function status(thread: OutreachSummary) {
   if (thread.suppressed) return "Stopped";
   if (thread.recipient_status === "invalid") return "Invalid address";
   if (thread.paused) return "Paused";
   if (thread.meeting_state === "booked_reported") return "Meeting reported";
   if (thread.meeting_state === "attended_reported") return "Meeting held";
-  if (thread.reply_state) return replyLabels[thread.reply_state];
-  if (thread.messages.some((message) => message.direction === "outbound"))
-    return "Awaiting reply";
-  return thread.approval ? "Message approved" : "Needs approval";
+  if (thread.has_inbound && thread.reply_state)
+    return replyLabels[thread.reply_state];
+  if (thread.has_outbound) return "Awaiting reply";
+  return thread.has_approval ? "Message approved" : "Needs approval";
 }
 
 export function OutreachDashboard() {
@@ -53,7 +53,9 @@ export function OutreachDashboard() {
     if (mode !== "local-demo") return;
     const scope = new AbortController();
     Promise.all([
-      api<{ threads: OutreachThread[] }>("/outreach", { signal: scope.signal }),
+      api<{ threads: OutreachSummary[] }>("/outreach", {
+        signal: scope.signal,
+      }),
       api<OutreachInsights>("/outreach/insights", { signal: scope.signal }),
       api<NextUpResponse>("/outreach/next-up", { signal: scope.signal }),
     ])
@@ -61,6 +63,17 @@ export function OutreachDashboard() {
         if (
           !Array.isArray(threads?.threads) ||
           !activity?.funnel ||
+          ![
+            activity.funnel.contacted,
+            activity.funnel.replied,
+            activity.funnel.meetings_held,
+          ].every((value) => Number.isSafeInteger(value) && value >= 0) ||
+          !threads.threads.every(
+            (thread) =>
+              typeof thread.has_inbound === "boolean" &&
+              typeof thread.has_outbound === "boolean" &&
+              typeof thread.has_approval === "boolean",
+          ) ||
           !Array.isArray(queue?.items)
         )
           throw new Error("Outreach activity could not be read.");
@@ -80,11 +93,7 @@ export function OutreachDashboard() {
   }, [api, mode, refresh]);
   const rows = [...(snapshot?.threads || [])]
     .filter((thread) => {
-      if (
-        filter === "Replies" &&
-        !thread.messages.some((message) => message.direction === "inbound")
-      )
-        return false;
+      if (filter === "Replies" && !thread.has_inbound) return false;
       if (filter === "Meetings" && thread.meeting_state === "not_recorded")
         return false;
       return `${thread.company_name} ${thread.recipient}`
@@ -233,7 +242,15 @@ export function OutreachDashboard() {
                           className="btn"
                           href={`/workspace/outreach/${encodeURIComponent(thread.search_id)}?thread=${encodeURIComponent(thread.id)}&view=${view}`}
                         >
-                          {action ? actions[action.action] : "Open outreach"}
+                          {filter === "Meetings"
+                            ? "View meeting"
+                            : filter === "Replies" &&
+                                action?.action !== "review_reply" &&
+                                action?.action !== "answer_reply"
+                              ? "View conversation"
+                              : action
+                                ? actions[action.action]
+                                : "Open outreach"}
                         </Link>
                       </li>
                     );

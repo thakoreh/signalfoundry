@@ -36,6 +36,29 @@ class OutreachTest(unittest.TestCase):
         self.key_index += 1
         return f'outreach_request_{self.key_index}'
 
+    def test_dashboard_summary_has_activity_facts_without_private_message_bodies(self):
+        from app.outreach import SentRequest
+        approved = self.ready()
+        with TestClient(create_app(self.path, testing=True)) as client:
+            summary = client.get('/api/outreach').json()['threads'][0]
+            self.assertFalse(summary['has_inbound'])
+            self.assertFalse(summary['has_outbound'])
+            self.assertTrue(summary['has_approval'])
+            self.assertEqual(summary['recipient_status'], approved.recipient_status)
+            self.assertIn('meeting_at', summary)
+            self.assertIn('meeting_timezone', summary)
+            for field in ('messages', 'subject', 'body', 'approval', 'contact_basis', 'sender_footer', 'source_facts'):
+                self.assertNotIn(field, summary)
+            detail = client.get('/api/outreach', params={'search_id': self.search.id}).json()['threads'][0]
+            self.assertIn('messages', detail)
+        sent = self.repo.mutate_outreach(approved.id, 'sent', SentRequest(**self.fields(approved)))
+        self.repo.mutate_outreach(sent.id, 'reply', PasteReply(**self.fields(sent), body='A fictional question.', reply_state='question'))
+        summary = self.repo.outreach_threads()['threads'][0]
+        self.assertTrue(summary['has_inbound'])
+        self.assertTrue(summary['has_outbound'])
+        self.assertFalse(summary['has_approval'])
+        self.assertEqual(Repository(self.path, 'different_tenant').outreach_threads()['threads'], [])
+
     def start(self):
         return self.repo.start_outreach(StartOutreach(search_id=self.search.id, account_ids=[self.account.id], idempotency_key=self.key()))['threads'][0]
 

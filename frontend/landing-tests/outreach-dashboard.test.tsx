@@ -30,8 +30,9 @@ const thread = (id: string, extra: object = {}) => ({
   paused: false,
   suppressed: false,
   reply_state: null,
-  messages: [],
-  approval: null,
+  has_inbound: false,
+  has_outbound: false,
+  has_approval: false,
   meeting_state: "not_recorded",
   updated_at: "2026-10-21",
   ...extra,
@@ -59,7 +60,7 @@ beforeEach(() => {
             threads: [
               thread("alpha"),
               thread("bravo", {
-                messages: [{ direction: "inbound" }],
+                has_inbound: true,
                 reply_state: "question",
               }),
               thread("charlie", {
@@ -134,8 +135,8 @@ it("filters and searches existing rows without generating work or counting a mee
   expect(
     container.querySelector(
       'a[href="/workspace/outreach/search_a?thread=charlie&view=Meetings"]',
-    ),
-  ).not.toBeNull();
+    )?.textContent,
+  ).toBe("View meeting");
   expect(
     container.querySelector(".outreach-dashboard-activity")?.textContent,
   ).toContain("GMT-05:00");
@@ -154,6 +155,46 @@ it("does not read or expose local records in hosted mode", async () => {
   await act(async () => root.render(<OutreachDashboard />));
   expect(api).not.toHaveBeenCalled();
   expect(container.textContent).toContain("not available for hosted");
+  expect(container.querySelector("dd")).toBeNull();
+});
+
+it("uses compact history facts without expecting message bodies or confusing approval with sending", async () => {
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, ...rest: unknown[]) =>
+    path === "/outreach"
+      ? Promise.resolve({
+          threads: [
+            thread("sent", {
+              has_outbound: true,
+              reply_state: "awaiting_review",
+            }),
+            thread("approved", { has_approval: true }),
+          ],
+        })
+      : original(path, ...rest),
+  );
+  await act(async () => root.render(<OutreachDashboard />));
+  expect(
+    container.querySelector(".outreach-dashboard-activity")?.textContent,
+  ).toContain("Awaiting reply");
+  expect(
+    container.querySelector(".outreach-dashboard-activity")?.textContent,
+  ).toContain("Message approved");
+  await click("Replies");
+  expect(container.querySelector(".outreach-dashboard-activity")).toBeNull();
+});
+
+it("rejects an incompatible summary instead of inventing empty history", async () => {
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, ...rest: unknown[]) =>
+    path === "/outreach"
+      ? Promise.resolve({ threads: [{ id: "legacy" }] })
+      : original(path, ...rest),
+  );
+  await act(async () => root.render(<OutreachDashboard />));
+  expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+    "could not be read",
+  );
   expect(container.querySelector("dd")).toBeNull();
 });
 it("moves local data controls to Settings rather than the home screen", async () => {
@@ -191,3 +232,37 @@ it("starts only the selected company and focuses that company on review without 
   );
   expect(api.mock.calls.map(([path]) => path)).toEqual(["/outreach"]);
 });
+
+it.each([
+  { threads: [] },
+  {
+    threads: [
+      { id: "other_thread", account_id: "other", search_id: "search_a" },
+    ],
+  },
+  { threads: [{ account_id: "chosen", search_id: "search_a" }] },
+])(
+  "does not navigate to a different company after an incomplete preparation response: %j",
+  async (result) => {
+    const navigate = vi.fn();
+    api.mockResolvedValue(result);
+    await act(async () =>
+      root.render(
+        <PrepareOutreach
+          searchId="search_a"
+          accountIds={["chosen"]}
+          companyName="Chosen company"
+          onPrepared={navigate}
+        />,
+      ),
+    );
+    await click("Start outreach");
+    expect(navigate).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain(
+      "selected business could not be opened",
+    );
+    const first = api.mock.calls[0][1].body;
+    await click("Start outreach");
+    expect(api.mock.calls[1][1].body).toBe(first);
+  },
+);

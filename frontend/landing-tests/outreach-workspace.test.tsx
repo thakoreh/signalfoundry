@@ -1084,11 +1084,11 @@ describe("persisted manual outreach journey", () => {
     expect(api).not.toHaveBeenCalled();
     await click("Start outreach (2)");
     const first = JSON.parse(api.mock.calls[0][1].body);
-    api.mockResolvedValueOnce({ threads: [] });
+    api.mockResolvedValueOnce({ threads: [{ id: "thread_a", search_id: "search_a", account_id: "account_a" }] });
     await click("Start outreach (2)");
     expect(JSON.parse(api.mock.calls[1][1].body)).toEqual(first);
     expect(first.account_ids).toEqual(["account_a", "account_b"]);
-    expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a");
+    expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a?thread=thread_a&view=Review");
   });
   it("retrieves AI only on explicit action, keeps uncertain retries idempotent, and leaves the result unsaved", async () => {
     const original = api.getMockImplementation()!;

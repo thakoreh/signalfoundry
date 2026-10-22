@@ -49,15 +49,23 @@ export function PrepareOutreach({
         }),
       });
       if (signal.aborted) return;
-      const first = result?.threads?.find(
-        (thread) =>
-          thread.search_id === searchId &&
-          selection.includes(thread.account_id) &&
-          /^[A-Za-z0-9_-]{1,128}$/.test(thread.id),
-      );
+      const first = Array.isArray(result?.threads)
+        ? result.threads.find(
+            (thread) =>
+              thread &&
+              typeof thread.id === "string" &&
+              thread.search_id === searchId &&
+              selection.includes(thread.account_id) &&
+              /^[A-Za-z0-9_-]{1,128}$/.test(thread.id),
+          )
+        : undefined;
+      if (!first)
+        throw new Error(
+          "The selected business could not be opened. Try again to recover the same outreach.",
+        );
       const path =
         outreachPath(searchId) +
-        (first ? `?thread=${encodeURIComponent(first.id)}&view=Review` : "");
+        `?thread=${encodeURIComponent(first.id)}&view=Review`;
       if (onPrepared) onPrepared(path);
       else window.location.assign(path);
     } catch (cause) {

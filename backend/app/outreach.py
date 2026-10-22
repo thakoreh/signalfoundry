@@ -554,8 +554,12 @@ class OutreachStore:
         if search_id:
             return {'threads': threads}
         fields = ('id', 'search_id', 'account_id', 'company_name', 'domain', 'recipient', 'reply_state', 'paused', 'suppressed',
-                  'ready_for_manual_action', 'meeting_state', 'sale_state', 'updated_at')
-        return {'threads': [{name: getattr(t, name) for name in fields} for t in threads]}
+                  'ready_for_manual_action', 'meeting_state', 'sale_state', 'updated_at',
+                  'recipient_status', 'meeting_at', 'meeting_timezone')
+        return {'threads': [dict({name: getattr(t, name) for name in fields},
+                                has_inbound=any(m.direction == 'inbound' for m in t.messages),
+                                has_outbound=any(m.direction == 'outbound' for m in t.messages),
+                                has_approval=t.approval is not None) for t in threads]}
 
     def next_up(self, limit=20):
         """Return a read-only, durable-work projection for returning users."""

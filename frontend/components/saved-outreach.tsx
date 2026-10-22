@@ -2,12 +2,12 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { errorMessage } from "../lib/api";
-import { replyLabels, type OutreachThread } from "../lib/outreach";
+import { replyLabels, type OutreachSummary } from "../lib/outreach";
 import { useWorkspaceSession } from "./workspace-session";
 
 export function SavedOutreach() {
   const { api, mode } = useWorkspaceSession();
-  const [threads, setThreads] = useState<OutreachThread[] | null>(null);
+  const [threads, setThreads] = useState<OutreachSummary[] | null>(null);
   const [error, setError] = useState("");
   const [revision, setRevision] = useState(0);
   const [expanded, setExpanded] = useState(false);
@@ -15,7 +15,7 @@ export function SavedOutreach() {
   useEffect(() => {
     if (mode !== "local-demo") return;
     const scope = new AbortController();
-    api<{ threads: OutreachThread[] }>("/outreach", { signal: scope.signal }).then(result => {
+    api<{ threads: OutreachSummary[] }>("/outreach", { signal: scope.signal }).then(result => {
       if (!Array.isArray(result?.threads)) throw new Error("Saved conversations could not be read.");
       if (!scope.signal.aborted) { setThreads(result.threads); setError(""); }
     }).catch(cause => { if (!scope.signal.aborted) setError(errorMessage(cause)); });
