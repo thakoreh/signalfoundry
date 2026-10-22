@@ -10,6 +10,8 @@ import {
   type BusinessIntake,
 } from "@/lib/business-intake";
 import { BusinessOnboarding } from "./business-onboarding";
+import { OutreachDashboard } from "./outreach-dashboard";
+import { LocalDataControls } from "./local-data-controls";
 import { SignalBrand } from "./signal-brand";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -17,10 +19,12 @@ export default function Workspace({
   organizationControl,
   userControl,
   setup = false,
+  settings = false,
 }: {
   organizationControl?: React.ReactNode;
   userControl?: React.ReactNode;
   setup?: boolean;
+  settings?: boolean;
 }) {
   const { api, mode, isAdmin } = useWorkspaceSession();
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
@@ -64,7 +68,8 @@ export default function Workspace({
           draft && "website" in draft ? draft.website : current?.website || "",
         );
         setInitialManual(Boolean(draft && "manual" in draft));
-        setReview(!setup && !draft && Boolean(current?.profile));
+        // Opening Edit business must show the saved profile, never restart analysis.
+        setReview(Boolean(current?.profile));
       } catch (cause) {
         if (!scope.signal.aborted) setError(errorMessage(cause));
       } finally {
@@ -147,25 +152,46 @@ export default function Workspace({
     );
   }
   return (
-    <BusinessOnboarding
-      key={initialManual ? "manual-intake" : "website-intake"}
-      initialManual={initialManual}
-      website={website}
-      setWebsite={setWebsite}
-      analyze={analyze}
-      analyzing={analyzing}
-      loading={loading}
-      error={error}
-      profile={workspace?.profile || null}
-      readOnly={!isAdmin}
-      review={review}
-      changeWebsite={() => setReview(false)}
-      onSaved={(updated) => {
-        setWorkspace(updated);
-        setReview(true);
-      }}
-      organizationControl={organizationControl}
-      userControl={userControl}
-    />
+    <>
+      <BusinessOnboarding
+        key={initialManual ? "manual-intake" : "website-intake"}
+        initialManual={initialManual}
+        website={website}
+        setWebsite={setWebsite}
+        analyze={analyze}
+        analyzing={analyzing}
+        loading={loading}
+        error={error}
+        profile={workspace?.profile || null}
+        readOnly={!isAdmin}
+        review={review}
+        changeWebsite={() => setReview(false)}
+        onSaved={(updated) => {
+          setWorkspace(updated);
+          setReview(true);
+        }}
+        organizationControl={organizationControl}
+        userControl={userControl}
+        home={
+          workspace?.profile && !setup ? (
+            settings ? (
+              <section className="workspace-settings">
+                <Link className="btn" href="/workspace">
+                  ← Dashboard
+                </Link>
+                <h1>Settings</h1>
+                <p>Manage your business and workspace data.</p>
+                <Link className="btn" href="/workspace/setup">
+                  Edit business
+                </Link>
+                <LocalDataControls />
+              </section>
+            ) : (
+              <OutreachDashboard />
+            )
+          ) : undefined
+        }
+      />
+    </>
   );
 }

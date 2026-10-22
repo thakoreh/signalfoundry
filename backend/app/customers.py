@@ -90,7 +90,28 @@ def engine_status() -> dict:
     }
 
 
-def provider_json(provider: str, endpoint: str, params: dict) -> dict:
+def provider_json(provider: str, endpoint: str, params: dict, *, cost=None, transport=None) -> dict:
+    from .cost_admission import paid_call, CostDenied, digest
+    if transport is not None and not isinstance(transport, httpx.MockTransport):
+        raise ProviderError('Only an offline mock transport may be injected.')
+    operation = provider + ':' + endpoint
+    if operation not in ('deepseek:search', 'brave:search', 'hunter:domain-search', 'hunter:email-verifier'):
+        raise ProviderError('Unsupported provider operation.')
+    if provider == 'hunter' and cost:
+        cost = cost.child(params.get('domain') or params.get('email'))
+    try:
+        if cost is None:
+            raise CostDenied('Paid dispatch has no authoritative tenant monetary admission context.')
+        credential = os.environ.get({'deepseek': 'DEEPSEEK_API_KEY', 'brave': 'BRAVE_SEARCH_API_KEY', 'hunter': 'HUNTER_API_KEY'}[provider], '').strip()
+        if not credential:
+            raise CostDenied('The admitted provider credential is missing.')
+        return paid_call(cost, operation, params, lambda: _provider_json_transport(provider, endpoint, params, credential=credential, transport=transport),
+                         billing_identity=digest(credential))
+    except CostDenied as error:
+        raise ProviderError(str(error)) from None
+
+
+def _provider_json_transport(provider: str, endpoint: str, params: dict, *, credential, transport=None) -> dict:
     """Only fixed provider endpoints; no env proxies, redirects, or response-body errors."""
     method, request_options = 'GET', {'params': params}
     if provider == 'deepseek' and endpoint == 'search':
@@ -98,21 +119,21 @@ def provider_json(provider: str, endpoint: str, params: dict) -> dict:
         query, count = params.get('query'), params.get('count')
         if not isinstance(query, str) or not query.strip() or len(query) > 128 or type(count) is not int or not 1 <= count <= 20 or params.get('need_content') is not False:
             raise ProviderError('The planned customer search is invalid.')
-        headers = {'Authorization': 'Bearer ' + os.environ['DEEPSEEK_API_KEY'], 'Content-Type': 'application/json'}
+        headers = {'Authorization': 'Bearer ' + credential, 'Content-Type': 'application/json'}
         method, request_options = 'POST', {'json': params}
     elif provider == 'brave' and endpoint == 'search':
         url = 'https://api.search.brave.com/res/v1/web/search'
-        headers = {'X-Subscription-Token': os.environ['BRAVE_SEARCH_API_KEY']}
+        headers = {'X-Subscription-Token': credential}
     elif provider == 'hunter' and endpoint in ('domain-search', 'email-verifier'):
         url = f'https://api.hunter.io/v2/{endpoint}'
-        params = {**params, 'api_key': os.environ['HUNTER_API_KEY']}
+        params = {**params, 'api_key': credential}
         request_options = {'params': params}
         headers = {}
     else:
         raise ProviderError('Unsupported provider operation.')
     try:
         deadline = time.monotonic() + 8
-        with httpx.Client(timeout=6, follow_redirects=False, trust_env=False) as client:
+        with httpx.Client(timeout=6, follow_redirects=False, trust_env=False, transport=transport) as client:
             with client.stream(method, url, **request_options, headers={**headers, 'Accept': 'application/json'}) as response:
                 if response.status_code != 200:
                     raise ProviderError(f'{provider.title()} could not complete this request. Check its configuration or allowance.')
@@ -131,6 +152,19 @@ def provider_json(provider: str, endpoint: str, params: dict) -> dict:
         raise
     except Exception:
         raise ProviderError(f'{provider.title()} could not be reached or returned an unreadable response.') from None
+
+
+SHARED_INBOXES = {'info', 'hello', 'support', 'sales', 'contact', 'office', 'admin', 'billing', 'team', 'enquiries', 'inquiries'}
+
+
+def shared_inbox(email):
+    return bool(email and email.strip().split('@', 1)[0].lower().split('+', 1)[0] in SHARED_INBOXES)
+
+
+def contact_priority(contact):
+    if not contact.email or not contact.email.strip():
+        return 0
+    return (0 if shared_inbox(contact.email) else 2) + (2 if contact.verification_status == 'verified' else 1)
 
 
 _DIRECTORIES = ('linkedin.com', 'facebook.com', 'instagram.com', 'youtube.com', 'twitter.com', 'x.com',
@@ -305,8 +339,8 @@ class ContactLookup:
     rejected_email: str | None = None
 
 
-def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
-    result = provider_json('hunter', 'domain-search', {'domain': domain, 'limit': 1})
+def enrich_contact(domain: str, timestamp: str, *, cost=None) -> ContactLookup:
+    result = provider_json('hunter', 'domain-search', {'domain': domain, 'limit': 1}, cost=cost)
     data = result.get('data', {})
     if not isinstance(data, dict) or data.get('webmail') or data.get('disposable'):
         return ContactLookup()
@@ -317,7 +351,7 @@ def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
     email = row.get('value')
     if not isinstance(email, str) or not re.fullmatch(r'[^\s@,;<>]{1,64}@[A-Za-z0-9.-]{1,253}', email) or email.rsplit('@', 1)[1].lower() != domain.lower():
         return ContactLookup()
-    verification = provider_json('hunter', 'email-verifier', {'email': email}).get('data', {})
+    verification = provider_json('hunter', 'email-verifier', {'email': email}, cost=cost).get('data', {})
     if not isinstance(verification, dict):
         raise ProviderError('Hunter returned an unreadable verification response.')
     # A high confidence score or catch-all domain does not establish verification.
@@ -336,7 +370,9 @@ def enrich_contact(domain: str, timestamp: str) -> ContactLookup:
                    + ('Provider reports valid; this does not guarantee delivery or decision authority.' if verified else 'Validity is not established; do not treat this address as verified.')))
 
 
-def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, call=provider_json) -> DiscoveryResult:
+def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, call=None, cost=None) -> DiscoveryResult:
+    if call is None:
+        call = lambda provider, endpoint, params: provider_json(provider, endpoint, params, cost=cost)
     state = engine_status()
     if state['discovery']['status'] != 'ready':
         raise ProviderError('Customer discovery is not configured. Connect the search provider first.')
@@ -397,7 +433,7 @@ def discover_customers(body: DiscoveryRequest, *, fetch_page=fetch_public_page, 
             return account, f'{account.domain}: Contact lookup was not attempted within the research time budget.'
         error = None
         try:
-            lookup = enrich_contact(account.domain, account.researched_at)
+            lookup = enrich_contact(account.domain, account.researched_at, cost=cost)
             if lookup.rejected_email:
                 visible_contacts = [item for item in visible_contacts if item.email.casefold() != lookup.rejected_email.casefold()]
                 account.contacts = visible_contacts

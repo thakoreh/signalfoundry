@@ -4,6 +4,7 @@ import os
 import secrets
 import tempfile
 import unittest
+from tests.cost_fixtures import cost_context
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -64,9 +65,9 @@ class DraftProviderTests(unittest.TestCase):
             self.assertNotIn('contacts', facts)
             self.assertNotIn('url', facts['evidence'][0])
             self.assertNotIn(self.env['DEEPSEEK_API_KEY'], request.content.decode())
-            return httpx.Response(200, json={'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(content(self.account))}}]})
+            return httpx.Response(200, json={'usage': {'prompt_tokens': 100, 'completion_tokens': 20, 'total_tokens': 120}, 'choices': [{'finish_reason': 'stop', 'message': {'content': json.dumps(content(self.account))}}]})
         with patch.dict(os.environ, self.env):
-            result = generate_customer_draft(self.body, transport=httpx.MockTransport(respond))
+            result = generate_customer_draft(self.body, transport=httpx.MockTransport(respond), cost=cost_context(self, keys=self.env))
         self.assertEqual(len(calls), 1)
         self.assertEqual(str(calls[0].url), 'https://api.deepseek.com/chat/completions')
         self.assertEqual(result.generation_engine, 'deepseek')
@@ -82,7 +83,7 @@ class DraftProviderTests(unittest.TestCase):
             call = Mock(return_value=response)
             with self.subTest(status=response.status_code), patch.dict(os.environ, self.env):
                 with self.assertRaises(DraftError) as raised:
-                    generate_customer_draft(self.body, transport=httpx.MockTransport(call))
+                    generate_customer_draft(self.body, transport=httpx.MockTransport(call), cost=cost_context(self, keys=self.env))
                 self.assertNotIn(self.env['DEEPSEEK_API_KEY'], str(raised.exception))
                 self.assertEqual(call.call_count, 1)
 
@@ -90,7 +91,9 @@ class DraftProviderTests(unittest.TestCase):
         facts = draft_facts(DEMO_PROFILE, self.account)
         bad = [dict(content(self.account), evidence_ids=['unknown']),
                dict(content(self.account), extra='not allowed'),
-               dict(content(self.account), subject='Subject\nInjected header')]
+               dict(content(self.account), subject='Subject\nInjected header'),
+               dict(content(self.account), subject='Re: invented previous conversation'),
+               dict(content(self.account), subject='Fwd: fake familiarity')]
         for value in ('Visit example.dev', 'Call tel:+14165551234', 'Call +1 (416) 555-1234',
                       'Reply info@business.com', 'Visit https://business.com', 'Results improve 77%'):
             bad.append(dict(content(self.account), body=value))
@@ -223,6 +226,8 @@ class DraftPersistenceTests(unittest.TestCase):
             first = client.post(endpoint, json={'idempotency_key': 'draft_request'})
             self.assertEqual(first.status_code, 200, first.text)
             self.assertEqual(client.post(endpoint, json={'idempotency_key': 'new_request'}).json(), first.json())
+            with patch.dict(os.environ, {'CLIENTROVE_DEEPSEEK_DRAFTS_ENABLED': '', 'DEEPSEEK_API_KEY': ''}):
+                self.assertEqual(client.post(endpoint, json={'idempotency_key': 'cached_without_provider'}).json(), first.json())
             self.assertEqual(client.post(endpoint.replace(account.id, 'unknown'), json={'idempotency_key': 'draft_request'}).status_code, 404)
             self.assertEqual(client.post(endpoint, json={'idempotency_key': 'draft_request', 'profile': {}}).status_code, 422)
         self.assertEqual(generator.call_count, 1)

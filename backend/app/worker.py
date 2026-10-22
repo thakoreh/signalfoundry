@@ -219,7 +219,11 @@ def create_worker() -> FastAPI:
 
     @app.post('/worker/customer-status')
     def customer_status(body: EmptyRequest):
-        return engine_status()
+        state = engine_status()
+        state['discovery'].update(status='unavailable', detail='Hosted paid discovery requires an authoritative tenant monetary ledger and is gated.')
+        state['contacts'].update(status='unavailable', detail='Hosted paid contact enrichment is gated by shared monetary admission.')
+        state['drafts'].update(status='unavailable', detail='Hosted paid drafts require shared monetary admission and are gated.')
+        return state
 
     @app.post('/worker/customers', response_model=DiscoveryResult)
     def customers(body: DiscoveryRequest):

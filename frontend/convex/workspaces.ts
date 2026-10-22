@@ -46,7 +46,18 @@ export const saveProfile = adminMutation({
   returns: validators.workspace,
   handler: async (ctx, args) => {
     const row = await requireWorkspace(ctx, ctx.principal.orgId);
-    const profile = validateProfile(args.profile);
+    const submitted = { ...args.profile };
+    // Older clients omit sender fields. Preserve saved identity unless explicitly
+    // edited/cleared, just as the local profile contract does.
+    for (const name of [
+      "sender_name",
+      "mailing_address",
+      "sender_contact",
+    ] as const) {
+      if (submitted[name] === undefined && row.profile?.[name] !== undefined)
+        submitted[name] = row.profile[name];
+    }
+    const profile = validateProfile(submitted);
     const patch = {
       profile,
       name: profile.company_name,
@@ -163,7 +174,14 @@ export const finishAnalyze = internalMutation({
         "CONFLICT",
         "Profile changed while analyzing; your changes were preserved. Try again.",
       );
-    const profile = validateProfile(args.profile);
+    const analyzed = { ...args.profile };
+    // The worker supplies business facts, never founder identity or a mailing
+    // address. Keep only owner-saved identity; even explicit worker values lose.
+    for (const name of ["sender_name", "mailing_address", "sender_contact"] as const) {
+      delete analyzed[name];
+      if (row.profile?.[name] !== undefined) analyzed[name] = row.profile[name];
+    }
+    const profile = validateProfile(analyzed);
     const patch = {
       profile,
       name: profile.company_name,

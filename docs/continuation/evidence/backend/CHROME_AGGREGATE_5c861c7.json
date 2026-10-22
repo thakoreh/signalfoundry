@@ -1,0 +1,16 @@
+{
+  "fixture_only": true,
+  "financial_table_counts": {
+    "cost_policies": 0,
+    "paid_attempts": 0,
+    "monetary_audit": 0,
+    "monetary_migrations": 1
+  },
+  "request_method_counts": {
+    "GET": 89,
+    "POST": 20,
+    "PATCH": 18,
+    "PUT": 4
+  },
+  "paid_route_requests": []
+}

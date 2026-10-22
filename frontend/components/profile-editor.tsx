@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
+import { useUnsavedChanges } from "./use-unsaved-changes";
 import type { Profile, WorkspaceData } from "@/lib/types";
 import { jsonBody, errorMessage } from "@/lib/api";
 import { tokens } from "@/lib/utils";
@@ -39,15 +40,22 @@ export function ProfileEditor({
   onboarding = false,
   onContinue,
   onBusyChange,
+  onDirtyChange,
 }: {
   profile: Profile | null;
   onSaved: (workspace: WorkspaceData) => void;
   onboarding?: boolean;
   onContinue?: () => void;
   onBusyChange?: (busy: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { api, mode: appMode, isAdmin } = useWorkspaceSession();
   const [name, setName] = useState(profile?.company_name || "");
+  const [sender, setSender] = useState({
+    sender_name: profile?.sender_name || "",
+    mailing_address: profile?.mailing_address || "",
+    sender_contact: profile?.sender_contact || "",
+  });
   const [description, setDescription] = useState(profile?.description || "");
   const [values, setValues] = useState<Record<string, string>>(() =>
     Object.fromEntries(
@@ -57,8 +65,30 @@ export function ProfileEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const edits = useRef(0);
+  const alive = useRef(false);
+  const epoch = useRef(0);
+  useLayoutEffect(() => {
+    alive.current = true;
+    const generation = ++epoch.current;
+    return () => {
+      alive.current = false;
+      epoch.current = generation + 1;
+    };
+  }, [api]);
+  useUnsavedChanges(dirty);
+  const changed = () => {
+    edits.current++;
+    setDirty(true);
+    onDirtyChange?.(true);
+    setSaved(false);
+  };
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
+    const submitted = edits.current;
+    const sessionEpoch = epoch.current;
     setBusy(true);
     onBusyChange?.(true);
     setError("");
@@ -66,6 +96,7 @@ export function ProfileEditor({
     try {
       const payload = {
         company_name: name.trim(),
+        ...(appMode === "local-demo" ? sender : {}),
         description: description.trim(),
         ...Object.fromEntries(
           fields.map(([key]) => [key, tokens(values[key])]),
@@ -75,19 +106,62 @@ export function ProfileEditor({
         method: "PUT",
         body: jsonBody(payload),
       });
+      if (!alive.current || epoch.current !== sessionEpoch) return;
       onSaved(result);
-      setSaved(true);
-      onContinue?.();
+      if (edits.current === submitted) {
+        setSaved(true);
+        setDirty(false);
+        onDirtyChange?.(false);
+        onContinue?.();
+      }
     } catch (e) {
-      setError(errorMessage(e));
+      if (alive.current && epoch.current === sessionEpoch)
+        setError(errorMessage(e));
     } finally {
-      setBusy(false);
-      onBusyChange?.(false);
+      if (alive.current && epoch.current === sessionEpoch) {
+        setBusy(false);
+        onBusyChange?.(false);
+      }
     }
   }
+  const senderFields =
+    appMode === "local-demo" ? (
+      <fieldset className="business-onboarding-detail-fields">
+        <legend>Sender details for outreach</legend>
+        <p>
+          Outreach must include your name, company, mailing address and a
+          reachable contact. These saved details form the footer; nothing is
+          sent here.
+        </p>
+        {(
+          [
+            ["sender_name", "Sender name", 240],
+            ["mailing_address", "Mailing address", 1000],
+            ["sender_contact", "Reachable contact", 320],
+          ] as const
+        ).map(([key, label, maxLength]) => (
+          <label key={key}>
+            {label}
+            <input
+              disabled={!isAdmin}
+              maxLength={maxLength}
+              value={sender[key]}
+              onChange={(event) => {
+                setSender({ ...sender, [key]: event.target.value });
+                setSaved(false);
+              }}
+            />
+          </label>
+        ))}
+        <span className="input-hint">
+          Contact: an email address, public HTTPS contact page or phone number
+          you actually monitor. Never enter fictional details for real outreach.
+        </span>
+      </fieldset>
+    ) : null;
   if (onboarding) {
     return (
-      <form onSubmit={save} className="profile-form">
+      <form onSubmit={save} onChangeCapture={changed} className="profile-form">
         {error && (
           <div role="alert" className="notice error">
             <Icon name="info" />
@@ -99,7 +173,7 @@ export function ProfileEditor({
             Business name
             <input
               required
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               maxLength={200}
               value={name}
               onChange={(e) => {
@@ -113,7 +187,7 @@ export function ProfileEditor({
             What does your business do?
             <textarea
               required
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={description}
               onChange={(e) => {
                 setDescription(e.target.value);
@@ -127,7 +201,7 @@ export function ProfileEditor({
           <label>
             Your ideal customers
             <textarea
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={values.industries}
               onChange={(e) => {
                 setValues({ ...values, industries: e.target.value });
@@ -141,6 +215,22 @@ export function ProfileEditor({
             </span>
           </label>
         </div>
+        {isAdmin && (
+          <div className="business-onboarding-next-step" aria-label="Next step">
+            <div>
+              <strong>Next: find customers</strong>
+              <p>Optional targeting and sender details can be added below.</p>
+            </div>
+            <button
+              className="btn primary"
+              disabled={busy}
+              type="submit"
+            >
+              {busy ? "Saving business details…" : "Find customers"}
+              <Icon name="arrow" size={16} />
+            </button>
+          </div>
+        )}
         <details className="business-onboarding-targeting">
           <summary>More targeting details</summary>
           <div className="business-onboarding-detail-fields">
@@ -148,7 +238,7 @@ export function ProfileEditor({
               <label key={key}>
                 {label}
                 <textarea
-                  disabled={busy || !isAdmin}
+                  disabled={!isAdmin}
                   value={values[key]}
                   onChange={(e) => {
                     setValues({ ...values, [key]: e.target.value });
@@ -166,35 +256,12 @@ export function ProfileEditor({
             ))}
           </div>
         </details>
-        {isAdmin && (
-          <button
-            className="btn primary business-onboarding-save"
-            disabled={busy || !isAdmin}
-            type="submit"
-          >
-            {busy ? (
-              <>
-                <span className="spinner" />
-                Saving business details…
-              </>
-            ) : saved ? (
-              <>
-                <Icon name="check" size={16} />
-                Business details saved
-              </>
-            ) : (
-              <>
-                {onContinue ? "Find customers" : "Save business details"}
-                <Icon name="arrow" size={16} />
-              </>
-            )}
-          </button>
-        )}
+        {senderFields}
       </form>
     );
   }
   return (
-    <form onSubmit={save} className="profile-form">
+    <form onSubmit={save} onChangeCapture={changed} className="profile-form">
       <div className="section-heading">
         <div>
           {!onboarding && <span className="eyebrow">YOUR NORTH STAR</span>}
@@ -237,7 +304,7 @@ export function ProfileEditor({
           Your company name
           <input
             required
-            disabled={busy || !isAdmin}
+            disabled={!isAdmin}
             maxLength={200}
             value={name}
             onChange={(e) => {
@@ -251,7 +318,7 @@ export function ProfileEditor({
           What do you help customers do?
           <textarea
             required
-            disabled={busy || !isAdmin}
+            disabled={!isAdmin}
             value={description}
             onChange={(e) => {
               setDescription(e.target.value);
@@ -266,7 +333,7 @@ export function ProfileEditor({
           <label key={key}>
             {label}
             <textarea
-              disabled={busy || !isAdmin}
+              disabled={!isAdmin}
               value={values[key]}
               onChange={(e) => {
                 setValues({ ...values, [key]: e.target.value });
@@ -294,16 +361,13 @@ export function ProfileEditor({
           </label>
         ))}
       </div>
+      {senderFields}
       <div className="form-footer">
         <p>
           <Icon name="shield" size={16} /> Your profile guides scoring across
           new campaigns
         </p>
-        <button
-          className="btn primary"
-          disabled={busy || !isAdmin}
-          type="submit"
-        >
+        <button className="btn primary" disabled={!isAdmin} type="submit">
           {busy ? (
             <>
               <span className="spinner" />

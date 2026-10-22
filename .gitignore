@@ -13,6 +13,11 @@ node_modules/
 *.db-*
 *.sqlite*
 artifacts/*.zip
+backups/
+exports/
+private/
+.local/
+*.csv
 .DS_Store
 
 deploy/secrets/

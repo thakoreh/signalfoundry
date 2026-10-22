@@ -2,7 +2,11 @@
 
 Prepared October 19, 2026 from the current repository and its release runbooks. This is a contribution to the overnight agent brief, not a claim that production can be guaranteed by morning. No implementation, deployment, provider request, account change, purchase, or external message was performed for this document.
 
-## Starting truth
+Current continuation source/status is docs/continuation/STATUS.md. The shared monetary ledger and optional local reply copilot are now implemented with offline evidence; actual history/pricing/authorization and full integration/Chrome acceptance are still missing. The original starting-truth snapshot below is historical and does not override current source or the owner contract.
+
+Current hosted lifecycle overlay: docs/continuation/HOSTED_LIFECYCLE.md records internal source/offline implementations for referrals, dated followups, meeting/outcome audit, time-safe preflight and returning projections. Public adapter remains503; hosted privacy/shared monetary/UI integration and remote/whole-product acceptance are still unmet.
+
+## Historical starting truth (October19)
 
 - Next.js is the SaaS gateway; verified Clerk organization identity and Convex are the intended hosted trust/data boundaries. SQLite is an unauthenticated, loopback-only local review system. Never expose it as the SaaS backend.
 - Website setup, bounded DeepSeek discovery, qualification, contact-status sorting, CSV, and explicitly requested AI introductions exist. Local provider configuration does not verify hosted configuration. Public emails remain unverified unless actual verification evidence exists.
@@ -12,6 +16,8 @@ Prepared October 19, 2026 from the current repository and its release runbooks. 
 - Clerk, Convex, Stripe, containers, provider networking, public deployment, privacy deletion, alerts, and restoration are **not established by local tests**. Older `ARCHITECTURE.md` and `PRODUCTION_READINESS.md` provider descriptions lag current discovery/draft/local-outreach code; reconcile them against source rather than repeating stale claims.
 
 ## Work order
+
+Current hosted implementation overlay: HOSTED_LEDGER.md/HOSTED_LIFECYCLE.md (under docs/continuation) describe default-off internal Convex ledger/lifecycle source and tests. They cover tenant/admin/expected-org, revision/idempotency, immutable approval/actual snapshots, sticky stops, manual reply/company review, fresh referrals, bounded dated followups, timed meetings/outcomes and returning projections. Repair82c8f28 addresses actual-source referral, unknown-provenance idempotency and effective historical/company-latest metrics. Hosted privacy/export/closure/retention, global monetary coordination, fully mapped UI/adapter parity and actual remote acceptance are still required. Public hosted outreach stays closed; no offline flag grants deployment/spend/send authority.
 
 ### P0 — Hosted ownership and complete persistence
 

@@ -1,5 +1,6 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { threadFields, approvalFields, messageFields, eventFields } from "./lib/outreachLedgerValidators";
 import {
   accountData,
   campaignFields,
@@ -11,6 +12,32 @@ import {
 } from "./validators";
 
 export default defineSchema({
+  // Additive, internal-only manual ledger prerequisites. No mailbox or AI calls.
+  outreachLedgers: defineTable({
+    orgId: v.string(), requestCount: v.number(), threadCount: v.number(),
+  }).index("by_orgId", ["orgId"]),
+  outreachThreads: defineTable(threadFields)
+    .index("by_orgId", ["orgId"])
+    .index("by_orgId_and_searchId_and_accountId", ["orgId", "searchId", "accountId"])
+    .index("by_orgId_and_companyKey", ["orgId", "companyKey"]),
+  outreachCompanies: defineTable({
+    orgId: v.string(), companyKey: v.string(), reviewVersion: v.number(),
+    coldOwnerId: v.optional(v.id("outreachThreads")),
+  }).index("by_orgId_and_companyKey", ["orgId", "companyKey"]),
+  outreachApprovals: defineTable(approvalFields)
+    .index("by_orgId_and_threadId", ["orgId", "threadId"]),
+  outreachMessages: defineTable(messageFields)
+    .index("by_orgId_and_threadId", ["orgId", "threadId"]),
+  outreachEvents: defineTable(eventFields).index("by_orgId_and_threadId", ["orgId", "threadId"]),
+  outreachSuppressions: defineTable({
+    orgId: v.string(), target: v.string(),
+    reason: v.union(v.literal("opt_out"), v.literal("source_question"), v.literal("bounce")),
+    threadId: v.id("outreachThreads"), createdAt: v.number(),
+  }).index("by_orgId_and_target", ["orgId", "target"]),
+  outreachRequests: defineTable({
+    orgId: v.string(), requestKey: v.string(), fingerprint: v.string(),
+    threadIds: v.array(v.id("outreachThreads")), createdAt: v.number(),
+  }).index("by_orgId_and_requestKey", ["orgId", "requestKey"]),
   customerDrafts: defineTable({
     orgId: v.string(),
     requestKey: v.string(),

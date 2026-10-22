@@ -4,10 +4,13 @@ import { validCustomerSearchId } from "@/lib/customer-search";
 
 export default async function OutreachPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ searchId: string }>;
+  searchParams: Promise<{ thread?: string; view?: string }>;
 }) {
   const { searchId } = await params;
+  const { thread, view } = await searchParams;
   if (!validCustomerSearchId(searchId)) notFound();
-  return <CustomerWorkspacePage searchId={searchId} outreach />;
+  return <CustomerWorkspacePage searchId={searchId} initialThreadId={thread} initialView={view === "Meetings" || view === "Conversations" ? view : "Review"} outreach />;
 }

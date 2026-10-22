@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import { errorMessage, jsonBody } from "../lib/api";
 import { useWorkspaceSession } from "./workspace-session";
 
@@ -11,10 +12,14 @@ export function PrepareOutreach({
   searchId,
   accountIds,
   onPrepared,
+  companyName,
+  triggerRef,
 }: {
   searchId: string;
   accountIds: string[];
   onPrepared?: (path: string) => void;
+  companyName?: string;
+  triggerRef?: RefObject<HTMLButtonElement | null>;
 }) {
   const { api, mode } = useWorkspaceSession();
   const [busy, setBusy] = useState(false);
@@ -35,7 +40,9 @@ export function PrepareOutreach({
     setBusy(true);
     setError("");
     try {
-      await api("/outreach", {
+      const result = await api<{
+        threads: { id: string; account_id: string; search_id: string }[];
+      }>("/outreach", {
         method: "POST",
         signal,
         body: jsonBody({
@@ -45,7 +52,23 @@ export function PrepareOutreach({
         }),
       });
       if (signal.aborted) return;
-      const path = outreachPath(searchId);
+      const first = Array.isArray(result?.threads)
+        ? result.threads.find(
+            (thread) =>
+              thread &&
+              typeof thread.id === "string" &&
+              thread.search_id === searchId &&
+              selection.includes(thread.account_id) &&
+              /^[A-Za-z0-9_-]{1,128}$/.test(thread.id),
+          )
+        : undefined;
+      if (!first)
+        throw new Error(
+          "The selected business could not be opened. Try again to recover the same outreach.",
+        );
+      const path =
+        outreachPath(searchId) +
+        `?thread=${encodeURIComponent(first.id)}&view=Review`;
       if (onPrepared) onPrepared(path);
       else window.location.assign(path);
     } catch (cause) {
@@ -58,8 +81,11 @@ export function PrepareOutreach({
     }
   }
   return (
-    <div className="customer-prepare-outreach">
+    <div
+      className={`customer-prepare-outreach${companyName ? " customer-prepare-outreach-row" : ""}`}
+    >
       <button
+        ref={triggerRef}
         className="btn primary"
         type="button"
         disabled={
@@ -69,8 +95,15 @@ export function PrepareOutreach({
           mode !== "local-demo"
         }
         onClick={() => void prepare()}
+        aria-label={
+          companyName ? `Start outreach for ${companyName}` : undefined
+        }
       >
-        {busy ? "Preparing…" : `Prepare outreach (${accountIds.length})`}
+        {busy
+          ? "Preparing…"
+          : companyName
+            ? "Start outreach"
+            : `Start outreach (${accountIds.length})`}
       </button>
       {mode !== "local-demo" && (
         <p>Outreach is not available for hosted workspaces yet.</p>

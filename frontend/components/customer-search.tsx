@@ -127,6 +127,10 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
   async function start(event: React.FormEvent) {
     event.preventDefault();
     if (inFlight.current || loading) return;
+    if (engine?.monetary?.status === "blocked") {
+      setError(engine.monetary.detail);
+      return;
+    }
     if (createdRun.current) {
       router.push(customerSearchPath(createdRun.current));
       return;
@@ -245,6 +249,7 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
               : "Not connected"}
         </span>
       </div>
+      {engine?.monetary?.status === "blocked" && <div className="customer-search-notice" role="status"><strong>Paid discovery is paused.</strong><p>{engine.monetary.detail}</p></div>}
       {!loading && !engine && (
         <div className="customer-search-notice">
           <p>Search availability could not be loaded.</p>
@@ -259,20 +264,38 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
       )}
       {!loading && engine && engine.discovery.status !== "ready" && (
         <div className="customer-search-notice" role="status">
-          <strong>
-            Your profile is saved. Customer search isn’t connected yet.
-          </strong>
+          <strong>Company research is unavailable.</strong>
           <p>
-            Ask your workspace administrator to connect company research, then
-            check availability again.
+            Customer search needs the existing company-research provider in the
+            local backend. A local operator must configure that provider and
+            restart the backend; this page cannot connect a provider.
           </p>
+          <p>
+            Email verification is optional for research and is not connected in
+            this workspace. Any address remains unverified until an actual
+            verifier supplies evidence.
+          </p>
+          {engine.discovery.detail && (
+            <p className="customer-search-notice-detail">
+              Company research status: {engine.discovery.detail}
+            </p>
+          )}
+          {engine.contacts.detail && (
+            <p className="customer-search-notice-detail">
+              Email verification status: {engine.contacts.detail}
+            </p>
+          )}
           <button
             type="button"
             className="customer-search-text-button"
             onClick={() => setRevision((value) => value + 1)}
           >
-            Check availability again
+            Recheck local availability
           </button>
+          <span className="customer-search-notice-footnote">
+            Recheck only reads local configuration; it does not configure or
+            purchase a provider.
+          </span>
         </div>
       )}
       <form
@@ -338,7 +361,7 @@ export function CustomerSearch({ onBack }: { onBack: () => void }) {
         )}
         <button
           className="btn primary"
-          disabled={starting || loading || engine?.discovery.status !== "ready"}
+          disabled={starting || loading || engine?.discovery.status !== "ready" || engine?.monetary?.status === "blocked"}
           type="submit"
         >
           {starting ? "Opening your search…" : "Find customers"}

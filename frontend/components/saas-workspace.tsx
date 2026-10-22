@@ -9,7 +9,13 @@ import Link from "next/link";
 import Workspace from "./workspace";
 import { WorkspaceSession } from "./workspace-session";
 
-export function SaasWorkspace({ setup = false }: { setup?: boolean }) {
+export function SaasWorkspace({
+  setup = false,
+  settings = false,
+}: {
+  setup?: boolean;
+  settings?: boolean;
+}) {
   const { isLoaded, isSignedIn, userId, orgId, orgRole } = useAuth();
   if (!isLoaded)
     return (
@@ -73,6 +79,7 @@ export function SaasWorkspace({ setup = false }: { setup?: boolean }) {
     >
       <Workspace
         setup={setup}
+        settings={settings}
         organizationControl={
           <OrganizationSwitcher
             hidePersonal

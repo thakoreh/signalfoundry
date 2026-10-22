@@ -12,7 +12,7 @@
   font-weight: 450;
 }
 .sf-brand b {
-  color: var(--sf-green-dark, #17664c);
+  color: var(--sf-green-dark, var(--ink));
 }
 .sf-brand-mark {
   display: inline-flex;
@@ -24,7 +24,7 @@
 }
 .sf-brand-mark i {
   width: 5px;
-  background: var(--sf-green-dark, #17664c);
+  background: var(--sf-green-dark, var(--brand-primary));
   border-radius: 2px;
 }
 .sf-brand-mark i:nth-child(1) {

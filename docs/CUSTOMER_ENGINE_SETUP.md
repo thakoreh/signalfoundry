@@ -1,5 +1,7 @@
 # Clientrove customer engine: operator setup
 
+Current continuation requirement: provider flags/keys below are insufficient by themselves. Every paid search, lookup/verifier and initial draft also needs the same durable global+tenant monetary authority with accepted current prices and reconciled historical account usage. History is unknown and no spend is authorized in this continuation. See [monetary safeguards](continuation/MONETARY_SAFEGUARDS.md) and [current setup/off switches](continuation/LOCAL_SETUP.md). Never delete the ledger, assume zero history or enable a fallback to bypass admission. Historical live-test observations below are not current provider health/quality evidence.
+
 The engine uses real search results and public company websites. DeepSeek Search
 is the selected default. Hunter is optional for business contacts. Neither service
 is activated merely because a key happens to exist: explicit enable flags are

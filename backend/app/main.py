@@ -22,7 +22,10 @@ from .safety import FetchError, fetch_public_page, normalize_url
 from .store import Repository
 from .customers import CustomerSearch, CustomerSearchRequest, DiscoveryRequest, ProviderError, discover_customers, engine_status
 from .primitives import now
-from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
+from .cost_admission import CostLedger, CostContext
+from .local_data import WorkspaceClosed, export_tenant
+from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError, DraftCostDenied, DraftInput, DraftRequest, draft_cache_key, draft_status, generate_customer_draft
+from .reply_drafts import ReplyDraftRequest, ReplyDraftCheck, ReplyDraftService, generate_reply_suggestion
 
 logger = logging.getLogger(__name__)
 ALLOWED_ORIGINS = [f'http://{host}:{port}' for host in ('localhost', '127.0.0.1') for port in (3000, 3001, 8000)]
@@ -71,6 +74,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     app = FastAPI(title='SignalFoundry local demo', version='0.1.0',
                   description='Local demo only. No authentication. Never expose this service to a public network.')
     app.state.repository = Repository(db_path or os.environ.get('SIGNALFOUNDRY_DB_PATH') or Path(__file__).resolve().parents[1] / 'data' / 'signalfoundry.sqlite3')
+    app.state.cost_ledger = CostLedger(app.state.repository)
+    app.state.cost_ledger.recover_inflight()
     app.state.fetch_page = fetch_public_page
     app.state.decision_provider = RulesDecisionProvider()
     # Explicit opt-in is mandatory. Merely having unrelated credentials in the
@@ -80,6 +85,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         app.state.decision_provider = JevDecisionProvider.from_environment()
     app.state.research_lock = threading.Lock()
     app.state.generate_customer_draft = generate_customer_draft
+    app.state.generate_reply_suggestion = generate_reply_suggestion
     app.add_middleware(BodyLimitMiddleware)
     app.add_middleware(CORSMiddleware, allow_origins=allowed_origins,
                        allow_methods=['GET', 'POST', 'PUT', 'PATCH'], allow_headers=['Content-Type'],
@@ -93,7 +99,10 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
             return JSONResponse({'detail': 'Only the configured workspace browser may access this API'}, status_code=403)
         if request.method in ('POST', 'PUT', 'PATCH') and request.headers.get('content-type', '').split(';')[0].lower() != 'application/json':
             return JSONResponse({'detail': 'Mutations require application/json'}, status_code=415)
-        response = await call_next(request)
+        if request.url.path != '/api/health' and app.state.repository.closed():
+            response = JSONResponse({'detail': 'This local workspace is closed or is a quarantined restore. No changes or paid work are allowed.'}, status_code=410)
+        else:
+            response = await call_next(request)
         # Host middleware returns plain text by default; keep the documented error shape.
         if response.status_code == 400 and request.headers.get('host', '').split(':')[0] not in ('localhost', '127.0.0.1', 'testserver' if testing else ''):
             response = JSONResponse({'detail': 'Invalid local demo host'}, status_code=400)
@@ -111,6 +120,10 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     @app.exception_handler(FetchError)
     async def fetch_error(request: Request, error: FetchError):
         return JSONResponse({'detail': str(error)}, status_code=422)
+
+    @app.exception_handler(WorkspaceClosed)
+    async def workspace_closed(request: Request, error: WorkspaceClosed):
+        return JSONResponse({'detail': 'This local workspace is closed. No data was saved.'}, status_code=410)
 
     @app.exception_handler(Exception)
     async def unexpected_error(request: Request, error: Exception):
@@ -141,12 +154,30 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
     def workspace():
         return repository().workspace()
 
+    @app.get('/api/privacy/export')
+    def privacy_export():
+        if configured_origin or public_access or os.environ.get('CLIENTROVE_LOCAL_EXPORT_ENABLED', 'true') != 'true':
+            raise HTTPException(403, 'Local workspace export is disabled for this deployment.')
+        try:
+            snapshot = export_tenant(repository())
+        except ValueError as error:
+            raise HTTPException(413, str(error)) from None
+        return JSONResponse(snapshot, headers={'Content-Disposition': 'attachment; filename="clientrove-workspace.json"'})
+
     @app.get('/api/customers/engine')
     def customer_engine():
         state = engine_status()
+        state['monetary'] = ({'status': 'blocked', 'historical_usage_known': False, 'detail': 'Hosted paid admission is unavailable.'}
+                             if configured_origin or public_access else app.state.cost_ledger.status(repository().tenant_id))
         if configured_origin:
             state['discovery'].update(status='unavailable', detail='Customer discovery requires an authenticated workspace on hosted deployments.')
         return state
+
+    @app.get('/api/cost/status')
+    def cost_status():
+        if configured_origin or public_access:
+            raise HTTPException(403, PUBLIC_PREVIEW_READ_ONLY_DETAIL)
+        return app.state.cost_ledger.status(repository().tenant_id)
 
     @app.post('/api/customers/search', response_model=CustomerSearch)
     def customer_search_start(body: CustomerSearchRequest):
@@ -168,7 +199,8 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
                 try:
                     search.status, search.stage, search.updated_at = 'running', 'Finding businesses and checking public facts', now()
                     repository().save_customer_search(search)
-                    result = discover_customers(request, fetch_page=app.state.fetch_page)
+                    result = discover_customers(request, fetch_page=app.state.fetch_page,
+                        cost=CostContext(app.state.cost_ledger, repository().tenant_id, 'search:' + search.id))
                     search.accounts, search.errors, search.query = result.accounts, result.errors, result.query
                     search.status = ('partial' if result.accounts else 'failed') if result.errors else 'complete'
                     search.stage = 'Search finished'
@@ -222,9 +254,7 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
             raise HTTPException(422, 'Save your business profile before drafting a message.')
         try:
             key = draft_cache_key(profile, account)
-            if draft_status()['status'] != 'ready':
-                raise HTTPException(503, 'AI message drafting is not connected yet.')
-            cached = repository().reserve_customer_draft(key, body.idempotency_key)
+            cached = repository().reserve_customer_draft(key, body.idempotency_key, allow_new=draft_status()['status'] == 'ready')
             if cached:
                 return cached
         except DraftTerminalError as exc:
@@ -232,7 +262,11 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         except DraftError as exc:
             raise HTTPException(409, str(exc)) from None
         try:
-            draft = app.state.generate_customer_draft(DraftInput(profile=profile, account=account))
+            draft = app.state.generate_customer_draft(DraftInput(profile=profile, account=account),
+                cost=CostContext(app.state.cost_ledger, repository().tenant_id, 'intro:' + body.idempotency_key))
+        except DraftCostDenied as error:
+            repository().finish_customer_draft(key, body.idempotency_key)
+            return JSONResponse({'detail': str(error), 'code': 'COST_BLOCKED'}, status_code=503)
         except Exception:
             repository().finish_customer_draft(key, body.idempotency_key)
             # Never log/stringify the model, provider, prompt or credential error.
@@ -346,8 +380,39 @@ def create_app(db_path: str | Path | None = None, *, testing: bool = False) -> F
         return Response(output.getvalue(), media_type='text/csv',
                         headers={'Content-Disposition': f'attachment; filename="signalfoundry-{campaign_id}.csv"'})
 
-    from .outreach import outreach_router
-    app.include_router(outreach_router(repository, blocked_preview=bool(configured_origin or public_access)))
+    from .outreach import outreach_router, OutreachError
+    outreach_blocked = bool(configured_origin or public_access or
+                            os.environ.get('CLIENTROVE_LOCAL_OUTREACH_ENABLED', 'true') != 'true')
+
+    def reply_service():
+        if outreach_blocked:
+            raise HTTPException(403, 'Conversation review is disabled in this deployment. Your saved research remains available.')
+        return ReplyDraftService(repository(), app.state.cost_ledger, app.state.generate_reply_suggestion)
+
+    @app.post('/api/outreach/{thread_id}/reply-draft')
+    def reply_draft(thread_id: str, body: ReplyDraftRequest | EmptyRequest):
+        service = reply_service()
+        if isinstance(body, EmptyRequest):
+            # Legacy probes/clients never imply consent to transmit replies.
+            repository().outreach_thread(thread_id)
+            raise HTTPException(503, 'AI reply suggestions require explicit context review and monetary admission. The manual editor remains available.')
+        try:
+            return service.request(thread_id, body)
+        except OutreachError as error:
+            raise HTTPException(error.status, str(error)) from None
+        except DraftCostDenied as error:
+            return JSONResponse({'detail': str(error), 'code': 'COST_BLOCKED'}, status_code=503)
+        except DraftError as error:
+            return JSONResponse({'detail': str(error), 'code': 'DRAFT_FAILED'}, status_code=409)
+
+    @app.post('/api/outreach/{thread_id}/reply-draft/check')
+    def check_reply_draft(thread_id: str, body: ReplyDraftCheck):
+        try:
+            return reply_service().check(thread_id, body)
+        except OutreachError as error:
+            raise HTTPException(error.status, str(error)) from None
+
+    app.include_router(outreach_router(repository, blocked_preview=outreach_blocked))
     return app
 
 

@@ -84,12 +84,7 @@ describe("workspace request lifecycle", () => {
     );
     await act(async () =>
       root.render(
-        <WorkspaceSession
-          key="org_a"
-          mode="saas"
-          role="org:admin"
-          organizationId="org_a"
-        >
+        <WorkspaceSession mode="saas" role="org:admin" organizationId="org_a">
           <Probe />
         </WorkspaceSession>,
       ),
@@ -97,12 +92,7 @@ describe("workspace request lifecycle", () => {
     const oldApi = savedApi;
     await act(async () =>
       root.render(
-        <WorkspaceSession
-          key="org_b"
-          mode="saas"
-          role="org:member"
-          organizationId="org_b"
-        >
+        <WorkspaceSession mode="saas" role="org:member" organizationId="org_b">
           <Probe />
         </WorkspaceSession>,
       ),

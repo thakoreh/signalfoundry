@@ -22,7 +22,7 @@ describe("website-first customer discovery landing", () => {
     expect(text).toContain("For founders selling SaaS to businesses");
     expect(text).toContain("approve an AI introduction");
     expect(text).toContain(
-      "Search for up to five businesses in the current test,",
+      "search for up to five businesses in the current test,",
     );
     expect(html).toContain('for="business-website"');
     expect(html).toContain('id="business-website"');
@@ -35,10 +35,9 @@ describe("website-first customer discovery landing", () => {
       "Create your account, then review your business profile before searching.",
     );
     for (const step of [
-      "Find businesses to approach",
-      "Approve your introduction",
-      "Keep track of the conversation",
-      "Record meetings and outcomes",
+      "Find the right businesses",
+      "Make the first message personal",
+      "Follow the conversation through",
     ])
       expect(text).toContain(step);
     expect(text).not.toMatch(
@@ -63,19 +62,22 @@ describe("website-first customer discovery landing", () => {
     expect(html).toMatch(/id="main-content"[^>]*tabindex="-1"/);
   });
 
-  it("shows a complete semantic product example without swipe or autoplay gates", () => {
+  it("sells the complete journey without exposing a dashboard, fabricated results or autoplay gates", () => {
     const { html, text } = renderLanding();
-    expect(text).toContain("Fictional product example");
-    expect(text).toContain("Illustrative layout, not live results.");
-    expect(text).toContain("The example businesses and email are fictional");
-    expect(text).toContain("Unverified");
+    expect(text).toContain("Finding a lead is the start.");
+    for (const stage of [
+      "Start with who you can help.",
+      "Give them a reason to reply.",
+      "Keep the opportunity in motion.",
+    ])
+      expect(text).toContain(stage);
     expect(text).toContain(
-      "Real searches may return fewer than five businesses; contact details vary.",
+      "You approve every message. You send from your own email tool.",
     );
-    expect(html).toContain('<th role="columnheader" scope="col">Company</th>');
-    expect(html).not.toMatch(
-      /role="tab(?:panel|list)?"|aria-roledescription="carousel"|inert=/,
-    );
+    expect(html).toContain('aria-label="Customer acquisition journey"');
+    expect(html).not.toMatch(/<table\b|sf-demo-draft|sf-preview-profile/);
+    expect(html).toContain('class="sf-hero-art" aria-hidden="true"');
+    expect(html).not.toMatch(/role="tab(?:panel|list)?"|inert=/);
     expect(text).not.toMatch(
       /trusted by|customers include|guaranteed leads|hot leads|unlimited leads/i,
     );
@@ -85,12 +87,11 @@ describe("website-first customer discovery landing", () => {
   it("explains verification limits, no sending and legal routes", () => {
     const { html, text } = renderLanding();
     expect(text).toContain("Searches may return fewer than five businesses;");
-    expect(text).toContain("unverified emails stay clearly marked");
+    expect(text).toContain("unverified emails stay clearly labeled");
     expect(text).toContain("Verification does not guarantee a reply.");
     expect(text).toContain(
-      "Planned next: a connected inbox and automatic follow-ups.",
+      "A connected inbox and automatic sending are not available.",
     );
-    expect(text).toContain("They are not connected or sending messages today.");
     expect(text).toContain("A recorded meeting is your report;");
     expect(text).toContain(
       "You review and write your responses; inbox sync and automatic follow-ups are planned.",
@@ -98,7 +99,8 @@ describe("website-first customer discovery landing", () => {
     expect(text).toContain("enter your business details manually");
     for (const route of ["privacy", "terms", "contact"])
       expect(html).toContain(`href="/${route}"`);
-    expect(html.match(/<details[ >]/g)).toHaveLength(6);
+    // Five FAQs remain; the removed dashboard demo used a sixth draft disclosure.
+    expect(html.match(/<details[ >]/g)).toHaveLength(5);
     expect(text).not.toMatch(/\$\d|free trial/i);
   });
 });

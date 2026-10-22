@@ -1,7 +1,7 @@
 """Optional, explicitly enabled Jev adapter. No calls occur on import or startup.
 
 Verified API documentation: https://docs.typesafe.ai/api and /models.
-Set DECISION_ENGINE=jev and JEV_API_KEY yourself to opt into paid external calls.
+Live dispatch is gated until it shares monetary admission; credentials alone do not enable it.
 Default and all supplied automated tests use local rules or a mock transport.
 """
 from __future__ import annotations
@@ -16,6 +16,7 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .models import Profile, ScoreComponent
+from .cost_admission import paid_call
 from .research import RulesDecisionProvider
 from .safety import Page, FetchError, PinnedHTTPSConnection, resolve_public
 
@@ -130,6 +131,10 @@ class JevDecisionProvider:
                 if len(response.content) > MAX_RESPONSE_BYTES:
                     raise ValueError('provider response exceeded limit')
                 return response.content
+        # Unsupported in the price catalog: even explicit opt-in stays gated.
+        return paid_call(None, 'jev:evaluate', payload, lambda: self._live_request(payload, headers))
+
+    def _live_request(self, payload, headers):
         deadline = time.monotonic() + 8.0
         ip = resolve_public('api.typesafe.ai', 443, 2.0)[0]
         remaining = deadline - time.monotonic()

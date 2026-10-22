@@ -21,8 +21,9 @@ export function normalizeBusinessWebsite(input: string): string {
       host.length > 253 ||
       !host.includes(".") ||
       /^[\d.]+$/.test(host) ||
+      /^\d+$/.test(host.split(".").at(-1) || "") ||
       host.includes(":") ||
-      /\.(localhost|local|internal|test|invalid|example)$/.test(host) ||
+      /\.(localhost|local|internal|test|invalid|example|onion|home|lan)$/.test(host) ||
       !host
         .split(".")
         .every(

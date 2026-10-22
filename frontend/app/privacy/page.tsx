@@ -44,13 +44,16 @@ export default function PrivacyPage() {
           <p>
             If you use the workspace, you may provide a website, company
             domains, CSV rows, profile notes, shortlist decisions, and research
-            output. The preview may also receive basic technical information
+            output, contact details, drafted messages, pasted replies and
+            manually reported meeting or customer outcomes. Local mode saves
+            these records on the computer running the app. The preview may also receive basic technical information
             needed to operate a session.
           </p>
           <h2>How to use this preview safely</h2>
           <p>
-            Do not upload confidential, regulated, or personal contact data. Use
-            public company information only. Research output is for review and
+            Use public company information and relevant public professional
+            contact details. Avoid confidential, regulated or unnecessary private
+            personal information when pasting replies. Research output is for review and
             should be checked before it is used elsewhere.
           </p>
           <h2>Optional AI message drafts</h2>
@@ -62,7 +65,29 @@ export default function PrivacyPage() {
             with your workspace so reopening the same research can reuse them.
             Drafts are editable, and this feature does not send messages.
           </p>
+          <p>
+            Optional local AI reply help has a separate opt-in. After you review
+            its disclosure and explicitly request a suggestion, it sends your
+            saved offering, limited public company excerpts, excerpts from up to
+            six manually recorded messages and the full latest received reply
+            within the supported saved-record limit,
+            to DeepSeek. Structured contact-list and sender-address fields are
+            omitted. Recognizable email, link and phone patterns in text are
+            removed, but this does not guarantee anonymization or remove all
+            private information. Review what you paste before requesting help.
+            Suggestions are saved locally and never approve or send a response.
+            This remains off without explicit activation, accepted monetary
+            policies and separate spending authorization.
+          </p>
           <h2>Retention and requests</h2>
+          <p>
+            Local mode offers a saved-workspace JSON export. The owner can
+            logically erase and close a local workspace with the documented
+            offline data tool. Minimal suppression, financial audit and closure
+            facts remain so deletion cannot reopen stopped outreach or reset
+            spending. This does not securely wipe disk remnants or delete
+            separate backups, exports or messages in an external email app.
+          </p>
           <p>
             Retention, deletion, subprocessors, and production support processes
             have not been finalized for this staging preview. No production

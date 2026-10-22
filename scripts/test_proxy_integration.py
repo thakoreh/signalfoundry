@@ -109,7 +109,8 @@ def main() -> None:
 
             with log_path.open('w') as log:
                 process = subprocess.Popen([
-                    node, str(dependencies / 'next/dist/bin/next'), 'dev', '--webpack',
+                    node, '--require', str(ROOT / 'scripts/fixture_loopback_fetch.cjs'),
+                    str(dependencies / 'next/dist/bin/next'), 'dev', '--webpack',
                     '--hostname', '127.0.0.1', '--port', str(port),
                 ], cwd=workspace, env=environment, stdout=log, stderr=subprocess.STDOUT,
                     start_new_session=True)

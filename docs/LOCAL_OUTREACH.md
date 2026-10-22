@@ -1,5 +1,7 @@
 # Persistent local outreach review
 
+Current continuation: the local flow now includes fresh referral contacts, bounded dated manual followups, timed meeting/confirmation reports, Next up/saved return, a reported-company activity summary, exact mailto handoff and logical local data controls. Optional editable AI reply suggestions are implemented with offline evidence under a separate default-off flag, context disclosure and monetary gate; no live use is authorized or verified. See [current status](continuation/STATUS.md), [reply contract](continuation/REPLY_COPILOT.md) and [consolidated setup](continuation/LOCAL_SETUP.md). Hosted/inbox/send/calendar remain unavailable; no connected capability is implied.
+
 This is a real SQLite-backed private local workflow. It does not connect an inbox,
 send mail, detect replies, create calendar events, or assert that a meeting or sale
 actually happened. SaaS must fail closed until it has tenant-authenticated hosted
@@ -44,13 +46,14 @@ reports; neither a link nor a meeting implies a sale.
 
 ## Spending boundary
 
-This workflow uses no new external services or paid model calls. Responses can be
-written and reviewed manually. AI reply drafting explicitly returns unavailable:
-the proposed total US$25 monthly budget needs a real monetary admission ledger
-covering existing DeepSeek usage, failed attempts and all other operating costs
-before additional model usage can be promised inside that cap. Existing initial
-AI drafting is a separate explicit feature with its existing count limits; those
-limits alone are not a US-dollar monthly guarantee.
+No new service or real paid call was used to implement this workflow. Responses
+can always be written and reviewed manually. Optional AI reply suggestions reuse
+DeepSeek only after explicit context review, default-off activation and the
+same durable global/tenant monetary admission used by search and introductions.
+The separate deepseek:reply operation needs its own accepted token-price bound;
+an intro/search policy is insufficient. Actual earlier DeepSeek usage remains
+unknown, and the US$25 ceiling is not spending permission. Count limits alone
+do not establish a dollar guarantee. See continuation/MONETARY_SAFEGUARDS.md.
 
 ## API
 
@@ -64,14 +67,23 @@ Every thread mutation accepts `expected_revision` and `idempotency_key`:
 
 - `PUT /{id}/draft`: `recipient`, `subject`, `body`, optional `booking_link`.
 - `POST /{id}/approve`: no additional fields.
-- `POST /{id}/sent`: no additional fields; records a manual report only.
+- `POST /{id}/sent`: optional `sent_as` (`approved` by default or `with_changes`), `actual_subject`, `actual_body`; changed reports require complete actual subject/body. Records a manual report only, retaining original approved text/hash separately. Recipient changes are not supported; see overnight/S1_SETUP.md.
 - `POST /{id}/replies`: pasted `body`, optional `reply_state` (defaults to review).
 - `PATCH /{id}/reply-state`: corrected `reply_state` for the latest pasted reply.
 - `PATCH /{id}/pause`: `paused` boolean.
 - `PATCH /{id}/outcomes`: `meeting_state` and `sale_state`, both explicit reports.
 
-`POST /{id}/reply-draft` accepts an empty JSON object and always returns disabled
-after checking conversation ownership. It cannot spend provider credit.
+`POST /{id}/reply-draft` accepts `expected_revision`, `idempotency_key`, explicit
+`context_confirmed: true` and `context_version: "reply-context-v2"`. It returns a
+separate snapshot-bound suggestion, never a thread mutation or approval. New
+generation stays unavailable without the reply flag, active eligible inbound,
+source/sender admission and monetary authority. Unchanged cached suggestions
+can reopen without another provider call. The legacy empty object returns503;
+older v1 consent fails validation. No request here authorizes real spending.
+
+`POST /{id}/reply-draft/check` accepts `expected_revision` and `snapshot_key` and
+only rechecks current context before filling the private editor. It has no paid
+dispatch and creates no approval or send. Exact Save/Approve remains separate.
 
 Local limits are 100 conversations, 50 messages per conversation and 10,000
 accepted distinct mutation/create requests per tenant. Persistence is scoped to

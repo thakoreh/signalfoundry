@@ -92,6 +92,14 @@ test("contact bands use descending score and deterministic name/id ties", () => 
   );
 });
 
+test("individual business addresses rank above shared inboxes without upgrading verification", () => {
+  const shared = account("shared", "Shared", 99, "verified");
+  const individual = account("individual", "Individual", 10, "unverified");
+  individual.contacts[0].email = "alex@individual.example";
+  assert.deepEqual(orderCustomerAccounts([shared, individual]).map(row => row.id), ["individual", "shared"]);
+  assert.equal(individual.contacts[0].verification_status, "unverified");
+});
+
 test("alternate sorts deliberately prioritize website score or company name", () => {
   const rows = [
     account("b", "Beta", 30, "verified"),

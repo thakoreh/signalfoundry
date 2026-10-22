@@ -24,6 +24,9 @@ export const jobStatus = v.union(
 );
 export const profile = v.object({
   company_name: v.string(),
+  sender_name: v.optional(v.string()),
+  mailing_address: v.optional(v.string()),
+  sender_contact: v.optional(v.string()),
   description: v.string(),
   industries: v.array(v.string()),
   company_sizes: v.array(v.string()),

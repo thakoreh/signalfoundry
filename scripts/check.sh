@@ -6,6 +6,8 @@ if [[ ! -x "$PYTHON" ]]; then PYTHON=python3; fi
 export NEXT_TELEMETRY_DISABLED=1
 export SIGNALFOUNDRY_MODE=local-demo NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo
 (cd "$ROOT/backend" && "$PYTHON" -m unittest discover -s tests -v)
+"$PYTHON" "$ROOT/scripts/test_local_journey_http.py"
+"$PYTHON" "$ROOT/scripts/test_review_fixture.py"
 "$PYTHON" "$ROOT/scripts/test_packaging.py"
 "$PYTHON" "$ROOT/scripts/test_deployment.py"
 "$PYTHON" "$ROOT/scripts/test_launcher.py"
@@ -14,6 +16,7 @@ export SIGNALFOUNDRY_MODE=local-demo NEXT_PUBLIC_SIGNALFOUNDRY_MODE=local-demo
 "$PYTHON" "$ROOT/scripts/production_worker_checks.py"
 bash -n "$ROOT/scripts/dev.sh" "$ROOT/scripts/setup.sh" "$ROOT/scripts/package.sh" "$ROOT/deploy/start.sh"
 (cd "$ROOT/frontend" && npm run typecheck && npm run lint && npm test && npm run test:convex && npm run test:landing && npm run build)
+node --test "$ROOT/scripts/test_fixture_fetch_guard.cjs"
 "$PYTHON" "$ROOT/scripts/test_proxy_integration.py"
 "$PYTHON" "$ROOT/scripts/test_full_stack.py"
 

@@ -5,7 +5,9 @@ import { useEffect } from "react";
 /** Content stays visible without JavaScript; entering view adds one finite reveal. */
 export function LandingPreviewMotion() {
   useEffect(() => {
-    const preview = document.querySelector<HTMLElement>(".sf-preview");
+    const preview = document.querySelector<HTMLElement>(
+      ".sf-preview, .sf-story",
+    );
     if (
       !preview ||
       preview.dataset.motionEntered === "true" ||
@@ -13,7 +15,8 @@ export function LandingPreviewMotion() {
     )
       return;
 
-    const content = preview.querySelector(".sf-preview-body") || preview;
+    const content =
+      preview.querySelector(".sf-preview-body, .sf-story-stages") || preview;
     let entered = false;
     const observer = new IntersectionObserver(
       (entries) => {

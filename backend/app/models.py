@@ -28,6 +28,9 @@ class StrictModel(BaseModel):
 
 class Profile(StrictModel):
     company_name: Text
+    sender_name: Annotated[str, StringConstraints(strip_whitespace=True, max_length=240)] = ''
+    mailing_address: Annotated[str, StringConstraints(strip_whitespace=True, max_length=1000)] = ''
+    sender_contact: Annotated[str, StringConstraints(strip_whitespace=True, max_length=320)] = ''
     description: LongText
     industries: list[Text] = Field(max_length=12)
     company_sizes: list[Text] = Field(max_length=12)

@@ -1,5 +1,6 @@
 import type { Account } from "../lib/types.ts";
 import { csvCell } from "../lib/account-export.ts";
+import { isSharedInbox } from "../lib/customer-search.ts";
 
 /** One row per contact, retaining unknown contact fields and source provenance. */
 export function customerCsv(accounts: Account[]): string {
@@ -16,6 +17,7 @@ export function customerCsv(accounts: Account[]): string {
       "contact_role",
       "email",
       "email_status",
+      "inbox_type",
       "contact_source",
       "verification_note",
       "unknowns",
@@ -36,6 +38,7 @@ export function customerCsv(accounts: Account[]): string {
         contact?.role || "",
         contact?.email || "",
         contact?.verification_status || "not_available",
+        contact?.email ? isSharedInbox(contact.email) ? "shared_inbox" : "business_address" : "unknown",
         contact?.source_url || "",
         contact?.note || "",
         account.unknowns.join(" | "),

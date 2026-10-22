@@ -89,6 +89,8 @@ describe("dedicated customer results", () => {
     api.mockImplementation((path: string) =>
       path === "/workspace"
         ? new Promise(() => undefined)
+        : path === "/outreach/insights"
+        ? Promise.resolve({ company_flags: [] })
         : Promise.resolve(
             fixtureRun(
               ++reads === 1 ? "queued" : reads === 2 ? "running" : "complete",
@@ -111,6 +113,14 @@ describe("dedicated customer results", () => {
       expect(options.method).toBeUndefined();
     }
     expect(reads).toBe(3);
+  });
+  it("marks contacted and suppressed companies using saved local history without starting research", async () => {
+    api.mockImplementation((path: string) => Promise.resolve(path === "/outreach/insights"
+      ? { company_flags: [{ domain: "verified.company.com", contacted: true, suppressed: true, paused: true }] }
+      : fixtureRun("complete")));
+    await mount();
+    expect(container.textContent).toContain("Suppressed · do not contact");
+    expect(api.mock.calls.every(([, options]) => !options.method)).toBe(true);
   });
   it("keeps verification labels and selections while sorting, and restores those choices on refresh", async () => {
     await mount();

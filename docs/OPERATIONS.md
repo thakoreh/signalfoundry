@@ -2,6 +2,8 @@
 
 This is a runbook to rehearse before launch. It is not evidence that any infrastructure was configured.
 
+For the current private local candidate, use [consolidated setup/off switches](continuation/LOCAL_SETUP.md), [local data/restore operations](continuation/LOCAL_DATA_OPERATIONS.md) and [monetary controls](continuation/MONETARY_SAFEGUARDS.md). Restores are quarantined drills, not activation/recovery approval. The hosted inventory below remains a planned deployment boundary, not configured infrastructure or hosted outreach parity.
+
 ## Service inventory
 
 - Next.js: customer-facing gateway, Clerk sessions and bounded REST mapping to Convex

@@ -27,6 +27,10 @@ class DraftTerminalError(DraftError):
     """A recorded failed attempt; an explicit new key may admit another attempt."""
 
 
+class DraftCostDenied(DraftError):
+    """A fixed monetary admission failure, not a retryable provider failure."""
+
+
 class DraftRequest(StrictModel):
     idempotency_key: Annotated[str, StringConstraints(pattern=r'^[A-Za-z0-9_-]{8,128}$')]
 
@@ -87,7 +91,9 @@ Use only the supplied offering and cited prospect facts. Do not invent people, c
 buying intent, results, statistics, testimonials, prior relationships, or product capabilities.
 Explain a possible benefit conditionally, not a guaranteed outcome. No links, addresses, phone
 numbers, tracking, attachments or sending. Use a generic greeting, no invented recipient name.
-Keep body under 130 words. Include one gentle question. Return exactly this JSON structure:
+Default to roughly 50–125 words: one specific verifiable observation, one plain line
+on the seller's offering, and one low-pressure interest question. No flattery opener,
+fake familiarity, Re:/Fwd: subject, invented urgency or connections. Return exactly this JSON structure:
 {"subject":"Short relevant subject","body":"Plain text introduction","evidence_ids":["supplied evidence id"]}
 Every prospect-specific assertion must be supported by one of the returned evidence IDs.
 If the evidence is insufficient, return an empty body rather than guessing."""
@@ -102,6 +108,8 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
     if not set(content.evidence_ids).issubset(known) or len(set(content.evidence_ids)) != len(content.evidence_ids):
         raise DraftError('AI returned an unsupported source reference. No message was sent.')
     text = content.subject + '\n' + content.body
+    if re.match(r'^\s*(?:re|fw|fwd)\s*:', content.subject, re.I):
+        raise DraftError('AI invented an existing email thread. Review a fresh subject instead.')
     # Prevent generated contact details / destinations. Citation links come only
     # from the stored evidence, independently of model output.
     if re.search(r'\b[a-z][a-z0-9+.-]*://|\b(?:tel|mailto|data|javascript):|www\.|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\b(?:[a-z0-9-]+\.)+[a-z]{2,63}\b|\+?\d[\d(). -]{6,}\d', text, re.I):
@@ -115,19 +123,17 @@ def validate_content(data: dict, facts: dict) -> GeneratedContent:
     return content
 
 
-def generate_customer_draft(body: DraftInput, *, transport=None) -> CustomerDraft:
-    if draft_status()['status'] != 'ready':
-        raise DraftError('AI message drafting is not connected yet.')
-    facts = draft_facts(body.profile, body.account)
-    payload = {'model': MODEL, 'thinking': {'type': 'disabled'}, 'max_tokens': 600,
-               'temperature': 0.3, 'stream': False, 'response_format': {'type': 'json_object'},
-               'messages': [{'role': 'system', 'content': SYSTEM},
-                            {'role': 'user', 'content': json.dumps(facts, ensure_ascii=True)}]}
+def bounded_completion(payload, operation, *, transport=None, cost=None):
+    """Fixed-host, one-attempt JSON boundary shared by explicitly gated drafts."""
+    from .cost_admission import paid_call, digest
+    if transport is not None and not isinstance(transport, httpx.MockTransport):
+        raise DraftError('Only an offline mock transport may be injected.')
+    credential = os.environ.get('DEEPSEEK_API_KEY', '').strip()
     started = time.monotonic()
-    try:
+    def dispatch():
         with httpx.Client(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(20.0, connect=5.0), transport=transport) as client:
             with client.stream('POST', 'https://api.deepseek.com/chat/completions',
-                               headers={'Authorization': 'Bearer ' + os.environ['DEEPSEEK_API_KEY'].strip(), 'Content-Type': 'application/json'},
+                               headers={'Authorization': 'Bearer ' + credential, 'Content-Type': 'application/json'},
                                json=payload) as response:
                 if response.status_code != 200 or 'application/json' not in response.headers.get('content-type', ''):
                     raise DraftError('AI drafting is temporarily unavailable. No automatic retry was made.')
@@ -137,11 +143,27 @@ def generate_customer_draft(body: DraftInput, *, transport=None) -> CustomerDraf
                     if size > MAX_RESPONSE_BYTES or time.monotonic() - started > 25:
                         raise DraftError('AI drafting exceeded its response limit. No automatic retry was made.')
                     chunks.append(chunk)
-        raw = json.loads(b''.join(chunks))
+        return json.loads(b''.join(chunks))
+    return paid_call(cost, operation, payload, dispatch, billing_identity=digest(credential))
+
+
+def generate_customer_draft(body: DraftInput, *, transport=None, cost=None) -> CustomerDraft:
+    from .cost_admission import CostDenied
+    if draft_status()['status'] != 'ready':
+        raise DraftError('AI message drafting is not connected yet.')
+    facts = draft_facts(body.profile, body.account)
+    payload = {'model': MODEL, 'thinking': {'type': 'disabled'}, 'max_tokens': 600,
+               'temperature': 0.3, 'stream': False, 'response_format': {'type': 'json_object'},
+               'messages': [{'role': 'system', 'content': SYSTEM},
+                            {'role': 'user', 'content': json.dumps(facts, ensure_ascii=True)}]}
+    try:
+        raw = bounded_completion(payload, 'deepseek:intro', transport=transport, cost=cost)
         choice = raw['choices'][0]
         if choice.get('finish_reason') != 'stop':
             raise DraftError('AI drafting did not finish cleanly. No automatic retry was made.')
         content = validate_content(json.loads(choice['message']['content']), facts)
+    except CostDenied as error:
+        raise DraftCostDenied(str(error)) from None
     except DraftError:
         raise
     except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):

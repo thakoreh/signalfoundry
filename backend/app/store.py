@@ -7,12 +7,13 @@ from __future__ import annotations
 import json
 import sqlite3
 from datetime import datetime, timezone
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 
 from .models import Account, Campaign, Profile, Workspace
 from .primitives import new_id, now
 from .customers import CustomerSearch
+from .local_data import WorkspaceClosed, closed, install_controls
 
 
 class Repository:
@@ -56,8 +57,6 @@ class Repository:
               );
               CREATE INDEX IF NOT EXISTS customer_draft_requests_tenant_created ON customer_draft_requests(tenant_id,created_at);
               CREATE INDEX IF NOT EXISTS customer_draft_requests_cached_aliases ON customer_draft_requests(tenant_id,cache_key,charged,created_at);
-              INSERT OR IGNORE INTO customer_draft_requests
-                SELECT tenant_id,request_key,cache_key,created_at,status,1,data FROM customer_drafts;
               CREATE TABLE IF NOT EXISTS outreach_threads (
                 tenant_id TEXT NOT NULL, id TEXT NOT NULL, search_id TEXT NOT NULL,
                 account_id TEXT NOT NULL, data TEXT NOT NULL,
@@ -74,10 +73,15 @@ class Repository:
                 created_at TEXT NOT NULL, PRIMARY KEY(tenant_id,target)
               );
             ''')
+            install_controls(db)
             workspace = Workspace(id=tenant_id, name='Your workspace', website=None,
                                   profile=None, created_at=now())
-            db.execute('INSERT OR IGNORE INTO workspaces VALUES (?,?)',
-                       (tenant_id, workspace.model_dump_json()))
+            if not closed(db, tenant_id):
+                db.execute('''INSERT OR IGNORE INTO customer_draft_requests
+                    SELECT tenant_id,request_key,cache_key,created_at,status,1,data FROM customer_drafts
+                    WHERE tenant_id NOT IN (SELECT scope_id FROM local_controls WHERE name='erased')''')
+                db.execute('INSERT OR IGNORE INTO workspaces VALUES (?,?)',
+                           (tenant_id, workspace.model_dump_json()))
 
     @contextmanager
     def connect(self):
@@ -87,12 +91,22 @@ class Repository:
         try:
             with connection:
                 yield connection
+        except sqlite3.IntegrityError as error:
+            if str(error) == 'local_workspace_closed':
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.') from None
+            raise
         finally:
             connection.close()
+
+    def closed(self):
+        with self.connect() as db:
+            return closed(db, self.tenant_id)
 
     def workspace(self) -> Workspace:
         with self.connect() as db:
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
+        if row is None:
+            raise WorkspaceClosed('This local workspace is closed.')
         return Workspace.model_validate_json(row['data'])
 
     def outreach_threads(self, search_id=None):
@@ -102,6 +116,14 @@ class Repository:
     def outreach_thread(self, thread_id):
         from .outreach import OutreachStore
         return OutreachStore(self).get(thread_id)
+
+    def outreach_next_up(self):
+        from .outreach import OutreachStore
+        return OutreachStore(self).next_up()
+
+    def outreach_insights(self):
+        from .outreach import OutreachStore
+        return OutreachStore(self).insights()
 
     def start_outreach(self, body):
         from .outreach import OutreachStore
@@ -137,9 +159,11 @@ class Repository:
 
     def save_customer_search(self, search: CustomerSearch) -> None:
         with self.connect() as db:
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.')
             db.execute('UPDATE customer_searches SET data=? WHERE tenant_id=? AND id=?', (search.model_dump_json(), self.tenant_id, search.id))
 
-    def reserve_customer_draft(self, cache_key: str, request_key: str):
+    def reserve_customer_draft(self, cache_key: str, request_key: str, *, allow_new=True, _db=None):
         """Transactionally admit one attempt per immutable profile/evidence snapshot.
 
         A request key is never charged twice. Only an explicit new key after a
@@ -147,8 +171,11 @@ class Repository:
         deduplicate across keys; cached response aliases stay bound to the input.
         """
         from .customer_drafts import CustomerDraft, DraftError, DraftTerminalError
-        with self.connect() as db:
-            db.execute('BEGIN IMMEDIATE')
+        with (self.connect() if _db is None else nullcontext(_db)) as db:
+            if not db.in_transaction:
+                db.execute('BEGIN IMMEDIATE')
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No draft work is allowed.')
             current = datetime.now(timezone.utc)
             def age(timestamp):
                 return (current - datetime.fromisoformat(timestamp.replace('Z', '+00:00'))).total_seconds()
@@ -187,6 +214,8 @@ class Repository:
                     if age(old['created_at']) > 90:
                         recover(old['request_key'])
                     raise DraftError('This draft is already in progress. Check it again shortly; no extra attempt was made.')
+            if not allow_new:
+                raise DraftError('AI message drafting is not connected. Existing saved drafts remain available.')
             recent = db.execute('SELECT created_at FROM customer_draft_requests WHERE tenant_id=? AND charged=1 ORDER BY created_at DESC LIMIT 5',
                                 (self.tenant_id,)).fetchall()
             if sum((current - datetime.fromisoformat(row['created_at'].replace('Z', '+00:00'))).total_seconds() < 3600 for row in recent) >= 5:
@@ -198,8 +227,8 @@ class Repository:
                        (self.tenant_id, cache_key, request_key, timestamp, 'pending'))
         return None
 
-    def finish_customer_draft(self, cache_key: str, request_key: str, draft=None) -> bool:
-        with self.connect() as db:
+    def finish_customer_draft(self, cache_key: str, request_key: str, draft=None, *, _db=None) -> bool:
+        with (self.connect() if _db is None else nullcontext(_db)) as db:
             updated = db.execute('UPDATE customer_drafts SET status=?,data=? WHERE tenant_id=? AND cache_key=? AND request_key=? AND status=?',
                        ('complete' if draft else 'failed', draft.model_dump_json() if draft else None,
                         self.tenant_id, cache_key, request_key, 'pending'))
@@ -212,9 +241,28 @@ class Repository:
 
     def save_profile(self, profile: Profile, website: str | None = None, *, set_website: bool = False) -> Workspace:
         with self.connect() as db:
+            db.execute('BEGIN IMMEDIATE')
+            if closed(db, self.tenant_id):
+                raise WorkspaceClosed('This local workspace is closed. No data was saved.')
             row = db.execute('SELECT data FROM workspaces WHERE tenant_id=?', (self.tenant_id,)).fetchone()
             workspace = Workspace.model_validate_json(row['data'])
+            # Older clients/website analysis do not know sender fields. Omission
+            # preserves saved identity; an explicit empty string can clear it.
+            if workspace.profile:
+                profile = profile.model_copy(update={name: getattr(workspace.profile, name)
+                    for name in ('sender_name', 'mailing_address', 'sender_contact')
+                    if name not in profile.model_fields_set})
             workspace.name = profile.company_name
+            if workspace.profile and workspace.profile != profile:
+                # Invalidate pending approvals, never rewrite immutable sent messages.
+                from .outreach import OutreachThread
+                for row in db.execute('SELECT id,data FROM outreach_threads WHERE tenant_id=?', (self.tenant_id,)).fetchall():
+                    thread = OutreachThread.model_validate_json(row['data'])
+                    if thread.approval:
+                        thread.approval, thread.ready_for_manual_action = None, False
+                        thread.revision += 1
+                        db.execute('UPDATE outreach_threads SET data=? WHERE tenant_id=? AND id=?',
+                                   (thread.model_dump_json(), self.tenant_id, row['id']))
             workspace.profile = profile
             if set_website:
                 workspace.website = website

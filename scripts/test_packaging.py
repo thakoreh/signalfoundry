@@ -3,6 +3,7 @@
 import pathlib
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import zipfile
@@ -14,19 +15,21 @@ class PackagingTest(unittest.TestCase):
             root = pathlib.Path(tmp)
             (root / 'scripts').mkdir()
             shutil.copy(pathlib.Path(__file__).with_name('package.sh'), root / 'scripts/package.sh')
+            shutil.copy(pathlib.Path(__file__).with_name('package_source.py'), root / 'scripts/package_source.py')
             omit = ['backend/data/signalfoundry.sqlite3', 'backend/data/unexpected.txt',
                     'other.sqlite3-wal', 'other.sqlite3-shm', 'other.sqlite3-journal',
                     'other.sqlite-wal', 'other.db-journal', '.env', '.env.local',
                     'deploy/secrets/preview.htpasswd', 'leaked.htpasswd', '.htpasswd', 'private.key', 'private.pem',
                     'frontend/node_modules/pkg/file.js', 'frontend/.next/build.js',
-                    'frontend/.convex/local-state.json', 'frontend/test-results/trace.zip']
+                    'frontend/.convex/local-state.json', 'frontend/test-results/trace.zip',
+                    'private/cost-policy.json', 'exports/leads.csv', '.local/diagnostics.json']
             keep = ['README.md', 'backend/app/main.py', 'backend/.env.example', 'frontend/package-lock.json']
             for name in omit + keep:
                 p = root / name
                 p.parent.mkdir(parents=True, exist_ok=True)
                 p.write_text('non-sensitive test content')
             archive = root / 'artifacts/source.zip'
-            subprocess.run(['bash', str(root / 'scripts/package.sh'), str(archive)], check=True, capture_output=True)
+            subprocess.run([sys.executable, str(root / 'scripts/package_source.py'), str(archive)], check=True, capture_output=True)
             with zipfile.ZipFile(archive) as z:
                 names = set(z.namelist())
             for name in omit:

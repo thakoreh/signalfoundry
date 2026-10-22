@@ -72,6 +72,63 @@ async function call(
   return { ...state, response };
 }
 
+test("hosted sender fields are explicitly bounded while omission and clearing remain distinct", async () => {
+  const saved = {
+    company_name: "Fictional Seller",
+    description: "Fictional workflow software",
+    industries: [],
+    company_sizes: [],
+    geographies: [],
+    buyer_roles: [],
+    keywords: [],
+    exclusions: [],
+  };
+  const sender = {
+    sender_name: " Test Founder ",
+    mailing_address: " Fictional test address ",
+    sender_contact: " founder@example.com ",
+  };
+  const populated = await call("workspace/profile", "PUT", {
+    ...saved,
+    ...sender,
+  });
+  assert.equal(populated.response.status, 200);
+  assert.deepEqual(populated.calls[0]?.args.profile, {
+    ...saved,
+    sender_name: "Test Founder",
+    mailing_address: "Fictional test address",
+    sender_contact: "founder@example.com",
+  });
+  const omitted = await call("workspace/profile", "PUT", saved);
+  assert.equal(omitted.response.status, 200);
+  assert.equal(
+    "sender_name" in (omitted.calls[0].args.profile as object),
+    false,
+  );
+  const cleared = await call("workspace/profile", "PUT", {
+    ...saved,
+    sender_name: "",
+  });
+  assert.equal(
+    (cleared.calls[0].args.profile as Record<string, unknown>).sender_name,
+    "",
+  );
+  for (const invalid of [
+    { sender_name: "x".repeat(241) },
+    { mailing_address: "x".repeat(1001) },
+    { sender_contact: null },
+    { sender_name: { orgId: "org_other" } },
+    { sender_name: "Name", orgId: "org_other" },
+  ]) {
+    const result = await call("workspace/profile", "PUT", {
+      ...saved,
+      ...invalid,
+    });
+    assert.equal(result.response.status, 400);
+    assert.deepEqual(result.calls, []);
+  }
+});
+
 test("hosted outreach fails closed after authentication without reaching a local or Convex repository", async () => {
   for (const [path, method] of [
     ["outreach", "GET"],

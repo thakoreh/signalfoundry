@@ -36,6 +36,29 @@ class OutreachTest(unittest.TestCase):
         self.key_index += 1
         return f'outreach_request_{self.key_index}'
 
+    def test_dashboard_summary_has_activity_facts_without_private_message_bodies(self):
+        from app.outreach import SentRequest
+        approved = self.ready()
+        with TestClient(create_app(self.path, testing=True)) as client:
+            summary = client.get('/api/outreach').json()['threads'][0]
+            self.assertFalse(summary['has_inbound'])
+            self.assertFalse(summary['has_outbound'])
+            self.assertTrue(summary['has_approval'])
+            self.assertEqual(summary['recipient_status'], approved.recipient_status)
+            self.assertIn('meeting_at', summary)
+            self.assertIn('meeting_timezone', summary)
+            for field in ('messages', 'subject', 'body', 'approval', 'contact_basis', 'sender_footer', 'source_facts'):
+                self.assertNotIn(field, summary)
+            detail = client.get('/api/outreach', params={'search_id': self.search.id}).json()['threads'][0]
+            self.assertIn('messages', detail)
+        sent = self.repo.mutate_outreach(approved.id, 'sent', SentRequest(**self.fields(approved)))
+        self.repo.mutate_outreach(sent.id, 'reply', PasteReply(**self.fields(sent), body='A fictional question.', reply_state='question'))
+        summary = self.repo.outreach_threads()['threads'][0]
+        self.assertTrue(summary['has_inbound'])
+        self.assertTrue(summary['has_outbound'])
+        self.assertFalse(summary['has_approval'])
+        self.assertEqual(Repository(self.path, 'different_tenant').outreach_threads()['threads'], [])
+
     def start(self):
         return self.repo.start_outreach(StartOutreach(search_id=self.search.id, account_ids=[self.account.id], idempotency_key=self.key()))['threads'][0]
 
@@ -48,10 +71,159 @@ class OutreachTest(unittest.TestCase):
         return self.repo.mutate_outreach(thread.id, 'draft', EditDraft(**self.fields(thread), **fields))
 
     def ready(self):
+        # Approval fixtures now explicitly provide a fictional saved sender.
+        self.sender()
         thread = self.edit(self.start(), recipient='hello@business.com', subject='A relevant introduction', body='Hello, could we discuss a possible fit?')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         if thread.messages and thread.reply_state not in ('interested', 'question'):
             thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+        thread = self.basis(thread)
         return self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def basis(self, thread, **changes):
+        from app.outreach import ContactBasis, ContactBasisRequest
+        evidence = dict(version=1, published_email=thread.recipient, source_url='https://business.com/contact',
+                        captured_at='2026-01-01T12:00:00Z', publisher_attribution='recipient', notice_status='clear',
+                        recipient_role='Operations team', message_relevance='Question about their property operations',
+                        recipient_country='CA', basis_type='conspicuous_publication')
+        evidence.update(changes)
+        return self.repo.mutate_outreach(thread.id, 'contact-basis', ContactBasisRequest(
+            **self.fields(thread), contact_basis=ContactBasis(**evidence)))
+
+    def sender(self):
+        profile = DEMO_PROFILE.model_copy(update={'sender_name': 'Alex Fixture',
+            'mailing_address': '100 Example Street, Toronto ON M5V 1A1', 'sender_contact': 'alex@example.com'})
+        self.repo.save_profile(profile)
+        return profile
+
+    def test_footer_is_exact_and_sender_change_invalidates_without_rewriting_history(self):
+        profile = self.sender()
+        footer = '\n\n--\nAlex Fixture | ' + profile.company_name + '\n100 Example Street, Toronto ON M5V 1A1\nContact: alex@example.com\nAdvertisement: business outreach.\nTo opt out, reply "unsubscribe".'
+        thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+        self.assertEqual(thread.sender_footer, footer)
+        with self.assertRaisesRegex(OutreachError, 'footer'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.edit(thread, body='Can we talk?' + footer)
+        thread = self.basis(thread)
+        approved = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        self.assertTrue(approved.ready_for_manual_action)
+        tampered = self.edit(approved, body=approved.body.replace('unsubscribe', 'subscribe'))
+        with self.assertRaisesRegex(OutreachError, 'footer'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(tampered)))
+        thread = self.edit(tampered, body=approved.body)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
+        snapshot = sent.messages[0].model_dump()
+        pending = self.edit(sent, body='Another message' + footer)
+        pending = self.repo.mutate_outreach(pending.id, 'approve', RevisionRequest(**self.fields(pending)))
+        self.repo.save_profile(profile.model_copy(update={'sender_name': 'Another Fixture'}))
+        current = self.repo.outreach_thread(pending.id)
+        self.assertFalse(current.ready_for_manual_action)
+        self.assertIsNone(current.approval)
+        self.assertEqual(current.messages[0].model_dump(), snapshot)
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(current.id, 'sent', RevisionRequest(**self.fields(current)))
+
+    def test_missing_address_and_unreachable_contact_block_approval(self):
+        for change in ({'mailing_address': ''}, {'sender_contact': 'not reachable'}):
+            profile = self.sender().model_copy(update=change)
+            self.repo.save_profile(profile)
+            thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+            thread = self.edit(thread, body=thread.body + thread.sender_footer)
+            with self.assertRaisesRegex(OutreachError, 'sender|contact'):
+                self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_sender_contact_rejects_malformed_email_domains(self):
+        for contact in ('alex@-example.com', 'alex@example..com', 'alex@exa_mple.com', '.alex@example.com', 'alex..fixture@example.com'):
+            with self.subTest(contact=contact):
+                self.repo.save_profile(self.sender().model_copy(update={'sender_contact': contact}))
+                self.assertEqual(self.start().sender_footer, '')
+
+    def test_cold_calendar_urls_without_slash_are_denied_in_subject_or_body(self):
+        for field, value in (('body', 'See https://calendly.com'), ('subject', 'Meet https://cal.com?user=fixture')):
+            with self.subTest(field=field):
+                thread = self.ready()
+                changes = {field: value + (thread.sender_footer if field == 'body' else '')}
+                thread = self.edit(thread, **changes)
+                with self.assertRaisesRegex(OutreachError, 'booking'):
+                    self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_cold_booking_link_is_denied_but_interested_reply_can_include_it(self):
+        thread = self.ready()
+        thread = self.edit(thread, booking_link='https://calendar.business.com/book')
+        with self.assertRaisesRegex(OutreachError, 'booking'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Interested', reply_state='interested'))
+        thread = self.edit(thread, body='Here is the requested link.' + thread.sender_footer)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        self.assertTrue(thread.ready_for_manual_action)
+
+    def test_missing_sender_blocks_approval_without_hiding_old_thread(self):
+        thread = self.edit(self.start(), recipient='hello@business.com', subject='Hello', body='Can we talk?')
+        self.assertEqual(self.repo.outreach_thread(thread.id).body, 'Can we talk?')
+        with self.assertRaisesRegex(OutreachError, 'sender'):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_sent_with_changes_preserves_approved_and_actual_snapshots(self):
+        thread = self.ready()
+        approved_body = thread.body
+        approved_hash = thread.approval.content_hash
+        with TestClient(create_app(self.path, testing=True)) as client:
+            response = client.post(f'/api/outreach/{thread.id}/sent', json={
+                **self.fields(thread), 'sent_as': 'with_changes', 'actual_subject': 'Actually sent subject',
+                'actual_body': 'Actually sent text'})
+        self.assertEqual(response.status_code, 200, response.text)
+        thread = self.repo.outreach_thread(thread.id)
+        message = thread.messages[-1]
+        self.assertEqual(message.body, 'Actually sent text')
+        self.assertEqual(message.subject, 'Actually sent subject')
+        self.assertEqual(message.approved_body, approved_body)
+        self.assertEqual(message.approved_content_hash, approved_hash)
+        self.assertEqual(message.sent_as, 'with_changes')
+        self.assertIsNone(thread.approval)
+        self.assertEqual(Repository(self.path).outreach_thread(thread.id).messages[-1], message)
+
+    def test_changed_sent_http_retry_binds_mode_and_actual_text(self):
+        thread = self.ready()
+        payload = {**self.fields(thread), 'sent_as': 'with_changes',
+                   'actual_subject': 'Actual subject', 'actual_body': 'Actual body'}
+        with TestClient(create_app(self.path, testing=True)) as client:
+            url = f'/api/outreach/{thread.id}/sent'
+            first = client.post(url, json=payload)
+            self.assertEqual(first.status_code, 200, first.text)
+            replay = client.post(url, json=payload)
+            self.assertEqual(replay.status_code, 200, replay.text)
+            self.assertEqual(replay.json(), first.json())
+            for changes in ({'actual_subject': 'Other subject'}, {'actual_body': 'Other body'},
+                            {'sent_as': 'approved', 'actual_subject': '', 'actual_body': ''}):
+                conflict = client.post(url, json={**payload, **changes})
+                self.assertEqual(conflict.status_code, 409, conflict.text)
+            self.assertEqual(len(self.repo.outreach_thread(thread.id).messages), 1)
+
+    def test_legacy_sent_http_retry_returns_current_state_without_duplicate_events(self):
+        thread = self.ready()
+        legacy = RevisionRequest(**self.fields(thread))
+        sent = self.repo.mutate_outreach(thread.id, 'sent', legacy)
+        with TestClient(create_app(self.path, testing=True)) as client:
+            url = f'/api/outreach/{thread.id}/sent'
+            for payload in (legacy.model_dump(), {**legacy.model_dump(), 'sent_as': 'approved'}):
+                response = client.post(url, json=payload)
+                self.assertEqual(response.status_code, 200, response.text)
+                self.assertEqual(response.json(), sent.model_dump())
+            for changes in ({'sent_as': 'with_changes', 'actual_subject': 'Changed', 'actual_body': 'Changed'},
+                            {'actual_subject': 'Changed'}, {'actual_body': 'Changed'},
+                            {'expected_revision': legacy.expected_revision + 1}):
+                response = client.post(url, json={**legacy.model_dump(), **changes})
+                self.assertEqual(response.status_code, 409, response.text)
+            self.assertEqual(len(self.repo.outreach_thread(thread.id).messages), 1)
+            suppressed = self.repo.mutate_outreach(sent.id, 'reply', PasteReply(
+                **self.fields(sent), body='Unsubscribe me', reply_state='opt_out'))
+            replay = client.post(url, json=legacy.model_dump())
+            self.assertEqual(replay.status_code, 200, replay.text)
+            self.assertEqual(replay.json(), suppressed.model_dump())
+            self.assertTrue(replay.json()['suppressed'])
+            self.assertFalse(replay.json()['ready_for_manual_action'])
+            self.assertEqual(len(replay.json()['messages']), 2)
 
     def test_create_reopens_same_eligible_customers_and_survives_repository_restart(self):
         first = self.start()
@@ -133,6 +305,7 @@ class OutreachTest(unittest.TestCase):
         thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='question'))
         self.assertEqual(thread.messages[-1].reply_state, 'question')
         thread = self.edit(thread, body='An answer written by the user')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         self.assertTrue(thread.ready_for_manual_action)
         thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Please remove me', reply_state='opt_out'))
@@ -166,19 +339,156 @@ class OutreachTest(unittest.TestCase):
         self.assertEqual(thread.sale_state, 'not_recorded')
         with self.assertRaises(OutreachError):
             self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='attended_reported', sale_state='not_recorded'))
-        thread = self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='booked_reported', sale_state='not_recorded'))
+        from app.outreach import MeetingRequest
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='booked_reported', sale_state='not_recorded'))
+        thread = self.repo.mutate_outreach(thread.id, 'meeting', MeetingRequest(**self.fields(thread),
+            meeting_at='2026-01-05T10:00:00-05:00', meeting_timezone='America/Toronto'))
         thread = self.repo.mutate_outreach(thread.id, 'outcomes', OutcomesRequest(**self.fields(thread), meeting_state='attended_reported', sale_state='won_reported'))
         self.assertEqual(thread.meeting_state, 'attended_reported')
         self.assertEqual(thread.sale_state, 'won_reported')
 
+    def test_source_question_is_sticky_suppressed_even_when_selected_as_question(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Where did you get my email?', reply_state='question'))
+        self.assertEqual(thread.reply_state, 'source_question')
+        self.assertTrue(thread.suppressed)
+        self.assertIsNone(thread.approval)
+        corrected = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(
+            **self.fields(thread), reply_state='interested'))
+        self.assertTrue(corrected.suppressed)
+
+    def test_bounce_marks_only_address_invalid_and_pauses_same_company_sibling(self):
+        first = self.ready()
+        second_search = self.search.model_copy(deep=True)
+        second_search.id = 'second_saved_search'
+        second_account = self.account.model_copy(update={'id': 'account_b'})
+        second_search.accounts = [second_account]
+        with self.repo.connect() as db:
+            db.execute('INSERT INTO customer_searches VALUES (?,?,?,?,?)',
+                       (self.repo.tenant_id, second_search.id, 'second_search', second_search.created_at, second_search.model_dump_json()))
+        sibling = self.repo.start_outreach(StartOutreach(
+            search_id=second_search.id, account_ids=[second_account.id], idempotency_key=self.key()))['threads'][0]
+        bounced = self.repo.mutate_outreach(first.id, 'reply', PasteReply(
+            **self.fields(first), body='Delivery failed permanently', reply_state='bounce'))
+        self.assertEqual(bounced.reply_state, 'bounce')
+        self.assertEqual(bounced.recipient_status, 'invalid')
+        self.assertFalse(bounced.suppressed)
+        paused = self.repo.outreach_thread(sibling.id)
+        self.assertTrue(paused.paused)
+        self.assertIsNone(paused.approval)
+
+    def test_auto_reply_and_referral_are_recorded_but_not_actionable_on_original_thread(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Out of office until Monday', reply_state='auto_reply'))
+        self.assertEqual(thread.reply_state, 'auto_reply')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.start()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Please contact my colleague instead', reply_state='referral'))
+        self.assertEqual(thread.reply_state, 'referral')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_next_up_is_read_only_and_prioritizes_inbound_review(self):
+        thread = self.ready()
+        inbound = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Can you explain more?', reply_state='awaiting_review'))
+        before = self.repo.outreach_thread(thread.id)
+        with self.repo.connect() as db:
+            request_count = db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0]
+        projection = self.repo.outreach_next_up()
+        self.assertEqual(projection['items'][0]['thread_id'], thread.id)
+        self.assertEqual(projection['items'][0]['action'], 'review_reply')
+        self.assertEqual(projection['items'][0]['reply_state'], 'awaiting_review')
+        self.assertEqual(self.repo.outreach_thread(thread.id).revision, before.revision)
+        with self.repo.connect() as db:
+            self.assertEqual(db.execute('SELECT COUNT(*) FROM outreach_requests').fetchone()[0], request_count)
+
+    def test_next_up_removes_interested_work_after_recorded_answer_but_not_after_new_inbound(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='I am interested', reply_state='interested'))
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'answer_reply')
+        thread = self.edit(thread, body='Here is the reviewed answer.' + thread.sender_footer)
+        thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+        thread = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
+        self.assertEqual(self.repo.outreach_next_up()['items'], [])
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='A new question', reply_state='question'))
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'answer_reply')
+
+    def test_same_company_cold_owner_is_atomic_and_loser_cannot_approve(self):
+        owner = self.ready()
+        second_search, _ = self.repo.create_customer_search('second_search', 'Property management')
+        second_account = qualify_customer(DEMO_PROFILE,
+            Page('https://business.com/team', 'Business Property Team', 'Property management services.', 'Property management services for businesses.'),
+            target='property management', geography='', search_id=second_search.id)
+        second_search.accounts, second_search.status = [second_account], 'complete'
+        self.repo.save_customer_search(second_search)
+        loser = self.repo.start_outreach(StartOutreach(
+            search_id=second_search.id, account_ids=[second_account.id], idempotency_key=self.key()))['threads'][0]
+        self.assertTrue(loser.paused)
+        self.assertFalse(owner.paused)
+        loser = self.repo.mutate_outreach(loser.id, 'pause', PauseRequest(**self.fields(loser), paused=False))
+        loser = self.edit(loser, recipient='team@business.com', subject='A second introduction', body='Hello, could we discuss a possible fit?')
+        loser = self.edit(loser, body=loser.body + loser.sender_footer)
+        loser = self.basis(loser)
+        claimed = self.repo.mutate_outreach(loser.id, 'approve', RevisionRequest(**self.fields(loser)))
+        self.assertTrue(claimed.paused)
+        self.assertIsNone(claimed.approval)
+        self.assertFalse(claimed.ready_for_manual_action)
+        self.assertTrue(self.repo.outreach_thread(owner.id).ready_for_manual_action)
+
+    def test_revisit_wall_time_rejects_gaps_preserves_both_folds_and_repairs_incomplete_pairs(self):
+        with self.assertRaisesRegex(ValueError, 'does not exist|offset'):
+            PasteReply(**self.fields(self.start()), body='Back later', reply_state='not_now',
+                        revisit_at='2026-03-08T02:30:00-05:00', revisit_timezone='America/Toronto')
+        for offset in ('-04:00', '-05:00'):
+            parsed = PasteReply(**self.fields(self.start()), body='Back later', reply_state='not_now',
+                                 revisit_at=f'2026-11-01T01:30:00{offset}', revisit_timezone='America/Toronto')
+            self.assertIsNotNone(parsed.revisit_at)
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Out of office', reply_state='auto_reply', revisit_timezone='America/Toronto'))
+        self.assertEqual(thread.reply_state, 'awaiting_review')
+        self.assertIsNone(thread.revisit_at)
+        self.assertEqual(thread.messages[-1].body, 'Out of office')
+
+    def test_not_now_and_auto_reply_dates_are_stored_explicitly_and_only_due_work_reaches_next_up(self):
+        thread = self.ready()
+        future = '2099-01-02T12:00:00-05:00'
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Please check back later', reply_state='not_now',
+            revisit_at=future, revisit_timezone='America/Toronto'))
+        self.assertEqual(thread.revisit_at, '2099-01-02T17:00:00+00:00')
+        self.assertEqual(thread.revisit_timezone, 'America/Toronto')
+        self.assertFalse(thread.review_due)
+        self.assertEqual(self.repo.outreach_next_up()['items'], [])
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(
+            **self.fields(thread), reply_state='auto_reply',
+            revisit_at='2000-01-02T12:00:00-05:00', revisit_timezone='America/Toronto'))
+        self.assertTrue(thread.review_due)
+        self.assertEqual(self.repo.outreach_next_up()['items'][0]['action'], 'review_reply')
+        self.assertEqual(thread.messages[-1].body, 'Please check back later')
+
     def test_sent_snapshot_preserves_exact_approved_link_after_later_edits(self):
+        self.sender()
+        # Booking invitations require an explicitly reported interested reply.
+        thread = self.start()
+        self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Interested, can we meet?', reply_state='interested'))
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Meeting', body='Would a meeting help?', booking_link='https://cal.business.com/intro')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
+        thread = self.basis(thread)
         thread = self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
         sent = self.repo.mutate_outreach(thread.id, 'sent', RevisionRequest(**self.fields(thread)))
         changed = self.edit(sent, booking_link='https://cal.business.com/different')
-        self.assertEqual(changed.messages[0].booking_link, 'https://cal.business.com/intro')
-        self.assertEqual(changed.messages[0].body, 'Would a meeting help?\n\nBooking link: https://cal.business.com/intro')
-        self.assertIsNotNone(changed.messages[0].approved_content_hash)
+        self.assertEqual(changed.messages[-1].booking_link, 'https://cal.business.com/intro')
+        self.assertEqual(changed.messages[-1].body, 'Would a meeting help?' + thread.sender_footer + '\n\nBooking link: https://cal.business.com/intro')
+        self.assertIsNotNone(changed.messages[-1].approved_content_hash)
 
     def test_opt_out_classification_suppresses_original_inbound_recipient_after_edit(self):
         thread = self.ready()
@@ -191,7 +501,9 @@ class OutreachTest(unittest.TestCase):
         self.assertIn('email:changed@business.com', targets)
 
     def test_concurrent_approval_and_edit_are_serialized_by_revision(self):
+        self.sender()
         thread = self.edit(self.start(), recipient='hello@business.com', subject='Subject', body='Body')
+        thread = self.edit(thread, body=thread.body + thread.sender_footer)
         def change(which):
             try:
                 if which == 'approve':
@@ -211,6 +523,7 @@ class OutreachTest(unittest.TestCase):
             self.assertEqual(response.status_code, 200, response.text)
             thread = response.json()['threads'][0]
             self.assertEqual(client.get('/api/outreach', params={'search_id': self.search.id}).json()['threads'][0]['id'], thread['id'])
+            self.assertEqual(client.get('/api/outreach/next-up').status_code, 200)
             self.assertEqual(client.post(f"/api/outreach/{thread['id']}/reply-draft", json={}).status_code, 503)
             self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': self.key(), 'tenant_id': 'other'}).status_code, 422)
             self.assertEqual(client.put(f"/api/outreach/{thread['id']}/draft", json={'expected_revision': 1, 'idempotency_key': 'bad_address_123', 'recipient': 'bad\nBcc:another@business.com', 'subject': '', 'body': ''}).status_code, 422)
@@ -218,6 +531,62 @@ class OutreachTest(unittest.TestCase):
             self.assertEqual(client.get('/api/outreach').status_code, 403)
             self.assertEqual(client.get(f"/api/outreach/{thread['id']}").status_code, 403)
             self.assertEqual(client.post('/api/outreach', json={'search_id': self.search.id, 'account_ids': [self.account.id], 'idempotency_key': 'public_start_123'}).status_code, 403)
+
+    def sibling(self, label):
+        search, _ = self.repo.create_customer_search(self.key(), 'Property management')
+        account = qualify_customer(DEMO_PROFILE, Page('https://business.com/' + label,
+            label + ' Property Management', 'Property management services.', 'Property management services for businesses.'),
+            target='property management', geography='', search_id=search.id)
+        search.status, search.accounts = 'complete', [account]
+        self.repo.save_customer_search(search)
+        thread = self.repo.start_outreach(StartOutreach(search_id=search.id, account_ids=[account.id], idempotency_key=self.key()))['threads'][0]
+        thread = self.edit(thread, recipient=label + '@business.com', subject='A specific introduction', body='Could we discuss operations?' + thread.sender_footer)
+        return self.basis(thread)
+
+    def test_explicit_company_choice_requires_new_approval_and_keeps_one_resumed_cold_owner(self):
+        owner = self.ready()
+        siblings = [self.sibling('second'), self.sibling('third')]
+        owner = self.repo.mutate_outreach(owner.id, 'reply', PasteReply(**self.fields(owner), body='Interested, please explain.', reply_state='interested'))
+        resumed = []
+        for sibling in siblings:
+            sibling = self.repo.outreach_thread(sibling.id)
+            self.assertTrue(sibling.paused)
+            sibling = self.repo.mutate_outreach(sibling.id, 'pause', PauseRequest(**self.fields(sibling), paused=False))
+            self.assertIsNone(sibling.approval)
+            self.assertFalse(sibling.ready_for_manual_action)
+            self.assertTrue(sibling.cold_followups_stopped)
+            resumed.append((sibling, RevisionRequest(**self.fields(sibling))))
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            list(pool.map(lambda item: self.repo.mutate_outreach(item[0].id, 'approve', item[1]), resumed))
+        views = [self.repo.outreach_thread(sibling.id) for sibling in siblings]
+        self.assertEqual(sum(thread.ready_for_manual_action for thread in views), 1)
+        self.assertEqual(sum(bool(thread.approval) for thread in views), 1)
+        self.assertEqual(len(self.repo.outreach_thread(owner.id).messages), 1)
+
+    def test_deferred_bounce_classification_invalidates_address_after_correction_resume_and_replay(self):
+        thread = self.ready()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Delivery failed permanently.', reply_state='awaiting_review'))
+        bounce = CorrectReply(**self.fields(thread), reply_state='bounce')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', bounce)
+        self.assertEqual(thread.recipient_status, 'invalid')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='interested'))
+        thread = self.repo.mutate_outreach(thread.id, 'pause', PauseRequest(**self.fields(thread), paused=False))
+        thread = self.edit(thread, body='A manual answer' + thread.sender_footer)
+        replay = self.repo.mutate_outreach(thread.id, 'reply-state', bounce)
+        self.assertEqual(replay.recipient_status, 'invalid')
+        with self.assertRaises(OutreachError):
+            self.repo.mutate_outreach(thread.id, 'approve', RevisionRequest(**self.fields(thread)))
+
+    def test_deferred_bounce_keeps_actual_inbound_recipient_when_draft_address_changed(self):
+        thread = self.ready()
+        original = thread.recipient
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='Delivery failed.', reply_state='awaiting_review'))
+        thread = self.edit(thread, recipient='new@business.com')
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(**self.fields(thread), reply_state='bounce'))
+        self.assertIn(original, thread.invalid_recipient_emails)
+        self.assertNotIn('new@business.com', thread.invalid_recipient_emails)
+        thread = self.edit(thread, recipient=original)
+        self.assertEqual(thread.recipient_status, 'invalid')
 
 
 if __name__ == '__main__':

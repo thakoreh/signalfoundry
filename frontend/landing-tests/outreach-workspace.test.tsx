@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { OutreachWorkspace } from "../components/outreach-workspace";
 import { PrepareOutreach } from "../components/prepare-outreach";
 import type { OutreachThread } from "../lib/outreach";
+import { requestEmailApp } from "../lib/manual-email";
 const { api, session } = vi.hoisted(() => ({
   api: vi.fn(),
   session: { mode: "local-demo" },
@@ -12,6 +13,10 @@ const { api, session } = vi.hoisted(() => ({
 vi.mock("../components/workspace-session", () => ({
   useWorkspaceSession: () => ({ api, mode: session.mode }),
 }));
+// Activity has its own read-only component contract tests. Keep these transport
+// races scoped to the exact conversation request, not a sibling summary fetch.
+vi.mock("../components/outreach-insights", () => ({ OutreachInsights: () => null }));
+vi.mock("../lib/manual-email", async importOriginal => ({ ...await importOriginal<typeof import("../lib/manual-email")>(), requestEmailApp: vi.fn() }));
 let container: HTMLDivElement, root: Root, thread: OutreachThread;
 const fixture = (): OutreachThread => ({
   id: "thread_a",
@@ -79,9 +84,757 @@ async function change(label: string, value: string) {
     );
   });
 }
+it("explicitly saves recipient publication evidence without losing message or inbound edits", async () => {
+  await mount();
+  await change("Message", "Private draft stays");
+  await click("Conversations");
+  await change("Paste a received reply", "Private inbound stays");
+  expect(container.textContent).toContain("Contact basis");
+  await change("Publication source URL", "https://example.org/team");
+  await change("Observation time (with timezone)", "2026-10-19T10:00:00Z");
+  await change("Recipient role", "Founder");
+  await change("Message relevance to this role", "Our message discusses their published product");
+  await change("Recipient country", "CA");
+  await change("Publication attribution", "recipient");
+  await change("Unsolicited-message notice review", "clear");
+  expect(api.mock.calls.some(([path]) => path.endsWith("/contact-basis"))).toBe(false);
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Save contact basis");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/contact-basis"));
+  expect(call?.[1].method).toBe("PUT");
+  expect(JSON.parse(call![1].body).contact_basis).toMatchObject({
+    version: 1, published_email: "hello@example.org", recipient_country: "CA",
+    source_url: "https://example.org/team", notice_status: "clear",
+    publisher_attribution: "recipient", basis_type: "conspicuous_publication",
+  });
+  expect(field("Message").value).toBe("Private draft stays");
+  expect(field("Paste a received reply").value).toBe("Private inbound stays");
+});
+it("normalizes incomplete contact-basis editor values to the backend contract", async () => {
+  await mount();
+  await change("Publication source URL", "https://example.org/team");
+  await click("Save contact basis");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/contact-basis"));
+  expect(JSON.parse(call![1].body).contact_basis).toMatchObject({
+    source_url: "https://example.org/team",
+    captured_at: "",
+    recipient_timezone: "",
+  });
+});
+it("keeps unsafe contact-basis source URLs as text instead of actionable links", async () => {
+  await mount();
+  await change("Publication source URL", "http://127.0.0.1/contact");
+  expect(container.querySelector('a[href="http://127.0.0.1/contact"]')).toBeNull();
+  expect(container.textContent).toContain("Source URL is not a safe public link");
+});
+it("clears local basis when a refreshed recipient no longer has the saved evidence", async () => {
+  thread.contact_basis = {
+    version: 1,
+    basis_type: "conspicuous_publication",
+    published_email: "hello@example.org",
+    source_url: "https://example.org/team",
+    captured_at: "2026-01-01T12:00:00Z",
+    publisher_attribution: "recipient",
+    notice_status: "clear",
+    recipient_role: "Operations lead",
+    message_relevance: "A specific role-relevant reason.",
+    recipient_country: "CA",
+    recipient_timezone: null,
+  };
+  await mount();
+  await change("Recipient role", "Private stale role");
+  thread = { ...thread, recipient: "new@example.org", contact_basis: null };
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" profileRefresh={1} />));
+  expect(field("Recipient role").value).toBe("");
+  expect(container.textContent).not.toContain("Private stale role");
+});
+
+it("hides old recipient evidence immediately during an unsaved recipient edit", async () => {
+  thread.contact_basis = {
+    version: 1,
+    basis_type: "conspicuous_publication",
+    published_email: "hello@example.org",
+    source_url: "https://example.org/team",
+    captured_at: "2026-01-01T12:00:00Z",
+    publisher_attribution: "recipient",
+    notice_status: "clear",
+    recipient_role: "Operations lead",
+    message_relevance: "A specific role-relevant reason.",
+    recipient_country: "CA",
+    recipient_timezone: null,
+  };
+  await mount();
+  await change("Recipient", "new@example.org");
+  expect(container.querySelector('a[href="https://example.org/team"]')).toBeNull();
+  expect(field("Publication source URL").value).toBe("");
+  expect(field("Observation time (with timezone)").value).toBe("");
+  expect(container.textContent).toContain("Evidence for: new@example.org");
+  expect(container.textContent).toContain("Recipient change is unsaved. Old evidence is hidden");
+  expect(button("Approve exact message").disabled).toBe(true);
+  expect(button("Copy approved message").disabled).toBe(true);
+});
+
+it("keeps newer evidence typed during a delayed save and denies late Copy after evidence typing", async () => {
+  await mount();
+  await click("Approve exact message");
+  const snapshot = structuredClone(thread);
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await click("Copy approved message");
+  await change("Recipient role", "New role");
+  await act(async () => finish(snapshot));
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(button("Copy approved message").disabled).toBe(true);
+  api.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  await click("Save contact basis");
+  // Inputs should remain editable while evidence save is pending.
+  expect(field("Recipient role").disabled).toBe(false);
+  await change("Recipient role", "Newer role");
+  await act(async () => finish({ ...thread, contact_basis: { version: 1 } as never }));
+  expect(field("Recipient role").value).toBe("Newer role");
+  expect(button("Save contact basis").disabled).toBe(false);
+});
+it("preserves message and inbound edits through sender repair and reloads current approval", async () => {
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" profileRefresh={0} />),
+  );
+  await change("Message", "Keep my private unsaved words");
+  await click("Conversations");
+  await change("Paste a received reply", "Keep my pasted reply");
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" profileRefresh={1} />),
+  );
+  expect(
+    api.mock.calls.filter(([path]) => path.startsWith("/outreach?")).length,
+  ).toBe(2);
+  expect(field("Message").value).toBe("Keep my private unsaved words");
+  expect(field("Paste a received reply").value).toBe("Keep my pasted reply");
+  expect(button("Copy approved message").disabled).toBe(true);
+});
+it("releases a cancelled save flight after profile suspension without losing edits", async () => {
+  await mount();
+  await change("Message", "Keep this draft");
+  const original = api.getMockImplementation()!;
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementation((path: string, options: RequestInit = {}) =>
+    path.endsWith("/draft")
+      ? new Promise((resolve) => {
+          finish = resolve;
+        })
+      : original(path, options),
+  );
+  await click("Save changes");
+  await act(async () =>
+    root.render(<OutreachWorkspace searchId="search_a" suspended />),
+  );
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
+  await act(async () => finish({ ...thread, body: "Obsolete completion" }));
+  expect(field("Message").value).toBe("Keep this draft");
+  expect(button("Save changes").disabled).toBe(false);
+  api.mockImplementation(original);
+  await click("Save changes");
+  expect(field("Message").value).toBe("Keep this draft");
+  expect(thread.body).toBe("Keep this draft");
+});
+it("keeps profile-return conflict edits until explicit discard reload, then permits fresh revision retry", async () => {
+  await mount();
+  await change("Message", "Private conflict draft");
+  await click("Conversations");
+  await change("Paste a received reply", "Private inbound");
+  thread.revision++;
+  thread.approval = null;
+  const original = api.getMockImplementation()!;
+  let conflict = true;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/draft") && conflict)
+      throw new Error("Request failed (409). Refresh current revision.");
+    return original(path, options);
+  });
+  await click("Save changes");
+  expect(field("Message").value).toBe("Private conflict draft");
+  expect(field("Paste a received reply").value).toBe("Private inbound");
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Reload saved version (discard edits)");
+  expect(field("Paste a received reply").value).toBe("");
+  conflict = false;
+  await change("Message", "Fresh retry");
+  await click("Save changes");
+  expect(thread.body).toBe("Fresh retry");
+});
+it("labels inbound-only conflict reload as explicit discard", async () => {
+  await mount();
+  await click("Conversations");
+  await change("Paste a received reply", "Private unsaved inbound");
+  api.mockRejectedValueOnce(new Error("Request failed (409)."));
+  expect(button("Approve exact message").disabled).toBe(true);
+  await click("Save received reply");
+  expect(button("Reload saved version (discard edits)")).toBeTruthy();
+  expect(field("Paste a received reply").value).toBe("Private unsaved inbound");
+});
+it("records actual text separately when manually sent with changes", async () => {
+  await mount();
+  await click("Approve exact message");
+  await click("Sent with changes");
+  await change("Actual subject sent", "My actual subject");
+  await change("Actual message sent", "My actual message");
+  await click("Record changed message");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/sent"));
+  expect(JSON.parse(call![1].body)).toMatchObject({
+    sent_as: "with_changes",
+    actual_subject: "My actual subject",
+    actual_body: "My actual message",
+  });
+});
+it("revalidates before an email app request and records nothing until the explicit report", async () => {
+  await mount();
+  await click("Approve exact message");
+  await click("Open in email app");
+  expect(requestEmailApp).toHaveBeenCalledWith(expect.stringContaining("mailto:hello@example.org?subject="));
+  expect(thread.messages).toHaveLength(0);
+  expect(container.textContent).toContain("Opening it is not sending");
+  await click("Not sent yet");
+  expect(thread.messages).toHaveLength(0);
+  await click("Copy approved message");
+  await click("Sent as approved");
+  expect(thread.messages).toHaveLength(1);
+});
+it("falls back to exact Copy for a long email link without opening an email app", async () => {
+  thread.body = "A fictional long message. ".repeat(100);
+  vi.mocked(requestEmailApp).mockClear();
+  await mount();
+  await click("Approve exact message");
+  await click("Open in email app");
+  expect(requestEmailApp).not.toHaveBeenCalled();
+  expect(navigator.clipboard.writeText).toHaveBeenCalledWith(expect.stringContaining(thread.body));
+  expect(thread.messages).toHaveLength(0);
+});
+it("cannot open the email app after edits invalidate a delayed readiness response", async () => {
+  vi.mocked(requestEmailApp).mockClear();
+  const original = api.getMockImplementation()!;
+  let finish!: (value: OutreachThread) => void;
+  api.mockImplementation((path: string, options?: RequestInit) => path === "/outreach/thread_a"
+    ? new Promise<OutreachThread>(resolve => { finish = resolve; }) : original(path, options));
+  await mount();
+  await click("Approve exact message");
+  const snapshot = structuredClone(thread);
+  await click("Open in email app");
+  await change("Message", "Keep this newer private text.");
+  await act(async () => finish(snapshot));
+  expect(requestEmailApp).not.toHaveBeenCalled();
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(field("Message").value).toBe("Keep this newer private text.");
+  expect(thread.messages).toHaveLength(0);
+});
+it("restores the saved footer without losing edits and copies only revalidated approved bytes", async () => {
+  const footer =
+    '\n\n--\nAlex | Fixture Co\n100 Example Street\nContact: alex@example.com\nTo opt out, reply "unsubscribe".';
+  Object.assign(thread, { sender_footer: footer });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path === "/outreach/thread_a") return structuredClone(thread);
+    return original(path, options);
+  });
+  await mount();
+  expect(field("Message").value).toBe("A reviewed factual message.");
+  expect(button("Save changes").disabled).toBe(true);
+  expect(container.textContent).toContain("required sender footer");
+  await change("Message", "Keep my unsaved words.");
+  await click("Restore saved sender footer");
+  expect(field("Message").value).toBe("Keep my unsaved words." + footer);
+  await click("Save changes");
+  await click("Approve exact message");
+  await click("Copy approved message");
+  expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+    "To: hello@example.org\nSubject: A specific introduction\n\nKeep my unsaved words." +
+      footer,
+  );
+  expect(thread.messages).toHaveLength(0);
+  vi.mocked(navigator.clipboard.writeText).mockClear();
+  thread.approval = null;
+  thread.ready_for_manual_action = false;
+  await click("Copy approved message");
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  expect(container.textContent).toContain("Approval changed");
+});
+
+it("keeps the untouched footer repair explicit and leaves approval fail-closed", async () => {
+  const footer =
+    '\n\n--\nAlex | Fixture Co\n100 Example Street\nContact: alex@example.com\nTo opt out, reply "unsubscribe".';
+  Object.assign(thread, { sender_footer: footer });
+  await mount();
+  expect(field("Message").value).toBe("A reviewed factual message.");
+  expect(container.textContent).toContain(
+    "Restore the required sender footer, then save changes before approval.",
+  );
+  expect(button("Save changes").disabled).toBe(true);
+  expect(button("Approve exact message").disabled).toBe(true);
+  await click("Restore saved sender footer");
+  expect(button("Save changes").disabled).toBe(false);
+});
+
+it("shows a persistent safe next action and scopes pause to this outreach", async () => {
+  await mount();
+  expect(container.textContent).toContain("Next: save your sender details in Edit business before approval.");
+  // Missing sender details must lead to their repair, not the disabled approval bar.
+  expect(container.querySelector('a[href="#outreach-sender-footer"]')?.textContent).toContain(
+    "Jump to next safe action",
+  );
+  await act(async () => container.querySelector<HTMLAnchorElement>('a[href="#outreach-sender-footer"]')!.click());
+  expect(document.activeElement?.id).toBe("outreach-sender-footer");
+  expect(button("Pause this outreach")).toBeTruthy();
+});
+
+it("shows saved seller facts beside the reply editor without inventing unknowns", async () => {
+  await act(async () =>
+    root.render(
+      <OutreachWorkspace
+        searchId="search_a"
+        profile={{
+          company_name: "Fixture Co",
+          description: "A saved description of the offer.",
+          industries: ["SaaS"],
+          company_sizes: [],
+          geographies: ["Canada"],
+          buyer_roles: ["Operations leaders"],
+          keywords: [],
+          exclusions: [],
+        }}
+      />,
+    ),
+  );
+  await click("Conversations");
+  expect(container.textContent).toContain("Saved offer facts");
+  expect(container.textContent).toContain("A saved description of the offer.");
+  expect(container.textContent).toContain("Operations leaders");
+  expect(container.textContent).toContain("Price or integration details: Unknown");
+});
+
+it("keeps unknown email provenance unknown and separates approval from reachability", async () => {
+  await mount();
+  expect(container.textContent).toContain("Email status: published but not verified");
+  expect(container.textContent).toContain("Provenance: Unknown");
+  expect(container.textContent).toContain(
+    "Approval confirms exact content; it does not verify reachability or delivery.",
+  );
+});
+describe("pending Copy intent", () => {
+  it.each(["Copy approved message", "Open in email app"])("cancels %s when a received reply is pasted during readiness", async action => {
+    await mount();
+    await click("Approve exact message");
+    await click("Conversations");
+    const snapshot = structuredClone(thread);
+    let finish!: (value: OutreachThread) => void;
+    api.mockImplementationOnce(() => new Promise<OutreachThread>(resolve => { finish = resolve; }));
+    await click(action);
+    await change("Paste a received reply", "Please unsubscribe me");
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(requestEmailApp).not.toHaveBeenCalled();
+    expect(button(action).disabled).toBe(true);
+    expect(button("Approve exact message").disabled).toBe(true);
+    expect(field("Paste a received reply").value).toBe("Please unsubscribe me");
+    expect(thread.messages).toHaveLength(0);
+  });
+  async function pendingCopy() {
+    await mount();
+    await click("Approve exact message");
+    const snapshot = structuredClone(thread);
+    let finish!: (value: OutreachThread) => void;
+    api.mockImplementationOnce(
+      () =>
+        new Promise<OutreachThread>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    await click("Copy approved message");
+    return { snapshot, finish };
+  }
+  it.each(["Message", "Subject", "Recipient", "Booking link · optional"])(
+    "denies late ready bytes after %s edits, even when reverted",
+    async (label) => {
+      const { snapshot, finish } = await pendingCopy();
+      const original = field(label).value;
+      await change(label, "New keystrokes");
+      await act(async () => finish(snapshot));
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(field(label).value).toBe("New keystrokes");
+      expect(thread.messages).toHaveLength(0);
+      await change(label, original);
+      await click("Copy approved message");
+      expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("denies an edit/revert while the same preflight is pending", async () => {
+    const { snapshot, finish } = await pendingCopy();
+    await change("Message", "Temporary edit");
+    await change("Message", snapshot.body);
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+  });
+  it.each([
+    "approval identity",
+    "revision",
+    "footer",
+    "wrong thread",
+    "unknown readiness",
+    "paused",
+    "suppressed",
+  ])("fails closed when preflight changes %s", async (kind) => {
+    const { snapshot, finish } = await pendingCopy();
+    if (kind === "approval identity")
+      snapshot.approval!.approved_at = "new approval";
+    if (kind === "revision") snapshot.revision++;
+    if (kind === "footer") snapshot.sender_footer = "New sender identity";
+    if (kind === "wrong thread") snapshot.id = "thread_other";
+    if (kind === "unknown readiness")
+      Object.assign(snapshot, { ready_for_manual_action: "unknown" });
+    if (kind === "paused") snapshot.paused = true;
+    if (kind === "suppressed") snapshot.suppressed = true;
+    await act(async () => finish(snapshot));
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(thread.messages).toHaveLength(0);
+  });
+  it.each(["thread", "search", "session", "unmount", "stage"])(
+    "denies late completion after %s navigation",
+    async (kind) => {
+      const original = api.getMockImplementation()!;
+      api.mockImplementation(async (path: string, options?: RequestInit) => {
+        if (path.startsWith("/outreach?"))
+          return {
+            threads: [
+              structuredClone(thread),
+              { ...fixture(), id: "thread_b", company_name: "Other business" },
+            ],
+          };
+        return original(path, options);
+      });
+      const { snapshot, finish } = await pendingCopy();
+      if (kind === "thread")
+        await act(async () =>
+          container
+            .querySelectorAll<HTMLButtonElement>(".outreach-lead")[1]
+            .click(),
+        );
+      if (kind === "stage") await click("Conversations");
+      if (kind === "search")
+        await act(async () =>
+          root.render(<OutreachWorkspace searchId="search_b" />),
+        );
+      if (kind === "session") {
+        session.mode = "saas";
+        await mount();
+      }
+      if (kind === "unmount") {
+        await act(async () => root.unmount());
+        root = createRoot(container);
+      }
+      await act(async () => finish(snapshot));
+      expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+      expect(container.textContent).not.toContain("Approved message copied");
+      expect(thread.messages).toHaveLength(0);
+    },
+  );
+  it("coalesces concurrent clicks and allows an explicit subsequent retry", async () => {
+    const { snapshot, finish } = await pendingCopy();
+    // Same-tick clicks also need a synchronous guard, not just a disabled button.
+    await act(async () => {
+      button("Copy approved message").click();
+      button("Copy approved message").click();
+    });
+    await act(async () => finish(snapshot));
+    expect(
+      api.mock.calls.filter(([path]) => path === "/outreach/thread_a"),
+    ).toHaveLength(1);
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(2);
+    expect(thread.messages).toHaveLength(0);
+  });
+  it("offers safe retry without a manual-copy bypass on failed readiness", async () => {
+    await mount();
+    await click("Approve exact message");
+    api.mockRejectedValueOnce(new Error("Offline"));
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+    expect(container.textContent).not.toContain("copy it manually");
+    expect(container.textContent).toContain("try Copy again");
+    await click("Copy approved message");
+    expect(navigator.clipboard.writeText).toHaveBeenCalledTimes(1);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+});
 async function mount() {
   await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
 }
+function replySuggestionFixture() {
+  return { draft: { subject: thread.subject, body: "AI reply stays editable.", evidence_ids: ["seller:offer"], warnings: ["Review this suggestion."],
+    generation_engine: "deepseek", created_at: "2026-10-21" }, snapshot_key: "a".repeat(64), expected_revision: thread.revision,
+    inbound_id: "latest_question", facts: [{ id: "seller:offer", excerpt: "Saved seller offering." }] };
+}
+function reviewedQuestionFixture() {
+  thread.reply_state = "question";
+  thread.sender_footer = "\n\n--\nSaved fictional sender footer";
+  thread.messages = [{ id: "latest_question", direction: "inbound", recipient: thread.recipient, subject: thread.subject,
+    body: "Please explain your offering.", reply_state: "question", source: "user_reported", created_at: "2026-10-21" }];
+}
+it("applies AI reply only to the private editor with saved footer and separate save/approval", async () => {
+  reviewedQuestionFixture();
+  const original = api.getMockImplementation()!;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/reply-draft/check")) return { current: true, snapshot_key: "a".repeat(64) };
+    if (path.endsWith("/reply-draft")) return replySuggestionFixture();
+    return original(path, options);
+  });
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion"); await click("Use as editable reply");
+  expect(field("Message").value).toBe("AI reply stays editable." + thread.sender_footer);
+  expect(thread.body).toBe("A reviewed factual message.");
+  expect(api.mock.calls.some(([path]) => /\/(draft|approve|sent)$/.test(path))).toBe(false);
+  expect(button("Copy approved message").disabled).toBe(true);
+  await click("Save changes");
+  expect(thread.body).toBe("AI reply stays editable." + thread.sender_footer);
+  expect(thread.approval).toBeNull();
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+it("preserves private typing when a reply suggestion ignores abort and returns late", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => path.endsWith("/reply-draft") ? late : original(path, options));
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion");
+  const signal = api.mock.calls.find(([path]) => path.endsWith("/reply-draft"))![1].signal;
+  await change("Message", "Private answer typed while AI was pending.");
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish(replySuggestionFixture()));
+  expect(field("Message").value).toBe("Private answer typed while AI was pending.");
+  expect(button("Use as editable reply")).toBeUndefined();
+  expect(thread.body).toBe("A reviewed factual message.");
+});
+it("cancels delayed AI Apply while the workspace is suspended for business repair", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/reply-draft/check")) return late;
+    if (path.endsWith("/reply-draft")) return Promise.resolve(replySuggestionFixture());
+    return original(path, options);
+  });
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion"); await click("Use as editable reply");
+  const signal = api.mock.calls.find(([path]) => path.endsWith("/reply-draft/check"))![1].signal;
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" suspended />));
+  expect(signal.aborted).toBe(true);
+  await act(async () => finish({ current: true, snapshot_key: "a".repeat(64) }));
+  expect(field("Message").value).toBe(thread.body);
+  expect(button("Use as editable reply")).toBeUndefined();
+});
+it("returns from suspended AI work without a stranded busy state or a late editor overwrite", async () => {
+  reviewedQuestionFixture();
+  let finish!: (value: unknown) => void;
+  const late = new Promise(resolve => { finish = resolve; });
+  const original = api.getMockImplementation()!;
+  api.mockImplementation((path: string, options: RequestInit = {}) => path.endsWith("/reply-draft") ? late : original(path, options));
+  await mount(); await click("Conversations");
+  await act(async () => container.querySelector<HTMLInputElement>('.outreach-ai-consent input')!.click());
+  await click("Request reply suggestion");
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" suspended />));
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" />));
+  await act(async () => finish(replySuggestionFixture()));
+  expect(button("Preparing suggestion…")).toBeUndefined();
+  expect(field("Message").value).toBe(thread.body);
+  expect(button("Request reply suggestion")).toBeTruthy();
+});
+it("creates a separate referred contact only on explicit action and preserves its parent", async () => {
+  thread.reply_state = "referral";
+  thread.messages = [{ id: "referral_inbound", direction: "inbound", recipient: thread.recipient,
+    subject: thread.subject, body: "Please contact Jordan in operations.", source: "user_reported", reply_state: "referral", created_at: "2026-10-21" }];
+  const parent = structuredClone(thread);
+  const child: OutreachThread = { ...fixture(), id: "referred_contact", recipient: "jordan@example.org", recipient_status: "user_entered",
+    referrer_name: "Casey Fixture", referrer_thread_id: parent.id, referrer_message_id: "referral_inbound", body: "", messages: [] };
+  let created = false;
+  api.mockImplementation(async (path: string, options: RequestInit = {}) => {
+    if (path.endsWith("/referrals")) {
+      expect(JSON.parse(String(options.body))).toMatchObject({ recipient: child.recipient, referrer_name: "Casey Fixture",
+        referrer_message_id: "referral_inbound", expected_revision: parent.revision });
+      created = true;
+      return structuredClone(child);
+    }
+    if (path.startsWith("/outreach?")) return { threads: created ? [parent, child] : [parent] };
+    throw new Error("Unexpected provider or mutation request");
+  });
+  await mount();
+  await click("Conversations");
+  await change("Referred email", child.recipient);
+  await change("Person who referred you", "Casey Fixture");
+  await click("Review");
+  await click("Conversations");
+  expect(field("Referred email").value).toBe(child.recipient);
+  expect(created).toBe(false);
+  await click("Add referred contact");
+  expect(field("Recipient").value).toBe(child.recipient);
+  expect(container.textContent).toContain("Referred by Casey Fixture");
+  expect(container.textContent).toContain("Review its own contact basis");
+  expect(parent.messages).toHaveLength(1);
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+function completeReviewContext() {
+  thread.sender_footer = "\n\n--\nFictional sender footer";
+  thread.body += thread.sender_footer;
+  thread.contact_basis = {
+    version: 1, basis_type: "conspicuous_publication", published_email: thread.recipient,
+    source_url: "https://example.org/team", captured_at: "2026-10-21T10:00:00Z",
+    publisher_attribution: "recipient", notice_status: "clear", recipient_role: "Founder",
+    message_relevance: "Fictional role-relevant offering", recipient_country: "CA", recipient_timezone: "UTC",
+  };
+}
+it.each([
+  ["awaiting_review", "review the received reply", "outreach-reply-review"],
+  ["referral", "referred contact", "outreach-referral"],
+] as const)("guides %s to a real focused review control without a write", async (state, text, id) => {
+  completeReviewContext();
+  thread.reply_state = state;
+  thread.messages = [{ id: "received", direction: "inbound", recipient: thread.recipient,
+    subject: "An actual received fixture", body: "Fictional received text", source: "user_reported",
+    reply_state: state, created_at: "2026-10-21T12:00:00Z" }];
+  await mount();
+  const status = container.querySelector('[aria-label="Current outreach step"]')!;
+  expect(status.textContent?.toLowerCase()).toContain(text);
+  const jump = status.querySelector<HTMLAnchorElement>("a")!;
+  expect(jump.getAttribute("href")).toBe("#" + id);
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe(id);
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(field("Message").value).toBe(thread.body);
+});
+it("focuses an existing meeting outcome target rather than a missing approval bar", async () => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = "2020-01-01T12:00:00Z";
+  thread.meeting_timezone = "UTC";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  const status = container.querySelector('[aria-label="Current outreach step"]')!;
+  expect(status.textContent).toContain("meeting");
+  const jump = status.querySelector<HTMLAnchorElement>("a")!;
+  expect(jump.getAttribute("href")).toBe("#outreach-meetings");
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-meetings");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it("uses the saved meeting's local time in a confirmation rather than labelling UTC as Toronto time", async () => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = "2030-11-05T15:00:00+00:00";
+  thread.meeting_timezone = "America/Toronto";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  await click("Prepare a confirmation for review");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/meeting-confirmation"));
+  const body = JSON.parse(call![1].body).body;
+  expect(body).toContain("10:00");
+  expect(body).toContain("America/Toronto");
+  expect(body).not.toContain("15:00");
+  expect(body.endsWith(thread.sender_footer)).toBe(true);
+  expect(api.mock.calls.some(([path]) => path.endsWith("/approve") || path.endsWith("/sent"))).toBe(false);
+});
+it("guides an active company conflict to contacts without pretending resume resolves ownership", async () => {
+  completeReviewContext();
+  thread.company_conflict = true;
+  await mount();
+  expect(button("Resume this outreach")).toBeUndefined();
+  expect(button("Pause this outreach")).toBeTruthy();
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-company-contacts"]')!;
+  expect(jump).toBeTruthy();
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-company-contacts");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it.each([
+  { recipient_country: "other" }, { notice_status: "unknown" }, { published_email: "different@example.org" },
+] as const)("guides contradictory saved contact evidence to its actual editor: %j", async (change) => {
+  completeReviewContext();
+  thread.contact_basis = { ...thread.contact_basis!, ...change };
+  await mount();
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-contact-basis"]')!;
+  expect(jump).toBeTruthy();
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-contact-basis");
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+it("keeps private incoming text while guiding outgoing edits to save first", async () => {
+  completeReviewContext();
+  await mount();
+  await click("Conversations");
+  await change("Message", "Private edited answer");
+  await change("Paste a received reply", "Private unsaved inbound");
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-save"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-save");
+  expect(field("Message").value).toBe("Private edited answer");
+  expect(field("Paste a received reply").value).toBe("Private unsaved inbound");
+  expect(button("Save received reply").disabled).toBe(true);
+  expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
+});
+
+it("keeps an unsent followup date recoverable after inbound hides the cold plan", async () => {
+  completeReviewContext();
+  thread.messages = [{ id: "initial", direction: "outbound", recipient: thread.recipient,
+    subject: "Initial fixture", body: "Reported fictional initial", source: "user_reported", reply_state: null,
+    created_at: "2026-10-19T14:00:00Z" }];
+  await mount();
+  await change("Followup date and time with numeric offset", "2030-11-05T10:00:00-05:00");
+  await change("Followup IANA timezone", "America/Toronto");
+  await click("Conversations");
+  await change("Paste a received reply", "Fictional received reply before scheduling.");
+  await click("Save received reply");
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-followup"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-followup");
+  expect(container.textContent).toContain("2030-11-05T10:00:00-05:00");
+  expect(container.textContent).toContain("America/Toronto");
+  expect(button("Approve exact message").disabled).toBe(true);
+  expect(button("Save followup review date")).toBeUndefined();
+  await click("Cancel followup date edit");
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(thread.messages.at(-1)?.body).toBe("Fictional received reply before scheduling.");
+  expect(container.querySelector('a[href="#outreach-reply-review"]')).toBeTruthy();
+});
+it.each([
+  ["2030-11-03T05:30:00Z", "GMT-04:00"],
+  ["2030-11-03T06:30:00Z", "GMT-05:00"],
+] as const)("keeps the booked fall-back occurrence explicit in the confirmation: %s", async (at, offset) => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = at;
+  thread.meeting_timezone = "America/Toronto";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  await click("Prepare a confirmation for review");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/meeting-confirmation"));
+  const body = JSON.parse(call![1].body).body;
+  expect(body).toContain("1:30");
+  expect(body).toContain(offset);
+  expect(body.endsWith(thread.sender_footer)).toBe(true);
+});
+
+it.each([false, true])("focuses the existing approval/copy actions without invoking them, approved=%s", async (approved) => {
+  completeReviewContext();
+  await mount();
+  if (approved) await click("Approve exact message");
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-actions"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-actions");
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   session.mode = "local-demo";
@@ -97,6 +850,8 @@ beforeEach(() => {
   api.mockImplementation(async (path: string, options: RequestInit = {}) => {
     if (path.startsWith("/outreach?"))
       return { threads: [structuredClone(thread)] };
+    if (path === "/outreach/thread_a" && !options.method)
+      return structuredClone(thread);
     const body = JSON.parse((options.body as string) || "{}");
     const action = path.split("/").at(-1);
     expect(body.expected_revision).toBe(thread.revision);
@@ -163,6 +918,20 @@ beforeEach(() => {
       thread.meeting_state = body.meeting_state;
       thread.sale_state = body.sale_state;
     }
+    if (action === "meeting") {
+      thread.meeting_at = body.meeting_at;
+      thread.meeting_timezone = body.meeting_timezone;
+      thread.meeting_state = "booked_reported";
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+    }
+    if (action === "followups") {
+      thread.next_followup_at = body.scheduled_at;
+      thread.followup_timezone = body.scheduled_timezone;
+      thread.approval = null;
+      thread.ready_for_manual_action = false;
+      thread.manual_action_block = "The confirmed followup is not due yet.";
+    }
     thread.revision++;
     return structuredClone(thread);
   });
@@ -179,7 +948,7 @@ describe("persisted manual outreach journey", () => {
     expect(api.mock.calls).toHaveLength(1);
     expect(api.mock.calls[0][0]).toBe("/outreach?search_id=search_a");
     expect(container.textContent).toContain("No mailbox is connected");
-    expect(container.textContent).toContain("Unverified email");
+    expect(container.textContent).toContain("Email status: published but not verified");
     await act(async () => root.unmount());
     root = createRoot(container);
     session.mode = "saas";
@@ -240,8 +1009,13 @@ describe("persisted manual outreach journey", () => {
     await change("Booking link", "https://example.org/book");
     await click("Save booking link");
     expect(thread.meeting_state).toBe("not_recorded");
-    await change("Meeting · reported by you", "booked_reported");
+    expect(button("Report a timed booking").disabled).toBe(true);
+    await change("Meeting date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Meeting IANA timezone", "America/Toronto");
+    expect(thread.meeting_state).toBe("not_recorded");
+    await click("Report a timed booking");
     expect(thread.meeting_state).toBe("booked_reported");
+    expect(thread.meeting_at).toBe("2026-11-05T10:00:00-05:00");
     expect(thread.sale_state).toBe("not_recorded");
     await change("Customer outcome · reported by you", "won_reported");
     expect(thread.sale_state).toBe("won_reported");
@@ -251,17 +1025,48 @@ describe("persisted manual outreach journey", () => {
       ),
     ).toBe(false);
   });
+  it("preserves a reminder date while switching views and only saves it explicitly", async () => {
+    thread.messages = [{ id: "initial", direction: "outbound", recipient: thread.recipient,
+      subject: thread.subject, body: thread.body, source: "user_reported", reply_state: null, created_at: "2026-10-19T14:00:00Z" }];
+    await mount();
+    await change("Followup date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Followup IANA timezone", "America/Toronto");
+    await click("Meetings");
+    expect(field("Meeting date and time with numeric offset").value).toBe("");
+    expect(field("Meeting IANA timezone").value).toBe("");
+    await click("Review");
+    expect(field("Followup date and time with numeric offset").value).toBe("2026-11-05T10:00:00-05:00");
+    expect(api.mock.calls.some(([path]) => path.endsWith("/followups"))).toBe(false);
+    await click("Save followup review date");
+    const payload = JSON.parse(api.mock.calls.find(([path]) => path.endsWith("/followups"))![1].body);
+    expect(payload).toMatchObject({ scheduled_at: "2026-11-05T10:00:00-05:00", scheduled_timezone: "America/Toronto", body: thread.body });
+    expect(button("Approve exact message").disabled).toBe(true);
+    expect(thread.messages).toHaveLength(1);
+  });
+  it("cancels cleared meeting date edits without discarding unrelated message text", async () => {
+    await mount();
+    await change("Message", "Keep these private edits");
+    await click("Meetings");
+    await change("Meeting date and time with numeric offset", "2026-11-05T10:00:00-05:00");
+    await change("Meeting date and time with numeric offset", "");
+    await click("Cancel meeting date edit");
+    await click("Review");
+    expect(field("Message").value).toBe("Keep these private edits");
+    expect(api.mock.calls.some(([path]) => path.endsWith("/meeting"))).toBe(false);
+    await click("Save changes");
+    expect(button("Approve exact message").disabled).toBe(false);
+  });
   it("preserves unsaved message edits across navigation and blocks paused actions", async () => {
     await mount();
     await change("Message", "Keep this edit.");
     await click("Meetings");
     await click("Review");
     expect(field("Message").value).toBe("Keep this edit.");
-    await click("Pause");
+    await click("Pause this outreach");
     expect(field("Message").value).toBe("Keep this edit.");
     await click("Save changes");
     expect(button("Approve exact message").disabled).toBe(true);
-    await click("Resume");
+    await click("Resume this outreach");
     expect(button("Approve exact message").disabled).toBe(false);
   });
   it("prepares only the explicit selection, reusing its key after uncertain failure", async () => {
@@ -277,13 +1082,13 @@ describe("persisted manual outreach journey", () => {
       ),
     );
     expect(api).not.toHaveBeenCalled();
-    await click("Prepare outreach (2)");
+    await click("Start outreach (2)");
     const first = JSON.parse(api.mock.calls[0][1].body);
-    api.mockResolvedValueOnce({ threads: [] });
-    await click("Prepare outreach (2)");
+    api.mockResolvedValueOnce({ threads: [{ id: "thread_a", search_id: "search_a", account_id: "account_a" }] });
+    await click("Start outreach (2)");
     expect(JSON.parse(api.mock.calls[1][1].body)).toEqual(first);
     expect(first.account_ids).toEqual(["account_a", "account_b"]);
-    expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a");
+    expect(navigate).toHaveBeenCalledWith("/workspace/outreach/search_a?thread=thread_a&view=Review");
   });
   it("retrieves AI only on explicit action, keeps uncertain retries idempotent, and leaves the result unsaved", async () => {
     const original = api.getMockImplementation()!;

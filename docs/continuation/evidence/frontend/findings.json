@@ -1,0 +1,38 @@
+{
+  "reviewed_commit": "c929cbaf0019909ff21bce3633f25842cf67c281",
+  "scope": "returning Next-up UI, existing-thread routing, read-only navigation, manual answer completion, revisit-date safety",
+  "verdict": "PASS_BOUNDED",
+  "blocking_findings": [],
+  "checks": {
+    "browser_desktop_1440": "PASS",
+    "browser_mobile_390": "PASS",
+    "browser_mobile_320": "PASS",
+    "next_up_get": "200; seeded interested reply rendered one item",
+    "existing_thread_route": "PASS; exact search_id and thread query preserved",
+    "reload_back": "PASS; item remained available",
+    "write_requests_on_load_open_reload_back": 0,
+    "page_errors": 0,
+    "horizontal_overflow": "none at 1440/390/320",
+    "backend_outbound_completion": "PASS; after recorded outbound answer next_up empty",
+    "backend_new_inbound_reappearance": "PASS; newer question returned answer_reply",
+    "backend_incomplete_revisit": "PASS; pasted body retained, state awaiting_review, no revisit_at",
+    "backend_test_outreach": "31 tests OK",
+    "frontend_next_up_component_tests": "2 tests passed"
+  },
+  "fixture": {
+    "search_id": "search_900fed9db0de4d2f9f985577e8439b14",
+    "thread_id": "outreach_9b2eda0bf5ac42aeaa892344eb6a8ca6",
+    "recipient": "hello@business.com"
+  },
+  "screenshots": [
+    "returning-next-up-1440.png",
+    "returning-next-up-390.png",
+    "returning-next-up-320.png",
+    "returning-failure-390.png"
+  ],
+  "notes": [
+    "The first empty Next-up observation used a draft-only fixture; after seeding a real inbound interested reply, the queue rendered correctly. This was fixture state, not treated as a product defect.",
+    "Manual answer/date mutation was exercised against the real c929 SQLite repository/API contract; no external provider, mailbox, send, or network call was used.",
+    "This is not full product acceptance: hosted auth/tenant parity, providers, mailbox/calendar, monetary guard, privacy/export/delete, backup/restore, operations/alerts, physical-device/screen-reader checks, and remaining journey requirements remain out of scope/unmet per handoff."
+  ]
+}
