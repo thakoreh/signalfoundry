@@ -1,5 +1,7 @@
 # SignalFoundry / ClientRove continuation handoff
 
+**Latest owner overlay:** the broad release goal is PAUSED for feedback. Only the explicitly requested landing revision continued; see [LANDING_FEEDBACK.md](LANDING_FEEDBACK.md) and current PROGRESS. Source is fd4e030, with illustrated scenes, controlled motion and a reviewed phone-layout repair. Prior source/container/secret checks passed at6bd154f after the test-only proxy fix; current pushed head needs its own readback. Historical red-CI/active-work statements below do not override this overlay. No whole-product acceptance is claimed.
+
 **Verdict: INCOMPLETE. Continue the existing app; do not rebuild or describe it as finished.** This bundle makes the project handoff independent of the previous AI's private memory, local chat history, gateway, and task board.
 
 Latest source5c861c7 has scoped independent repair passes plus partial real connected-Chrome evidence; see CHROME_LOCAL_REVIEW_5c861c7.md. Owner permission "use my chrome" now allows dedicated fictional test tabs, with other owner tabs/profile files/data protected. Full acceptance remains unfinished, and required source CI fails in the real proxy-readiness probe despite passing tests/build/container. Continue its diagnosis and safe implementation; no new permission question for Chrome or false green-CI claim.

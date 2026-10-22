@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "5c861c77cbff4b5da31df2d4d8a58a6e0bff1bf3",
+  "application_checkpoint": "fd4e030a6590b8b471afcacd151e60a20edff9d7",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff, failed and passing scoped reviews, and labelled partial real Chrome evidence; no runtime/customer data or whole-product acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -28,6 +28,11 @@
       "path": "HOSTED_LIFECYCLE.md",
       "bytes": 8634,
       "sha256": "febcef11bf245be8aa8cbb4add9a46539f4016963ca383a018162c389be980f8"
+    },
+    {
+      "path": "LANDING_FEEDBACK.md",
+      "bytes": 4484,
+      "sha256": "7b7e61d15c3ed94a55be95f58508921b8b0790c0020d9f00e09f11730181bd0d"
     },
     {
       "path": "LEADPOET_REVIEW.md",
@@ -61,8 +66,8 @@
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 13978,
-      "sha256": "cbc1571c7a6349230d22c3ed485401fddf55410620ce7441290e1a590da8abe9"
+      "bytes": 14499,
+      "sha256": "7ac6d08a0ac383e61ee4393df5abbb7364cfd874424c08182920018974f5e596"
     },
     {
       "path": "OWNER_CONTRACT.md",
@@ -71,8 +76,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 8926,
-      "sha256": "89d57030cc4aae51f817b84fd6355526e89bb69e0378bda87c1605b84d23ec4c"
+      "bytes": 9471,
+      "sha256": "551d30ee661cb82effd1e5af2c2389a5be9f12e95d54987f35ad860a88820fea"
     },
     {
       "path": "RELEASE_HANDOFF.md",
@@ -86,8 +91,8 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 24111,
-      "sha256": "28dd3b76c579d7235e6679241aef6c18dc1ef173e3766b2c289089ed6c98f990"
+      "bytes": 24807,
+      "sha256": "d97c09865def5315505a96723fef91421a29d98ff2fea4eaf2e06360cb2f896d"
     },
     {
       "path": "evidence/backend/CHROME_AGGREGATE_5c861c7.json",
@@ -148,6 +153,36 @@
       "path": "evidence/screenshots/20261021/30-repaired-return-320.jpg",
       "bytes": 34122,
       "sha256": "15b9db5cfddf945e0cff3d951406df49fb342e6a7d7e2dac5fa81dfaa4ff937c"
+    },
+    {
+      "path": "evidence/screenshots/20261021/31-landing-walkthrough-1440.jpg",
+      "bytes": 66882,
+      "sha256": "e584e637ca3ae34f4bf1f520c34ff5aa57d14e9f0ddbd4114c5923a3d610f78e"
+    },
+    {
+      "path": "evidence/screenshots/20261021/32-landing-full-1440.jpg",
+      "bytes": 319479,
+      "sha256": "eafb60a2ba5ed49a063263ecb493784368681e86330a59c4d8f935c54485c9e7"
+    },
+    {
+      "path": "evidence/screenshots/20261021/33-landing-full-320.jpg",
+      "bytes": 227761,
+      "sha256": "912ace03376f767c6b363243a169634a3e8d2911df77c4a49423792e7d9fe5d0"
+    },
+    {
+      "path": "evidence/screenshots/20261021/34-landing-390.jpg",
+      "bytes": 28489,
+      "sha256": "44444509a84343c02400ad5ed090f19bd4ee65bb57c40738c153082d16f1b2d2"
+    },
+    {
+      "path": "evidence/screenshots/20261021/35-landing-320.jpg",
+      "bytes": 21020,
+      "sha256": "5c9106110a5141e1131a4316c57a06db50f659178c1334279c3a769a9bc019e5"
+    },
+    {
+      "path": "evidence/screenshots/20261021/36-landing-repaired-320.jpg",
+      "bytes": 26422,
+      "sha256": "b7a7ffbeff910f5de11d4a6fea4a5aba9b9268b93e7d49f26d7c58fdbd073a8d"
     },
     {
       "path": "evidence/screenshots/returning-next-up-viewport-1440.png",
@@ -320,6 +355,21 @@
       "sha256": "300a203a2fc775fc8962818879f55763adb085c78402c98f64db89639685bd1a"
     },
     {
+      "path": "reports/UX_LANDING_RECHECK_fd4e030.md",
+      "bytes": 2156,
+      "sha256": "67b7e16c95120dec6c03b877c259c59b6bbba14fedc6c30172811db8f4fc8517"
+    },
+    {
+      "path": "reports/UX_LANDING_REVIEW_c0a7c40.md",
+      "bytes": 4070,
+      "sha256": "7b9b98eb34e973130dec9be554d1bc2438fa107cbf7b032be8a5d1d928f68dca"
+    },
+    {
+      "path": "reports/UX_LANDING_REVIEW_e8e4942.md",
+      "bytes": 8677,
+      "sha256": "1cb7707a31a358550a2396fa1d7333ccfa8ce9884703f8b18b2ae901eb8f887e"
+    },
+    {
       "path": "reports/UX_NEXT_ACTION_626093d.md",
       "bytes": 11486,
       "sha256": "888610dd4cf98c55c7419aadd6506167a135f17fbf14d28e4261ac4efa8d2d92"
@@ -355,5 +405,5 @@
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ],
-  "application_checkpoint_scope": "Reviewed actionable navigation, private-date recovery, explicit local meeting offsets and corrected-stop returning queue. Exact production build and scoped independent offline rechecks pass; partial real Chrome evidence captured. Required source CI fails at existing proxy-readiness probe; container passes. Full local/hosted/live and production acceptance remain incomplete."
+  "application_checkpoint_scope": "Broad release goal paused by owner. Focused landing feedback implemented with illustrated scenes, controlled motion and independently rechecked phone repair. Exact production builds and scoped tests/reviews pass; fresh Chrome landing evidence is retained. Required checks passed at prior6bd154f; final pushed head needs separate readback. Full local/hosted/live acceptance remains incomplete."
 }

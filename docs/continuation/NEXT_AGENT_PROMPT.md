@@ -1,5 +1,7 @@
 # Copy-paste continuation prompt
 
+**Latest owner instruction:** the broad release goal is PAUSED for feedback. The only subsequent authorization was a focused landing revision during voice review; that source is fd4e030 with evidence in LANDING_FEEDBACK.md and current PROGRESS. Do not treat historical “start executing” or active diagnosis wording below as permission to resume the broad backlog. The prior proxy fix and first landing slice passed required checks at6bd154f; obtain exact-head readback for later commits. The app remains incomplete.
+
 You are taking over SignalFoundry (some source/UI still says ClientRove). Finish the existing app, not another plan, prototype or replacement. The original whole-app goal is INCOMPLETE. A previous one-hour completion target was missed; it is historical, not a new deadline or permission to weaken acceptance.
 
 Latest overlay:5c861c7 repairs actual Chrome/independent-review navigation, stale private date, confirmation offset and corrected-stop queue defects. Both scoped immutable rechecks pass; required source CI is RED at the unchanged real proxy-readiness probe, now reproduced in an external Windows diagnostic copy. Do not disable/relax that test. Read PROGRESS and CHROME_LOCAL_REVIEW_5c861c7.md. The owner answered "use my chrome": dedicated connected task tabs are permitted; other owner tabs, profile files and data stay protected. No alternate automation method, paid/provider/send/deploy authority was granted. Native fixture dialog remains unverified; owner chose "Continue code checks for now".
