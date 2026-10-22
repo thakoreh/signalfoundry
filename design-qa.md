@@ -38,7 +38,7 @@ Full-view comparisons put source01 with implementation12, source02 with implemen
 - P2, native animation cancellation: viewport change rejected `ready`, causing an app error despite catching `finished`. `bd99967` catches visual cancellation; new rejected-promise regression passes. Fresh final Chrome resize leaves the exact-company review open with no app error log.14/15/17/18 are post-fix.
 - Evidence corrections, not product defects:09 is a stale pre-busy frame, replaced by10.13 clips the focused pipeline crop, replaced by full12.16 contains a viewport-change capture artifact, replaced by native17/readable18. Do not count rejected captures as passing evidence.
 
-No actionable P0/P1/P2 finding remains established in this focused slice after the rechecks.
+Final numeric contrast check found one additional P2: the new11px caption was4.35:1 against the actual rgb247/248/245 paper, below4.5:1. Darken it from #67796c to #5f7465 (calculated4.72:1). Rebuild and verify computed color/raster before closing this finding.
 
 ## Required fidelity surfaces
 
@@ -63,4 +63,4 @@ Physical phone, screen reader, browser200%zoom, entire14-step product, live prov
 - [x] Preserve private edits and existing manual/approval/provider boundaries.
 - [x] Record evidence exclusions and broader acceptance limits.
 
-final result: passed
+final result: blocked

@@ -1,5 +1,9 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## October22 final contrast measurement
+
+Measured actual new caption on rgb247/248/245 paper: #67796c is4.35:1. Darken to #5f7465, calculated4.72:1. Root design QA temporarily blocked until optimized build and fresh computed/visual check. No interaction or provider change. Prior174 component/source build proof remains scoped; final-head checks will rerun.
+
 ## October22 component polish — final local evidence
 
 Application bd99967c0e3d614df9c0b2f6d031d5e999b978f6 optimized webpack production build including TypeScript PASS;174 component tests/25files and focused ESLint PASS. Staged secret scans PASS, no new dependency/backend/Convex/provider changes. Fresh Chrome confirms final resize-cancellation/no-app-error behavior, visible backward/forward focus boundary, Escape trigger return/unlocked page, desktop and390/320 panel/action fit. Root design-qa.md passes the owner-approved pattern adaptation only; it is implementing-agent QA, not independent final review or whole-product acceptance. Evidence report PREMIUM_COMPONENT_POLISH.md records exact tested scope and excludes stale09, clipped13 and viewport-artifact16; native17/detail18 replace the latter. Final screenshots are external fictional fixtures only. Owner profile/env/database/ports were not used; local test analysis changed only the task's fictional profile. No new paid call, external message, connection, account or deployment; actual prior spending unknown. No merge/main push/rule change. Broad goal paused. Final owned fixture wrapper29888/Next50640/session71144, loopback3001/API8025; reverify identity before any future process operation. Canonical overlays/manifest updated; current PR-head CI pending readback after final evidence push.
