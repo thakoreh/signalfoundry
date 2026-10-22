@@ -284,6 +284,33 @@ class LocalJourneyTest(unittest.TestCase):
             thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(**self.fields(thread), body='A manually classified terminal reply.', reply_state=state))
             self.assertEqual(self.repo.outreach_next_up()['items'], [])
 
+    def assert_stopped_correction_has_no_answer_task(self, stop):
+        thread = self.report_initial()
+        thread = self.repo.mutate_outreach(thread.id, 'reply', PasteReply(
+            **self.fields(thread), body='Fictional manually reviewed stop.', reply_state=stop))
+        received = thread.messages[-1].model_dump()
+        thread = self.repo.mutate_outreach(thread.id, 'reply-state', CorrectReply(
+            **self.fields(thread), reply_state='interested'))
+        snapshot = thread.model_dump()
+        with TestClient(create_app(self.path, testing=True)) as client:
+            response = client.get('/api/outreach/next-up')
+            self.assertEqual(response.status_code, 200, response.text)
+            self.assertNotIn(thread.id, [item['thread_id'] for item in response.json()['items']])
+        self.assertEqual(self.repo.outreach_thread(thread.id).model_dump(), snapshot)
+        # Local manual review changes the effective classification; the actual
+        # received text, sender, timestamps and every other saved field stay put.
+        self.assertEqual(thread.messages[-1].model_dump(), {**received, 'reply_state': 'interested'})
+        self.assertFalse(thread.ready_for_manual_action)
+
+    def test_corrected_bounce_does_not_offer_an_answer_to_the_invalid_address(self):
+        self.assert_stopped_correction_has_no_answer_task('bounce')
+
+    def test_corrected_opt_out_does_not_offer_an_answer_to_the_suppressed_company(self):
+        self.assert_stopped_correction_has_no_answer_task('opt_out')
+
+    def test_corrected_source_challenge_does_not_offer_an_answer_to_the_suppressed_company(self):
+        self.assert_stopped_correction_has_no_answer_task('source_question')
+
     def test_prepared_contact_prefers_individual_address_and_offer_edits_invalidate_approval(self):
         from app.models import Contact
         self.account.contacts = [Contact(name=None, role='Team', email='info@business.com', verification_status='verified', source_url='https://business.com/contact', note='Fictional provider fixture'),

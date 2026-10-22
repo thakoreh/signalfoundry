@@ -782,6 +782,59 @@ it("keeps private incoming text while guiding outgoing edits to save first", asy
   expect(api.mock.calls.some(([, options]) => options?.method)).toBe(false);
 });
 
+it("keeps an unsent followup date recoverable after inbound hides the cold plan", async () => {
+  completeReviewContext();
+  thread.messages = [{ id: "initial", direction: "outbound", recipient: thread.recipient,
+    subject: "Initial fixture", body: "Reported fictional initial", source: "user_reported", reply_state: null,
+    created_at: "2026-10-19T14:00:00Z" }];
+  await mount();
+  await change("Followup date and time with numeric offset", "2030-11-05T10:00:00-05:00");
+  await change("Followup IANA timezone", "America/Toronto");
+  await click("Conversations");
+  await change("Paste a received reply", "Fictional received reply before scheduling.");
+  await click("Save received reply");
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-followup"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-followup");
+  expect(container.textContent).toContain("2030-11-05T10:00:00-05:00");
+  expect(container.textContent).toContain("America/Toronto");
+  expect(button("Approve exact message").disabled).toBe(true);
+  expect(button("Save followup review date")).toBeUndefined();
+  await click("Cancel followup date edit");
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(thread.messages.at(-1)?.body).toBe("Fictional received reply before scheduling.");
+  expect(container.querySelector('a[href="#outreach-reply-review"]')).toBeTruthy();
+});
+it.each([
+  ["2030-11-03T05:30:00Z", "GMT-04:00"],
+  ["2030-11-03T06:30:00Z", "GMT-05:00"],
+] as const)("keeps the booked fall-back occurrence explicit in the confirmation: %s", async (at, offset) => {
+  completeReviewContext();
+  thread.meeting_state = "booked_reported";
+  thread.meeting_at = at;
+  thread.meeting_timezone = "America/Toronto";
+  await act(async () => root.render(<OutreachWorkspace searchId="search_a" initialView="Meetings" />));
+  await click("Prepare a confirmation for review");
+  const call = api.mock.calls.find(([path]) => path.endsWith("/meeting-confirmation"));
+  const body = JSON.parse(call![1].body).body;
+  expect(body).toContain("1:30");
+  expect(body).toContain(offset);
+  expect(body.endsWith(thread.sender_footer)).toBe(true);
+});
+
+it.each([false, true])("focuses the existing approval/copy actions without invoking them, approved=%s", async (approved) => {
+  completeReviewContext();
+  await mount();
+  if (approved) await click("Approve exact message");
+  const writes = api.mock.calls.filter(([, options]) => options?.method).length;
+  const jump = container.querySelector<HTMLAnchorElement>('a[href="#outreach-actions"]')!;
+  await act(async () => jump.click());
+  expect(document.activeElement?.id).toBe("outreach-actions");
+  expect(api.mock.calls.filter(([, options]) => options?.method)).toHaveLength(writes);
+  expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
+});
+
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   session.mode = "local-demo";

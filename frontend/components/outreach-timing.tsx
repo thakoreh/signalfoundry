@@ -20,8 +20,10 @@ export function TimingFields({ value, onChange, kind, disabled }: {
 export function meetingTimeLabel(at: string, zone: string | null | undefined) {
   try {
     if (!zone) return `${at} (saved timestamp; timezone unknown)`;
-    const time = new Intl.DateTimeFormat("en-CA", { timeZone: zone, dateStyle: "full", timeStyle: "short" }).format(new Date(at));
-    return `${time} (${zone})`;
+    const date = new Date(at);
+    const time = new Intl.DateTimeFormat("en-CA", { timeZone: zone, dateStyle: "full", timeStyle: "short" }).format(date);
+    const offset = new Intl.DateTimeFormat("en-CA", { timeZone: zone, timeZoneName: "longOffset" }).formatToParts(date).find(part => part.type === "timeZoneName")?.value;
+    return `${time} (${zone}${offset ? `, ${offset}` : ""})`;
   } catch { return `${at} (saved timestamp; timezone unavailable)`; }
 }
 export function SavedMeeting({ thread }: { thread: OutreachThread }) {

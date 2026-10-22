@@ -576,7 +576,7 @@ class OutreachStore:
                 continue
             if meeting_due:
                 priority, action, reason = 2, 'report_meeting', 'Report what happened, or repair a missing meeting date. Unknown stays unknown.'
-            elif thread.next_followup_at and datetime.fromisoformat(thread.next_followup_at) <= datetime.now(timezone.utc) and not inbound and not thread.paused and not thread.suppressed and not thread.company_conflict:
+            elif thread.next_followup_at and datetime.fromisoformat(thread.next_followup_at) <= datetime.now(timezone.utc) and not inbound and not blocked(thread):
                 priority, action, reason = 2, 'review_followup', 'Any reply since your last send? Check your inbox, then review this due reminder. Nothing sends automatically.'
             elif inbound and thread.reply_state == 'referral' and thread.messages[latest_inbound].id in thread.referral_completed_message_ids:
                 continue
@@ -586,7 +586,7 @@ class OutreachStore:
                 priority, action, reason = 0, 'review_reply', 'Review the pasted reply and its recorded consequence.'
             elif inbound and thread.reply_state in ('interested', 'question') and latest_outbound > latest_inbound and not thread.body:
                 continue
-            elif inbound and thread.reply_state in ('interested', 'question'):
+            elif inbound and thread.reply_state in ('interested', 'question') and not thread.suppressed and thread.recipient_status != 'invalid':
                 priority, action, reason = 1, 'answer_reply', 'Write and review a human answer using saved facts.'
             elif thread.approval and thread.ready_for_manual_action:
                 priority, action, reason = 3, 'manual_send', 'Copy or send the exact approved message, then record what happened.'

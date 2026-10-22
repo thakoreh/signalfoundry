@@ -156,6 +156,7 @@ export function OutreachWorkspace({
     : null;
   const basisDirty = Boolean(thread && bases[thread.id]);
   const timingDirty = !!thread && Object.keys(timings).some(key => key.startsWith(thread.id + ":"));
+  const showsFollowupPlan = !!thread && !thread.messages.some(message => message.direction === "inbound") && thread.messages.some(message => message.direction === "outbound") && thread.meeting_state === "not_recorded";
   const pendingReplyReview = !!thread && !!replySelections[thread.id];
   const incomingDirty = !!thread && !!incoming[thread.id]?.trim();
   useUnsavedChanges(
@@ -591,6 +592,17 @@ export function OutreachWorkspace({
                   setJump({threadId: thread.id, target: nextAction.target});
                 }}>Jump to next safe action</a>}
               </section>
+              {timings[`${thread.id}:followup`] && !showsFollowupPlan && (
+                <section className="outreach-followup" id="outreach-followup" tabIndex={-1} aria-label="Unsubmitted followup date">
+                  <h3>Review your unsent followup date</h3>
+                  <p>This private date was never scheduled. A received reply or reported meeting stops cold followups. Keep a copy if useful, then cancel the date edit to continue review.</p>
+                  <p>{timings[`${thread.id}:followup`].at || "Date not entered"} · {timings[`${thread.id}:followup`].zone || "Timezone not entered"}</p>
+                  <button className="btn" type="button" disabled={!!busy} onClick={() => {
+                    cancelCopy();
+                    setTimings(current => { const next = { ...current }; delete next[`${thread.id}:followup`]; return next; });
+                  }}>Cancel followup date edit</button>
+                </section>
+              )}
               {step === "Meetings" ? (
                 <div className="outreach-meetings" id="outreach-meetings" tabIndex={-1}>
                   <h3>Track what happened</h3>
@@ -672,7 +684,7 @@ export function OutreachWorkspace({
                 </div>
               ) : (
                 <>
-                  {!thread.messages.some(message => message.direction === "inbound") && thread.messages.some(message => message.direction === "outbound") && thread.meeting_state === "not_recorded" && (
+                  {showsFollowupPlan && (
                     <section className="outreach-followup" aria-label="Manual followup plan" id="outreach-followup" tabIndex={-1}>
                       <h3>Plan a reminder</h3>
                       <p>{thread.followups_sent || 0} of 2 followups recorded. Check your inbox first. Every received reply stops the cold sequence.</p>
@@ -1000,7 +1012,7 @@ export function OutreachWorkspace({
                         : "Review the recipient and facts, save your message, then approve the exact content."}
                   </p>
                   <DraftClaimReview body={draft.body} footer={thread.sender_footer || ""} offering={profile?.description || ""} sources={thread.source_facts || []} />
-                  <div className="outreach-action-bar" id="outreach-actions">
+                  <div className="outreach-action-bar" id="outreach-actions" tabIndex={-1}>
                     <button
                       className="btn primary"
                       type="button"
