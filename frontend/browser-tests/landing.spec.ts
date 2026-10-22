@@ -350,6 +350,32 @@ test("small screens keep the selling story readable and the website action reach
       .locator("ol")
       .evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
+  // The floating mobile labels must leave the center's text readable.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  const coveredCenterText = await page
+    .locator(".sf-momentum-art")
+    .evaluate((art) => {
+      const labels = [...art.querySelectorAll(".sf-momentum-token")].map(
+        (element) => element.getBoundingClientRect(),
+      );
+      return [
+        ...art.querySelectorAll(
+          ".sf-momentum-center strong, .sf-momentum-center > span",
+        ),
+      ].some((element) => {
+        const text = element.getBoundingClientRect();
+        return labels.some(
+          (label) =>
+            label.left < text.right &&
+            label.right > text.left &&
+            label.top < text.bottom &&
+            label.bottom > text.top,
+        );
+      });
+    });
+  expect(coveredCenterText, "Floating labels cover the center text").toBe(
+    false,
+  );
   const website = page.getByRole("textbox", { name: "Your business website" });
   await website.focus();
   await expect(website).toBeFocused();
