@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "fd4e030a6590b8b471afcacd151e60a20edff9d7",
+  "application_checkpoint": "f65fa8069a9cce3047c12e238ab89e0d6ebed516",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff, failed and passing scoped reviews, and labelled partial real Chrome evidence; no runtime/customer data or whole-product acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -30,6 +30,11 @@
       "sha256": "febcef11bf245be8aa8cbb4add9a46539f4016963ca383a018162c389be980f8"
     },
     {
+      "path": "INSTANTLY_PILOT_OPTIONS_20261022.md",
+      "bytes": 13947,
+      "sha256": "cb3d91c2bce5ed58dfef1b2b084800e663c298768335632d81a622a8a26cccc3"
+    },
+    {
       "path": "LANDING_FEEDBACK.md",
       "bytes": 4484,
       "sha256": "7b7e61d15c3ed94a55be95f58508921b8b0790c0020d9f00e09f11730181bd0d"
@@ -46,8 +51,8 @@
     },
     {
       "path": "LOCAL_DECISIONS.md",
-      "bytes": 7812,
-      "sha256": "fe48fbee1255cf7861d4e8a48c88d47c4aabec9cb8284a30776425b2cb533042"
+      "bytes": 8585,
+      "sha256": "86bab1bddac3aa806599aad7c3e05bf90b0f660693d8f1446854a04c947fcc6c"
     },
     {
       "path": "LOCAL_LOOP_CONTRACT.md",
@@ -60,14 +65,24 @@
       "sha256": "6f976b8918703b39acba4337f067701777f1ee7755e7cb6dd61c32c800328a5f"
     },
     {
+      "path": "MAILBOX_PILOT_OPTIONS_20261022.md",
+      "bytes": 12651,
+      "sha256": "70fea21968a8335965acbe5818bd5f93e0de6bc533d5546d58443134d3d9a6c3"
+    },
+    {
       "path": "MONETARY_SAFEGUARDS.md",
       "bytes": 7854,
       "sha256": "1fd9c87078de35f3d332f4a7a8b79719c132dc2f9ee2fc2a30fc01f8679bb3d0"
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 14499,
-      "sha256": "7ac6d08a0ac383e61ee4393df5abbb7364cfd874424c08182920018974f5e596"
+      "bytes": 14808,
+      "sha256": "e96c64d2743faa52b678d12d2a2aea7a18fdaf6cfacab78ed295c70afa9b25ad"
+    },
+    {
+      "path": "OUTREACH_AGENT_RESEARCH_20261022.md",
+      "bytes": 19294,
+      "sha256": "ab05e8d9d584e7af9277402549e402c444ca9f33208dd81188ac8418399666b0"
     },
     {
       "path": "OWNER_CONTRACT.md",
@@ -76,8 +91,8 @@
     },
     {
       "path": "README.md",
-      "bytes": 9471,
-      "sha256": "551d30ee661cb82effd1e5af2c2389a5be9f12e95d54987f35ad860a88820fea"
+      "bytes": 9671,
+      "sha256": "8624f3ea12cef1ed50670cb3f6f740efd96d45aa44054e287cd62be2cf86d8d1"
     },
     {
       "path": "RELEASE_HANDOFF.md",
@@ -91,8 +106,13 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 24807,
-      "sha256": "d97c09865def5315505a96723fef91421a29d98ff2fea4eaf2e06360cb2f896d"
+      "bytes": 26172,
+      "sha256": "10f96d50310024d4e4766d8310fb4174e84bf3bf967306b0ada62b3b27d45ec9"
+    },
+    {
+      "path": "WORKSPACE_FEEDBACK.md",
+      "bytes": 6946,
+      "sha256": "552f18a40bf1237f76f1932eef50d5387d7d104a62032322642e640aede67934"
     },
     {
       "path": "evidence/backend/CHROME_AGGREGATE_5c861c7.json",
@@ -183,6 +203,51 @@
       "path": "evidence/screenshots/20261021/36-landing-repaired-320.jpg",
       "bytes": 26422,
       "sha256": "b7a7ffbeff910f5de11d4a6fea4a5aba9b9268b93e7d49f26d7c58fdbd073a8d"
+    },
+    {
+      "path": "evidence/screenshots/20261021/37-workspace-desktop-d41f6f1.jpg",
+      "bytes": 63037,
+      "sha256": "0afc5f14da1283de66914811d7e983e6576e64a76d6c7d14e4f0d731fbd2aa7a"
+    },
+    {
+      "path": "evidence/screenshots/20261021/38-workspace-meetings-d41f6f1.jpg",
+      "bytes": 55297,
+      "sha256": "d55515d300978d5c6596f2c5401ae3ebab515f589ca906d80c407b4e25335a26"
+    },
+    {
+      "path": "evidence/screenshots/20261021/39-workspace-meetings-390-d41f6f1.jpg",
+      "bytes": 22957,
+      "sha256": "db5efa20c9cf725af2551af50a1c3e653a0d7dc82a4532b7501e39ec2eb6910c"
+    },
+    {
+      "path": "evidence/screenshots/20261021/40-workspace-meetings-320-d41f6f1.jpg",
+      "bytes": 30652,
+      "sha256": "9e0e08f01581db3a92a57b36b2c51dc688339092e54022380d723da0f98098ea"
+    },
+    {
+      "path": "evidence/screenshots/20261021/41-workspace-settings-320-d41f6f1.jpg",
+      "bytes": 17835,
+      "sha256": "c4462eab2ac5bb1aeb8ae7fa06e9e4174afbced1ad6a2d223c925a07cc54a121"
+    },
+    {
+      "path": "evidence/screenshots/20261021/42-selected-outreach-320-d41f6f1.jpg",
+      "bytes": 35435,
+      "sha256": "8f9b119569477686c55da619d26ac4996ea12e5b5ea43262fb10a0a845000923"
+    },
+    {
+      "path": "evidence/screenshots/20261021/43-workspace-final-390-f65fa80.jpg",
+      "bytes": 38008,
+      "sha256": "ab8fc07fdab0a917e89efa50b17a8ad2d25f62b161108fcffdeea2dd9e37e453"
+    },
+    {
+      "path": "evidence/screenshots/20261021/44-workspace-final-320-f65fa80.jpg",
+      "bytes": 22537,
+      "sha256": "4c9f1b58aae43d8231757631768422d136302bb219693a58e8e845d1b39d92eb"
+    },
+    {
+      "path": "evidence/screenshots/20261021/45-workspace-final-desktop-f65fa80.jpg",
+      "bytes": 62571,
+      "sha256": "703feeb1dc5031de67a4261ba2290134e9f599b68d536840edc5e6ad7b60fce1"
     },
     {
       "path": "evidence/screenshots/returning-next-up-viewport-1440.png",
@@ -403,7 +468,22 @@
       "path": "reports/UX_SPEC_REVIEW_ce37b6c.md",
       "bytes": 9425,
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
+    },
+    {
+      "path": "reports/WORKSPACE_RECHECK_d41f6f1.md",
+      "bytes": 4817,
+      "sha256": "c86b60b456f273d5a63a08273639db6d89c90479a8bb4933985771ddc6a5216e"
+    },
+    {
+      "path": "reports/WORKSPACE_REVIEW_618b101.md",
+      "bytes": 7067,
+      "sha256": "6c921b70f17603aedf80b9bd3d030c935d2cd01790561301377792b7cd83b0a2"
+    },
+    {
+      "path": "reports/WORKSPACE_VISUAL_RECHECK_f65fa80.md",
+      "bytes": 3556,
+      "sha256": "15c6badd8dcee4b829b153a68c358c7e9fb57f85121bbfe29de4a89f121e0724"
     }
   ],
-  "application_checkpoint_scope": "Broad release goal paused by owner. Focused landing feedback implemented with illustrated scenes, controlled motion and independently rechecked phone repair. Exact production builds and scoped tests/reviews pass; fresh Chrome landing evidence is retained. Required checks passed at prior6bd154f; final pushed head needs separate readback. Full local/hosted/live acceptance remains incomplete."
+  "application_checkpoint_scope": "Broad release goal paused. Owner-authorized landing/workspace feedback only: minimal dashboard/Settings/exact selected Review; repaired compact summary contract; scoped tests, exact builds, independent rechecks and partial connected Chrome proof. Failed or ambiguous captures labelled. Actual transport unconnected; latest separate-inbox Instantly option exceeds25USD; provider, spending and rights unresolved. Final pushed-head checks require independent readback; no whole-product acceptance."
 }

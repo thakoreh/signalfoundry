@@ -1,4 +1,10 @@
-# Current continuation status — October21,2026
+# Current continuation status — October22,2026
+
+## Current focused workspace feedback — f65fa80; whole-app goal stays paused
+
+After the landing revision, the owner explicitly authorized a minimal workspace and outreach research. [WORKSPACE_FEEDBACK.md](WORKSPACE_FEEDBACK.md) records the implemented dashboard/Settings/selected-customer flow, original failed review, repaired real summary contract, 240 backend/165 component passes, exact-source production builds and partial real Chrome evidence. Independent repair review passes19 distinct cases; responsive/CSS review passes within its stated scope. Failed/clipped39 and filter-ambiguous45 captures are excluded from specific-state proof. No whole-product, hosted, physical-device or production acceptance.
+
+The latest mailbox requirement excludes customers' main inboxes and considers Instantly/separate sending accounts. [Instantly research](INSTANTLY_PILOT_OPTIONS_20261022.md) finds47USD platform alone, pre-warmed minimum first-month estimate at least112 before tax: outside the25USD total ceiling including unreconciled prior DeepSeek. API reply entitlements/commercial rights/provider permission remain unresolved. No mailbox chosen or connected; actual sending-agent implementation waits on this decision. No account, spend, send, deploy, merge or main push. Required checks need exact latest-head readback; earlier green runs below are historical.
 
 ## Latest owner feedback checkpoint — fd4e030; broad release paused
 

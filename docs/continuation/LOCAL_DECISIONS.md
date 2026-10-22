@@ -1,5 +1,7 @@
 # Historical local implementation decisions
 
+**October22 owner feedback supersedes home composition below:** the broad goal is paused; owner requested removing returning-work/Next up, Saved conversations and local-data panels from home in favor of one minimal activity dashboard. Existing storage/projections are preserved; Settings retains data controls. Customer rows prepare their exact selected Review thread. This does not authorize sending. See WORKSPACE_FEEDBACK.md. Latest mailbox requirement excludes customers' main inboxes; Instantly/separate sending accounts are under research, not chosen or connected. No actual engine implementation until a permitted affordable provider decision; US25includes unknown DeepSeek history. Historical Next up-as-home wording is not a reason to restore the removed panels.
+
 Current implementation/status supersedes the original pending-work/deadline wording below. See STATUS.md, COMPANY_RESUME_ADJUDICATION.md, MONETARY_SAFEGUARDS.md, LOCAL_DATA_OPERATIONS.md and LOCAL_SETUP.md. The approved minimal contracts below now have local referral/followup/meeting/funnel implementations and scoped tests/reviews; no hosted/connected or full rendered acceptance is claimed. Monetary prices/history remain unaccepted. Never restart the old worker hierarchy or retry an expired deadline.
 
 The old clock/worker orchestration is historical, not an instruction to start or restart anything. See NEXT_AGENT_PROMPT.md for current continuation instructions. Date ambiguity is clarified by DATE_REVIEW_ADJUDICATION.md.

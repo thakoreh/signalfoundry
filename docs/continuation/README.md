@@ -1,6 +1,6 @@
 # SignalFoundry / ClientRove continuation handoff
 
-**Latest owner overlay:** the broad release goal is PAUSED for feedback. Only the explicitly requested landing revision continued; see [LANDING_FEEDBACK.md](LANDING_FEEDBACK.md) and current PROGRESS. Source is fd4e030, with illustrated scenes, controlled motion and a reviewed phone-layout repair. Prior source/container/secret checks passed at6bd154f after the test-only proxy fix; current pushed head needs its own readback. Historical red-CI/active-work statements below do not override this overlay. No whole-product acceptance is claimed.
+**Latest owner overlay:** the broad release goal is PAUSED. Subsequent explicit authorization covers landing/workspace feedback and mailbox research only. Current application f65fa80 includes the minimal dashboard, Settings data controls and exact selected-customer Review routing; see [WORKSPACE_FEEDBACK.md](WORKSPACE_FEEDBACK.md), [latest provider decision](INSTANTLY_PILOT_OPTIONS_20261022.md) and current PROGRESS. The owner excludes customers' main inboxes; Instantly exceeds the25USD total cap and no provider is selected. Actual sending-agent implementation is gated. Earlier landing/CI/active-work statements are historical; obtain exact-head check readback. No whole-product acceptance or permission to resume the backlog is implied.
 
 **Verdict: INCOMPLETE. Continue the existing app; do not rebuild or describe it as finished.** This bundle makes the project handoff independent of the previous AI's private memory, local chat history, gateway, and task board.
 
