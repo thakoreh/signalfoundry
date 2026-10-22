@@ -680,6 +680,9 @@ export function CustomerSearchResults({ searchId }: { searchId: string }) {
       flushSync(() => setMorphingSource(account.id));
       try {
         const transition = document.startViewTransition(show);
+        // Resizes or competing transitions may reject ready even after the
+        // review has opened. Animation cancellation must stay non-fatal.
+        void transition.ready.catch(() => {});
         void transition.finished
           .catch(() => {})
           .finally(() => setMorphingSource(null));

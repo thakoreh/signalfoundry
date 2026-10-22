@@ -213,6 +213,28 @@ it("falls back to the same safe review if native view transitions fail", async (
   }
 });
 
+it("keeps review usable when the browser cancels a transition while resizing", async () => {
+  Object.defineProperty(document, "startViewTransition", {
+    configurable: true,
+    value: (update: () => void) => {
+      update();
+      return {
+        ready: Promise.reject(new Error("Viewport size changed")),
+        finished: Promise.reject(new Error("Animation cancelled")),
+      };
+    },
+  });
+  try {
+    await act(async () => root.render(<CustomerSearchResults searchId="search_a" />));
+    await open();
+    expect(dialog().open).toBe(true);
+    expect(dialog().querySelector("#outreach-company")?.textContent).toBe("verified");
+    expect(dialog().querySelector("h2")?.getAttribute("style")).not.toContain("outreach-company");
+  } finally {
+    Reflect.deleteProperty(document, "startViewTransition");
+  }
+});
+
 it("does not carry an old search's retained review into another search", async () => {
   await act(async () =>
     root.render(<CustomerSearchResults searchId="search_a" />),
