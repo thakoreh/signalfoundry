@@ -28,6 +28,9 @@
 .outreach-dashboard-nav {
   flex-shrink: 0;
 }
+.outreach-dashboard .btn {
+  min-height: 44px;
+}
 .outreach-connection {
   font-size: 13px;
   color: #637266;
