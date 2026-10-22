@@ -446,5 +446,4 @@
 .outreach-workspace--embedded .outreach-heading h2 { font-size:23px; letter-spacing:-.6px; font-weight:550; margin:0 0 9px; }
 .outreach-workspace--embedded .outreach-layout { grid-template-columns:minmax(0,1fr); }
 .outreach-workspace--embedded .outreach-editor { min-width:0; padding:22px; }
-.outreach-workspace--embedded .outreach-return-summary { display:none; }
 @media(max-width:640px) { .outreach-workspace--embedded .outreach-editor { padding:16px; } }

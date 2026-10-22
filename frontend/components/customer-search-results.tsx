@@ -159,7 +159,7 @@ function CustomerDraftDialog({
         <button
           type="button"
           className="customer-draft-close"
-          aria-label={`Close ${title.charAt(0).toLowerCase()}${title.slice(1)}`}
+          aria-label={outreach ? `Close ${title}` : `Close ${title.charAt(0).toLowerCase()}${title.slice(1)}`}
           onClick={onClose}
         >
           <Icon name="close" size={19} />

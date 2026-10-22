@@ -113,6 +113,7 @@ it("opens exactly the selected company's existing review in place without genera
       .map(([path]) => path),
   ).toEqual(["/outreach"]);
   expect(dialog().textContent).toContain("No mailbox is connected");
+  expect(dialog().querySelector(".outreach-return-summary")).toBeNull();
 });
 
 it("retains private edits across close, another company, and reopen; restores trigger focus", async () => {

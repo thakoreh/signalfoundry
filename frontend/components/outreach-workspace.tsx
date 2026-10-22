@@ -1173,7 +1173,7 @@ export function OutreachWorkspace({
           )}
         </div>
       )}
-      <details className="outreach-return-summary"><summary>Progress and next review dates</summary><OutreachInsights revision={threads.reduce((total, item) => total + item.revision, 0)} /></details>
+      {!embedded && <details className="outreach-return-summary"><summary>Progress and next review dates</summary><OutreachInsights revision={threads.reduce((total, item) => total + item.revision, 0)} /></details>}
     </section>
   );
 }
