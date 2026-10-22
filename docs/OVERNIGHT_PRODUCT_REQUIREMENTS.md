@@ -4,6 +4,8 @@ Prepared October 19, 2026. This is input to the parent agent's integrated handof
 
 ## Product contract to preserve
 
+Current implementation evidence is docs/continuation/STATUS.md. Local reply suggestions now have separately gated, explicit, editable offline implementation; the historical starting-state table below does not imply that this code remains absent. The product still has no connected inbox/send/calendar acceptance or production readiness.
+
 Build for founders of **launched B2B SaaS** products with a definable business buyer. The intended product helps turn researched prospects into useful conversations and qualified meetings, with eventual sales outcomes measured. Lists, drafts, and exports are the foundation—not the whole vision. The differentiator to earn is a simple, trustworthy founder workflow that coordinates the work and reduces manual effort. Neither “AI agent” branding nor cheaper lead rows establishes differentiation or paid demand.
 
 The intended promise is **founder-approved outbound from a product website to qualified conversations**. Public copy must describe implemented capabilities and explicitly distinguish manual assistance from connected automation. Prospects ≠ positive replies ≠ booked meetings ≠ attended qualified meetings ≠ paying customers. Do not guarantee any recipient action or sales result.

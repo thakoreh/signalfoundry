@@ -2,7 +2,9 @@
 
 Prepared October 19, 2026 from the current repository and its release runbooks. This is a contribution to the overnight agent brief, not a claim that production can be guaranteed by morning. No implementation, deployment, provider request, account change, purchase, or external message was performed for this document.
 
-## Starting truth
+Current continuation source/status is docs/continuation/STATUS.md. The shared monetary ledger and optional local reply copilot are now implemented with offline evidence; actual history/pricing/authorization and full integration/Chrome acceptance are still missing. The original starting-truth snapshot below is historical and does not override current source or the owner contract.
+
+## Historical starting truth (October19)
 
 - Next.js is the SaaS gateway; verified Clerk organization identity and Convex are the intended hosted trust/data boundaries. SQLite is an unauthenticated, loopback-only local review system. Never expose it as the SaaS backend.
 - Website setup, bounded DeepSeek discovery, qualification, contact-status sorting, CSV, and explicitly requested AI introductions exist. Local provider configuration does not verify hosted configuration. Public emails remain unverified unless actual verification evidence exists.

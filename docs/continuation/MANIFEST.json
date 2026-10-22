@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "8ccf104be6f329dec5f142a968feeed90ea9ece4",
+  "application_checkpoint": "eea1d6c839a6001ac356378c4536639ea0d22ffc",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff and scoped reviews plus labelled historical evidence; no runtime/customer data or new complete Chrome acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -61,8 +61,8 @@
     },
     {
       "path": "RELEASE_HANDOFF.md",
-      "bytes": 9222,
-      "sha256": "cd9b7977d301680705d5d2f5cdcdbb151e3fe17b6e9d1cb8e15aec29334d4c02"
+      "bytes": 9827,
+      "sha256": "927935a87fb369a82de8720c31a52b426eac46417a5a0d14d09b8925deb23898"
     },
     {
       "path": "REPLY_COPILOT.md",
@@ -71,8 +71,8 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 19824,
-      "sha256": "8a14416fde6f36815efe607e334de1e414574251a5cbb71ce3163a112b2e5c4e"
+      "bytes": 19910,
+      "sha256": "2889d6f02d76951244e3333d1dd9971bb1a2479444b33e2deabe89dfa4f7525e"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -126,8 +126,8 @@
     },
     {
       "path": "reports/CONTINUATION_EVIDENCE.md",
-      "bytes": 2892,
-      "sha256": "bd17b4178ad12d83c4845b1201f42f32c1734493d2067a7d3ff8cdb7b27c6dc4"
+      "bytes": 3458,
+      "sha256": "cae8e8c532010a5d8fe43a285f4b229ba9a29e0f6c108a3121ff728de2085bec"
     },
     {
       "path": "reports/COST_REVIEW_ca43048.md",
@@ -205,6 +205,11 @@
       "sha256": "276fc0b4b8b565a3d96165c2b75a6f46ec98969faa937cd3afc3490c4d1f6308"
     },
     {
+      "path": "reports/SECURITY_REVIEW_REPLY_eea1d6c.md",
+      "bytes": 6452,
+      "sha256": "c59f5650110a546773978c0b2268607c68aca031c7de04ea056b6213e4027c31"
+    },
+    {
       "path": "reports/SECURITY_REVIEW_ab04a85.md",
       "bytes": 6857,
       "sha256": "c9b740dce63cc597c8d9d8225976114891471d01a11623f3b357e5f0babd9b38"
@@ -220,6 +225,11 @@
       "sha256": "101f53bed16ed2a44917d106ee674409d0111f80bfc9405a6d5b7f3153988c29"
     },
     {
+      "path": "reports/UX_SPEC_REVIEW_REPLY_eea1d6c.md",
+      "bytes": 5806,
+      "sha256": "2cafa73c90c333d4b71e0781b9bb0e94d8e78e5a28b6438a52950b9718d5b235"
+    },
+    {
       "path": "reports/UX_SPEC_REVIEW_ab04a85.md",
       "bytes": 7341,
       "sha256": "b530e34dc08e1c24839c1d2e07c571d000fc0f81fd90d7948bf9e151ea6cef7e"
@@ -230,5 +240,5 @@
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ],
-  "application_checkpoint_scope": "Previous fully checked pre-reply freeze. Current v2 reply rework follows48ccb1f; inspect current branch head and PROGRESS for exact independent re-review/CI state."
+  "application_checkpoint_scope": "Current application source with passing exact-head CI and scoped offline reply/cost/UX rechecks. Full Chrome, live/hosted and production acceptance remain incomplete."
 }
