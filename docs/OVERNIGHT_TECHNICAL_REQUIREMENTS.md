@@ -17,7 +17,7 @@ Current hosted lifecycle overlay: docs/continuation/HOSTED_LIFECYCLE.md records 
 
 ## Work order
 
-Current hosted implementation overlay: HOSTED_LEDGER.md (under docs/continuation) describes the default-off internal Convex manual-ledger prerequisites and their tests. They cover tenant/admin/expected-org, revision/idempotency, immutable approval/actual snapshots, sticky stops and manual reply/company review. This is partial source implementation only; complete lifecycle, privacy, global monetary coordination and adapter parity are still required. The public hosted outreach adapter remains closed, no live deployment/account test is claimed, and no offline flag grants deployment/spend/send authority.
+Current hosted implementation overlay: HOSTED_LEDGER.md/HOSTED_LIFECYCLE.md (under docs/continuation) describe default-off internal Convex ledger/lifecycle source and tests. They cover tenant/admin/expected-org, revision/idempotency, immutable approval/actual snapshots, sticky stops, manual reply/company review, fresh referrals, bounded dated followups, timed meetings/outcomes and returning projections. Repair82c8f28 addresses actual-source referral, unknown-provenance idempotency and effective historical/company-latest metrics. Hosted privacy/export/closure/retention, global monetary coordination, fully mapped UI/adapter parity and actual remote acceptance are still required. Public hosted outreach stays closed; no offline flag grants deployment/spend/send authority.
 
 ### P0 — Hosted ownership and complete persistence
 

@@ -1,5 +1,11 @@
 # CURRENT: portable continuation handoff — 2026-10-21
 
+## Lifecycle repair independently reaccepted within offline scope —82c8f28
+
+Exact application82c8f2848057064ad5d7f44bdf8c507517e32466 required source-checks/container-checks/GitGuardian all PASS, read back after run39706024805 completed. Both immutable rechecks pass: security131 offline tests (99 Convex including84 permanent+10 original unchanged+5 new;18 Python;14 adapter), focused strict copied types/hash34files; spec original unchanged42 and extended47 total, not89 distinct tests. They verify original self-referral/unknown repair failures plus genuine new contacts, immutable message/correction migration, company received recency, no-write/time/preflight/stop boundaries. No scoped actionable finding remains established in this repair; original failed reports remain archived. No full remote/Chrome/product acceptance is inferred.
+
+Root author236 backend/160 Convex/135 components/67 Node/typecheck/lint/production webpack build and real fresh-SQLite/owned-loopback HTTP/preflight5 PASS on the application source. Redacted staged35.5KB secret scan PASS before source checkpoint. Whole goal remains ACTIVE/INCOMPLETE: safe source work progressed this turn, not a repeated whole-goal blocker. Remaining useful implementation includes hosted privacy/retention/export/closure, fully mapped adapter/UI parity, shared hosted/local monetary authority and mailbox/outbox/operations prerequisites. Complete fresh Chrome still needs an allowed isolated method/profile; account/history/rate/provider authority remains absent. No paid or external-message/account/deploy/main/owner-data operation. A final report/manifest-only checkpoint requires its own exact CI, never borrowed82 green.
+
 ## Active continuation — independent lifecycle findings reproduced and repaired
 
 Exact23014d8 required source/container checks PASS in run39704999959, but two independent reviewers still reproduced four concrete issues: edited-parent self-referral to the actual inbound sender (both local and hosted), repeated unknown-provenance repair, erased earlier human replies after later OOO, and stale sibling company interest. Failed reports are preserved verbatim. New permanent RED controls reproduced all four hosted assertions and the local HTTP409 counterexample before repair; green CI was not used to dismiss them.

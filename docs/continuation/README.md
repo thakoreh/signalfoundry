@@ -6,7 +6,7 @@ Current continuation overlay: local referrals, bounded followups, timed meetings
 
 Read RELEASE_HANDOFF.md first for the current verdict, human inputs, exact tested source/checks and remaining acceptance limits.
 
-Hosted continuation now has internal, default-off manual-ledger prerequisites, described in HOSTED_LEDGER.md. It is partial implementation only; the hosted REST adapter remains unavailable. Local reply copilot remains separately default-off. Neither source feature implies live/provider/browser or whole-product acceptance. Preserve old reports and consult the latest PROGRESS/STATUS rather than rebuilding accepted local work.
+Hosted continuation now has internal, default-off manual-ledger and lifecycle source, described in HOSTED_LEDGER.md/HOSTED_LIFECYCLE.md: fresh referrals, bounded followups, timed meetings/outcomes, fresh preflight and returning projections. Repair82c8f28 addresses independent actual-source referral, unknown-source idempotency and funnel findings; latest PROGRESS records exact recheck/CI status. Hosted privacy/retention/export/closure, shared monetary authority and fully mapped adapter/UI parity remain unfinished, so the hosted REST adapter stays unavailable. Local reply copilot remains separately default-off. Neither source feature implies live/provider/browser or whole-product acceptance. Preserve failed baseline reports as well as passing rechecks.
 
 ## Start here
 

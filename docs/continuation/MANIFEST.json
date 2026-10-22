@@ -1,5 +1,5 @@
 {
-  "application_checkpoint": "132831f751f0fc5d2c7793d62b0923c387a31eb6",
+  "application_checkpoint": "82c8f2848057064ad5d7f44bdf8c507517e32466",
   "historical_screenshot_checkpoint": "c929cbaf0019909ff21bce3633f25842cf67c281",
   "scope": "Current continuation handoff and scoped reviews plus labelled historical evidence; no runtime/customer data or new complete Chrome acceptance.",
   "hash_basis": "Git index blobs, independent of working-copy CRLF; excludes this manifest.",
@@ -16,8 +16,13 @@
     },
     {
       "path": "HOSTED_LEDGER.md",
-      "bytes": 6832,
-      "sha256": "c729c90254d862d9e7841c9395998aa103d536f814633aca8c149f8dead2753a"
+      "bytes": 6696,
+      "sha256": "e918a7c05f80a3cd18079e84017cdaf4015b505c0ef00398d6b3d0abedf09602"
+    },
+    {
+      "path": "HOSTED_LIFECYCLE.md",
+      "bytes": 8634,
+      "sha256": "febcef11bf245be8aa8cbb4add9a46539f4016963ca383a018162c389be980f8"
     },
     {
       "path": "LEADPOET_REVIEW.md",
@@ -41,8 +46,8 @@
     },
     {
       "path": "LOCAL_SETUP.md",
-      "bytes": 9384,
-      "sha256": "f505f37e6723794a4b7548391bd6aa8f6ad2a5ba0de8072d06d2d20ca6847d09"
+      "bytes": 9437,
+      "sha256": "1a300626069202f056d415f17d9dbdc1557dbd58d5b395a55f9a00bf6cf5900c"
     },
     {
       "path": "MONETARY_SAFEGUARDS.md",
@@ -51,8 +56,8 @@
     },
     {
       "path": "NEXT_AGENT_PROMPT.md",
-      "bytes": 12846,
-      "sha256": "1ccf76f4fe86cf65a463652c3b15e359b7794a36aa076b2ae073160c87139540"
+      "bytes": 13174,
+      "sha256": "a2383c2215c9eaf7c9c04432ac96a59c204371773a42778aa40c0babf766dcdf"
     },
     {
       "path": "OWNER_CONTRACT.md",
@@ -61,13 +66,13 @@
     },
     {
       "path": "README.md",
-      "bytes": 8077,
-      "sha256": "69ea67ed6fba58e49023e77d66b4b06d73878df3e7faf24d4e5bfc632ff03d6c"
+      "bytes": 8410,
+      "sha256": "01d12fee927c25b7fbdd06683a780e110a3bb84d5f817989bdc0f08be4470cfc"
     },
     {
       "path": "RELEASE_HANDOFF.md",
-      "bytes": 11307,
-      "sha256": "25f0468972e40ca152329d8d2d4c16d9954945701aa58b21fa12ef56c3df575f"
+      "bytes": 13076,
+      "sha256": "dc9b7d771a0918744a3b03b937db7d124a53beeac401a2383c6eb4dcfdf741e4"
     },
     {
       "path": "REPLY_COPILOT.md",
@@ -76,8 +81,8 @@
     },
     {
       "path": "STATUS.md",
-      "bytes": 21125,
-      "sha256": "e3d57bcfee7550ca8b6c89666bfade6d280ec9c8414a159e91fbbcb9f1c1c68e"
+      "bytes": 22301,
+      "sha256": "fc392e60ffa8e307f034713fbd5c78f07f737b0e79cc12a8908aad3d33aa7c8f"
     },
     {
       "path": "evidence/backend/findings.jsonl",
@@ -185,6 +190,11 @@
       "sha256": "7d06c9c91ca1068624a09b363c5b98d930a9c4eee5b0e4670a7f2c55d41e3cdf"
     },
     {
+      "path": "reports/SECURITY_RECHECK_LIFECYCLE_82c8f28.md",
+      "bytes": 7627,
+      "sha256": "7b97ef049dff1999b0099a9b44bce6628357da1290276e27b4d97ffb2857f43c"
+    },
+    {
       "path": "reports/SECURITY_REVIEW_3befd3d.md",
       "bytes": 3273,
       "sha256": "6b41a6c93b6f0feb40a88c183d64f638c615dff1321fc0d559f407e29387b623"
@@ -215,6 +225,11 @@
       "sha256": "95a2218231ef0b0beb0b082bd1f0240073eb8796580094ec7d6eda72263e04f6"
     },
     {
+      "path": "reports/SECURITY_REVIEW_LIFECYCLE_23014d8.md",
+      "bytes": 10503,
+      "sha256": "6ca8c46b81c2f1053548c90e20abe5c7f889a1f50eb0ae72b81e9bd447439d4b"
+    },
+    {
       "path": "reports/SECURITY_REVIEW_REPLY_48ccb1f.md",
       "bytes": 8393,
       "sha256": "276fc0b4b8b565a3d96165c2b75a6f46ec98969faa937cd3afc3490c4d1f6308"
@@ -235,6 +250,11 @@
       "sha256": "37bd42549a640e5e36ff7fae4fa76316e73331b9c2f96ac0ebea68a706db6cd6"
     },
     {
+      "path": "reports/SPEC_RECHECK_LIFECYCLE_82c8f28.md",
+      "bytes": 5826,
+      "sha256": "1b4b117744a212e5b8ea5b21c005717d49fd5afd0b90c0ad5dd5b61af258e958"
+    },
+    {
       "path": "reports/SPEC_REVIEW_HOSTED_132831f.md",
       "bytes": 5061,
       "sha256": "37f2902a2bee68f913ea60a2cd2c74a8c5201abe9e9e26321b1d9314ac762cd9"
@@ -243,6 +263,11 @@
       "path": "reports/SPEC_REVIEW_HOSTED_4bf4621.md",
       "bytes": 8123,
       "sha256": "7d0bcbf8df38f86631073a8316e76b1fa125d68f47da041e6a832162cdb52537"
+    },
+    {
+      "path": "reports/SPEC_REVIEW_LIFECYCLE_23014d8.md",
+      "bytes": 8496,
+      "sha256": "300a203a2fc775fc8962818879f55763adb085c78402c98f64db89639685bd1a"
     },
     {
       "path": "reports/UX_SPEC_REVIEW_REPLY_48ccb1f.md",
@@ -265,5 +290,5 @@
       "sha256": "143da6f30e7bae64c299429af8b706ceeec1c76a3889861dd7f21880734faae7"
     }
   ],
-  "application_checkpoint_scope": "Internal gated hosted manual-ledger foundation and independently rechecked identity/default/date repair; exact application source CI passes. Full lifecycle/eligibility/clock/privacy/adapter parity, Chrome/live and production acceptance remain incomplete."
+  "application_checkpoint_scope": "Internal default-off hosted ledger/lifecycle and independently rechecked actual-source referral, unknown-source idempotency and effective reply/company metrics repairs. Application exact source/container CI passes; full hosted privacy/shared monetary/adapter/UI parity, fresh Chrome/live and production acceptance remain incomplete."
 }
